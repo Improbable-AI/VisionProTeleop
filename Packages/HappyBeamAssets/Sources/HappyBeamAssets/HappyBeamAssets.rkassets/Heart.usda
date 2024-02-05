@@ -1,0 +1,154 @@
+#usda 1.0
+(
+    defaultPrim = "Root"
+    metersPerUnit = 1
+    upAxis = "Y"
+)
+
+def Xform "Root"
+{
+    reorder nameChildren = ["heartLight", "Heart", "M_Heart"]
+    def "Heart" (
+        active = true
+        customData = {
+            float3 rotationEulerHint = (-1.5707963, 0, 0)
+        }
+        references = @heart_new.usdc@
+    )
+    {
+        quatf xformOp:orient = (0.70710677, -0.70710677, 0, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        float3 xformOp:translate = (0.09, 0.09, 0.09)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        over "heart_geo_geometry" (
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            reorder nameChildren = ["M_Heart"]
+            rel material:binding = </Root/Heart/heart_geo_geometry/M_Heart> (
+                bindMaterialAs = "weakerThanDescendants"
+            )
+
+            def Material "M_Heart" (
+                active = true
+            )
+            {
+                token inputs:frame:stPrimvarName = "st"
+                token outputs:mtlx:surface
+                token outputs:realitykit:vertex
+                prepend token outputs:surface.connect = </Root/Heart/heart_geo_geometry/M_Heart/UsdPreviewSurface.outputs:surface>
+
+                def Shader "UsdPreviewSurface" (
+                    active = true
+                )
+                {
+                    uniform token info:id = "UsdPreviewSurface"
+                    color3f inputs:diffuseColor = (0.18, 0.18, 0.18)
+                    color3f inputs:diffuseColor.connect = </Root/Heart/heart_geo_geometry/M_Heart/diffuseColor.outputs:rgb>
+                    color3f inputs:emissiveColor = (0, 0, 0)
+                    float inputs:metallic = 0
+                    float inputs:metallic.connect = </Root/Heart/heart_geo_geometry/M_Heart/metallic.outputs:r>
+                    normal3f inputs:normal = (0, 0, 1)
+                    normal3f inputs:normal.connect = </Root/Heart/heart_geo_geometry/M_Heart/normal.outputs:rgb>
+                    float inputs:occlusion = 1
+                    float inputs:occlusion.connect = </Root/Heart/heart_geo_geometry/M_Heart/occlusion.outputs:r>
+                    float inputs:roughness = 0.5
+                    float inputs:roughness.connect = </Root/Heart/heart_geo_geometry/M_Heart/roughness.outputs:r>
+                    token outputs:surface
+                }
+
+                def Shader "diffuseColor"
+                {
+                    uniform token info:id = "UsdUVTexture"
+                    asset inputs:file = @mat_heart_Base_color_1.png@
+                    float2 inputs:st.connect = </Root/Heart/heart_geo_geometry/M_Heart/diffuseColor/TexCoordReader.outputs:result>
+                    color3f outputs:rgb
+
+                    def Shader "TexCoordReader"
+                    {
+                        uniform token info:id = "UsdPrimvarReader_float2"
+                        token inputs:varname.connect = </Root/Heart/heart_geo_geometry/M_Heart/UsdPreviewSurface.inputs:frame:stPrimvarName>
+                        float2 outputs:result
+                    }
+                }
+
+                def Shader "roughness"
+                {
+                    uniform token info:id = "UsdUVTexture"
+                    asset inputs:file = @mat_heart_Roughness_1.png@
+                    float2 inputs:st.connect = </Root/Heart/heart_geo_geometry/M_Heart/roughness/TexCoordReader.outputs:result>
+                    float outputs:r
+
+                    def Shader "TexCoordReader"
+                    {
+                        uniform token info:id = "UsdPrimvarReader_float2"
+                        token inputs:varname.connect = </Root/Heart/heart_geo_geometry/M_Heart/UsdPreviewSurface.inputs:frame:stPrimvarName>
+                        float2 outputs:result
+                    }
+                }
+
+                def Shader "metallic"
+                {
+                    uniform token info:id = "UsdUVTexture"
+                    asset inputs:file = @mat_heart_Metallic_1.png@
+                    float2 inputs:st.connect = </Root/Heart/heart_geo_geometry/M_Heart/metallic/TexCoordReader.outputs:result>
+                    float outputs:r
+
+                    def Shader "TexCoordReader"
+                    {
+                        uniform token info:id = "UsdPrimvarReader_float2"
+                        token inputs:varname.connect = </Root/Heart/heart_geo_geometry/M_Heart/UsdPreviewSurface.inputs:frame:stPrimvarName>
+                        float2 outputs:result
+                    }
+                }
+
+                def Shader "normal"
+                {
+                    uniform token info:id = "UsdUVTexture"
+                    asset inputs:file = @mat_heart_Normal_1.png@
+                    float2 inputs:st.connect = </Root/Heart/heart_geo_geometry/M_Heart/normal/TexCoordReader.outputs:result>
+                    normal3f outputs:rgb
+
+                    def Shader "TexCoordReader"
+                    {
+                        uniform token info:id = "UsdPrimvarReader_float2"
+                        token inputs:varname.connect = </Root/Heart/heart_geo_geometry/M_Heart/UsdPreviewSurface.inputs:frame:stPrimvarName>
+                        float2 outputs:result
+                    }
+                }
+
+                def Shader "emissiveColor"
+                {
+                    uniform token info:id = "UsdUVTexture"
+                    asset inputs:file = @heartLight_M_heartLight_emissive.jpg@
+                    float2 inputs:st.connect = </Root/Heart/heart_geo_geometry/M_Heart/emissiveColor/TexCoordReader.outputs:result>
+                    color3f outputs:rgb
+
+                    def Shader "TexCoordReader"
+                    {
+                        uniform token info:id = "UsdPrimvarReader_float2"
+                        token inputs:varname.connect = </Root/Heart/heart_geo_geometry/M_Heart/UsdPreviewSurface.inputs:frame:stPrimvarName>
+                        float2 outputs:result
+                    }
+                }
+
+                def Shader "occlusion"
+                {
+                    uniform token info:id = "UsdUVTexture"
+                    asset inputs:file = @mat_heart_Mixed_AO_1.png@
+                    float2 inputs:st.connect = </Root/Heart/heart_geo_geometry/M_Heart/occlusion/TexCoordReader.outputs:result>
+                    float outputs:r
+
+                    def Shader "TexCoordReader"
+                    {
+                        uniform token info:id = "UsdPrimvarReader_float2"
+                        token inputs:varname.connect = </Root/Heart/heart_geo_geometry/M_Heart/UsdPreviewSurface.inputs:frame:stPrimvarName>
+                        float2 outputs:result
+                    }
+                }
+            }
+        }
+    }
+}
+

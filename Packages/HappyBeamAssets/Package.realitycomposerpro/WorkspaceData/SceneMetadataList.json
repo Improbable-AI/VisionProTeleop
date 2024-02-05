@@ -1,0 +1,811 @@
+{
+  "1C2BBE17-BE04-4F3C-AA19-CAA7798D8D3D" : {
+    "cameraTransform" : [
+      -0.95794987678527832,
+      -1.8758248288008872e-09,
+      0.28693538904190063,
+      0,
+      -0.0034207138232886791,
+      0.99992901086807251,
+      -0.011420249007642269,
+      0,
+      -0.28691506385803223,
+      -0.011921570636332035,
+      -0.9578818678855896,
+      0,
+      -0.28787413239479065,
+      0.027620401233434677,
+      -1.043994665145874,
+      1
+    ],
+    "objectMetadataList" : [
+      [
+        "1C2BBE17-BE04-4F3C-AA19-CAA7798D8D3D",
+        "Root",
+        "heart_new",
+        "heart_geo_geometry"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "1C2BBE17-BE04-4F3C-AA19-CAA7798D8D3D",
+        "Root"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "1C2BBE17-BE04-4F3C-AA19-CAA7798D8D3D",
+        "Root",
+        "Heart"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "1C2BBE17-BE04-4F3C-AA19-CAA7798D8D3D",
+        "Root",
+        "Heart",
+        "heart_geo_geometry"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      }
+    ]
+  },
+  "3A00D4E3-904C-4AFC-9B4B-E77ED416E7C9" : {
+    "cameraTransform" : [
+      0.73093640804290771,
+      -1.0669074512748011e-09,
+      0.68244558572769165,
+      0,
+      0.10799315571784973,
+      0.98739993572235107,
+      -0.11566654592752457,
+      0,
+      -0.6738467812538147,
+      0.15824432671070099,
+      0.72172647714614868,
+      0,
+      -2.2711150646209717,
+      1.8906793594360352,
+      2.3540012836456299,
+      1
+    ],
+    "objectMetadataList" : [
+      [
+        "3A00D4E3-904C-4AFC-9B4B-E77ED416E7C9",
+        "Root",
+        "heartTurret",
+        "heartTurret_geo_geometry_001"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "3A00D4E3-904C-4AFC-9B4B-E77ED416E7C9",
+        "Root"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "3A00D4E3-904C-4AFC-9B4B-E77ED416E7C9",
+        "Root",
+        "heartTurret"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      }
+    ]
+  },
+  "3D46857A-D11F-4C2A-88CF-9B6A3644D9D0" : {
+    "cameraTransform" : [
+      -0.28734534978866577,
+      -2.6611131033860147e-05,
+      0.95782703161239624,
+      0,
+      0.3669394850730896,
+      0.92370551824569702,
+      0.11010646820068359,
+      0,
+      -0.88475322723388672,
+      0.38310292363166809,
+      -0.26541253924369812,
+      0,
+      -1.8619006872177124,
+      1.5519758462905884,
+      -1.2445456981658936,
+      1
+    ],
+    "objectMetadataList" : [
+      [
+        "3D46857A-D11F-4C2A-88CF-9B6A3644D9D0",
+        "Root",
+        "HeartBeam",
+        "heartBeam_geo"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "3D46857A-D11F-4C2A-88CF-9B6A3644D9D0",
+        "Root",
+        "heartBeam2_7",
+        "heartBeam_geo"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "3D46857A-D11F-4C2A-88CF-9B6A3644D9D0",
+        "Root",
+        "HeartBeam_old"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "3D46857A-D11F-4C2A-88CF-9B6A3644D9D0",
+        "Root"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "3D46857A-D11F-4C2A-88CF-9B6A3644D9D0",
+        "Root",
+        "HeartBeam",
+        "M_HeartBlaster",
+        "debug_animate_beam"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "3D46857A-D11F-4C2A-88CF-9B6A3644D9D0",
+        "Root",
+        "HeartBeam",
+        "M_HeartBlaster"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "3D46857A-D11F-4C2A-88CF-9B6A3644D9D0",
+        "Root",
+        "heartLight_longer",
+        "M_HeartBlaster"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "3D46857A-D11F-4C2A-88CF-9B6A3644D9D0",
+        "Root",
+        "HeartBeam"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      }
+    ]
+  },
+  "9D769A97-8213-4A0A-9C67-83770550C4D5" : {
+    "cameraTransform" : [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0.86602544784545898,
+      -0.49999994039535522,
+      0,
+      0,
+      0.49999994039535522,
+      0.86602544784545898,
+      0,
+      0.090339638292789459,
+      1.186941385269165,
+      2.0267918109893799,
+      1
+    ],
+    "objectMetadataList" : [
+
+    ]
+  },
+  "9F2A50FF-E397-459E-9687-B2BA675FD8A4" : {
+    "cameraTransform" : [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0.86602538824081421,
+      -0.5,
+      0,
+      0,
+      0.5,
+      0.86602538824081421,
+      0,
+      0,
+      0.15370412170886993,
+      0.26622328162193298,
+      1
+    ],
+    "objectMetadataList" : [
+
+    ]
+  },
+  "0111CAB9-D9BB-428E-B589-823BC6A3C1FF" : {
+    "cameraTransform" : [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0.86602580547332764,
+      -0.49999937415122986,
+      0,
+      0,
+      0.49999937415122986,
+      0.86602580547332764,
+      0,
+      -0.56254655122756958,
+      4.9864215850830078,
+      5.5705685615539551,
+      1
+    ],
+    "objectMetadataList" : [
+      [
+        "0111CAB9-D9BB-428E-B589-823BC6A3C1FF",
+        "Root"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      }
+    ]
+  },
+  "41638A40-3F3C-42A4-8610-F00A7C47D32F" : {
+    "cameraTransform" : [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0.8660053014755249,
+      -0.5000348687171936,
+      0,
+      0,
+      0.5000348687171936,
+      0.8660053014755249,
+      0,
+      701.86370849609375,
+      135.97712707519531,
+      235.29985046386719,
+      1
+    ],
+    "objectMetadataList" : [
+      [
+        "41638A40-3F3C-42A4-8610-F00A7C47D32F",
+        "heartLight_005",
+        "heartLight_geo"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "41638A40-3F3C-42A4-8610-F00A7C47D32F",
+        "heartLight_005"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "41638A40-3F3C-42A4-8610-F00A7C47D32F",
+        "heartLight_005",
+        "heartLight_geo",
+        "heartLight_geo_geometry"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "41638A40-3F3C-42A4-8610-F00A7C47D32F",
+        "_materials"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      }
+    ]
+  },
+  "303016AD-4EF2-42DD-BFFC-26F346FA1405" : {
+    "cameraTransform" : [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0.86602544784545898,
+      -0.49999994039535522,
+      0,
+      0,
+      0.49999994039535522,
+      0.86602544784545898,
+      0,
+      0,
+      0.27093505859375,
+      0.46927335858345032,
+      1
+    ],
+    "objectMetadataList" : [
+
+    ]
+  },
+  "A1F5B4F1-E42D-40EB-87A8-55C9E76C7D42" : {
+    "cameraTransform" : [
+      0.99817818403244019,
+      -1.6964008864306379e-08,
+      -0.060334015637636185,
+      0,
+      0.0031620755326002836,
+      0.99862575531005859,
+      0.052313651889562607,
+      0,
+      0.060251057147979736,
+      -0.052409078925848007,
+      0.99680644273757935,
+      0,
+      0.17425596714019775,
+      0.33851608633995056,
+      0.91019415855407715,
+      1
+    ],
+    "objectMetadataList" : [
+      [
+        "A1F5B4F1-E42D-40EB-87A8-55C9E76C7D42",
+        "Root",
+        "UpdatedGrumpyScene2_1",
+        "cloud_002_anim",
+        "cloud_ref_root_jnt"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "A1F5B4F1-E42D-40EB-87A8-55C9E76C7D42",
+        "Root",
+        "UpdatedGrumpyScene2"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "A1F5B4F1-E42D-40EB-87A8-55C9E76C7D42",
+        "Root",
+        "UpdatedGrumpyScene2",
+        "RainbowBody"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "A1F5B4F1-E42D-40EB-87A8-55C9E76C7D42",
+        "Root",
+        "UpdatedGrumpyScene2_1",
+        "RainbowBody"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "A1F5B4F1-E42D-40EB-87A8-55C9E76C7D42",
+        "Root",
+        "UpdatedGrumpyScene2_1"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "A1F5B4F1-E42D-40EB-87A8-55C9E76C7D42",
+        "Root",
+        "UpdatedGrumpyScene2_1",
+        "cloud_002_anim",
+        "Materials"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "A1F5B4F1-E42D-40EB-87A8-55C9E76C7D42",
+        "Root",
+        "UpdatedGrumpyScene2",
+        "cloud_002_anim"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "A1F5B4F1-E42D-40EB-87A8-55C9E76C7D42",
+        "Root",
+        "UpdatedGrumpyScene2",
+        "RainbowBody",
+        "diffuse"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "A1F5B4F1-E42D-40EB-87A8-55C9E76C7D42",
+        "Root",
+        "UpdatedGrumpyScene2_1",
+        "RainbowBody",
+        "should_animate"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "A1F5B4F1-E42D-40EB-87A8-55C9E76C7D42",
+        "Root",
+        "UpdatedGrumpyScene2_1",
+        "cloud_002_anim"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "A1F5B4F1-E42D-40EB-87A8-55C9E76C7D42",
+        "Root",
+        "UpdatedGrumpyScene2",
+        "RainbowBody",
+        "should_animate"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "A1F5B4F1-E42D-40EB-87A8-55C9E76C7D42",
+        "Root"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "A1F5B4F1-E42D-40EB-87A8-55C9E76C7D42",
+        "Root",
+        "UpdatedGrumpyScene2",
+        "cloud_002_anim",
+        "cloud_ref_root_jnt"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      }
+    ]
+  },
+  "D69CB11A-0917-4549-A10A-6B5515B8FF7A" : {
+    "cameraTransform" : [
+      0.99593925476074219,
+      -2.1864547949945745e-09,
+      -0.090027652680873871,
+      0,
+      0.019044052809476852,
+      0.97737032175064087,
+      0.21067659556865692,
+      0,
+      0.087990336120128632,
+      -0.21153561770915985,
+      0.97340148687362671,
+      0,
+      -0.053632944822311401,
+      0.052359402179718018,
+      1.0187044143676758,
+      1
+    ],
+    "objectMetadataList" : [
+      [
+        "D69CB11A-0917-4549-A10A-6B5515B8FF7A",
+        "Root",
+        "UpdatedGrumpyScene2",
+        "Materials"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "D69CB11A-0917-4549-A10A-6B5515B8FF7A",
+        "Root",
+        "UpdatedGrumpyScene2",
+        "cloud_ref_004_root_jnt"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "D69CB11A-0917-4549-A10A-6B5515B8FF7A",
+        "Root",
+        "UpdatedGrumpyScene2",
+        "RainbowBody"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "D69CB11A-0917-4549-A10A-6B5515B8FF7A",
+        "Root",
+        "UpdatedGrumpyScene2",
+        "RainbowFace"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "D69CB11A-0917-4549-A10A-6B5515B8FF7A",
+        "Root",
+        "cloud_lod1_anim_001_2_10",
+        "cloud_ref_004_root_jnt"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "D69CB11A-0917-4549-A10A-6B5515B8FF7A",
+        "Root",
+        "UpdatedGrumpyScene2",
+        "Materials",
+        "RainbowFace"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "D69CB11A-0917-4549-A10A-6B5515B8FF7A",
+        "Root"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "D69CB11A-0917-4549-A10A-6B5515B8FF7A",
+        "Root",
+        "UpdatedGrumpyScene2",
+        "Materials",
+        "RainbowBody",
+        "emissive"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "D69CB11A-0917-4549-A10A-6B5515B8FF7A",
+        "Root",
+        "UpdatedGrumpyScene2",
+        "Materials",
+        "RainbowBody"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "D69CB11A-0917-4549-A10A-6B5515B8FF7A",
+        "Root",
+        "UpdatedGrumpyScene2",
+        "Materials",
+        "RainbowBody",
+        "diffuse"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "D69CB11A-0917-4549-A10A-6B5515B8FF7A",
+        "Root",
+        "cloud_lod1_anim_001_2_10",
+        "Materials"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "D69CB11A-0917-4549-A10A-6B5515B8FF7A",
+        "Root",
+        "UpdatedGrumpyScene2"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      }
+    ]
+  },
+  "E6525C04-8218-4AE7-986D-7FBA370DC12E" : {
+    "cameraTransform" : [
+      0.99629008769989014,
+      -9.0197374902345473e-08,
+      -0.08605869859457016,
+      0,
+      -0.042970426380634308,
+      0.86641979217529297,
+      -0.49746382236480713,
+      0,
+      0.074562989175319672,
+      0.49931624531745911,
+      0.86320537328720093,
+      0,
+      5.7455902099609375,
+      0.96756178140640259,
+      0.66487836837768555,
+      1
+    ],
+    "objectMetadataList" : [
+      [
+        "E6525C04-8218-4AE7-986D-7FBA370DC12E",
+        "Root",
+        "HeartBeam"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "E6525C04-8218-4AE7-986D-7FBA370DC12E",
+        "Root",
+        "HeartBeam",
+        "M_HeartBlaster"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "E6525C04-8218-4AE7-986D-7FBA370DC12E",
+        "Root"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      }
+    ]
+  },
+  "F9B07DEE-6F9A-4A44-9843-B8774502663A" : {
+    "cameraTransform" : [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0.8672250509262085,
+      -0.49791637063026428,
+      0,
+      0,
+      0.49791637063026428,
+      0.8672250509262085,
+      0,
+      2.455524206161499,
+      3.1404361724853516,
+      3.8123841285705566,
+      1
+    ],
+    "objectMetadataList" : [
+      [
+        "F9B07DEE-6F9A-4A44-9843-B8774502663A",
+        "Root"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "F9B07DEE-6F9A-4A44-9843-B8774502663A",
+        "Root",
+        "heartTurret"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      }
+    ]
+  },
+  "FB7FFA70-6DCF-4B0F-A512-C0760BFB4488" : {
+    "cameraTransform" : [
+      -0.55350339412689209,
+      -6.1638114857487381e-05,
+      -0.832846999168396,
+      0,
+      0.10505423694849014,
+      0.99200737476348877,
+      -0.069891653954982758,
+      0,
+      0.82619470357894897,
+      -0.12617941200733185,
+      -0.5490729808807373,
+      0,
+      5.795903205871582,
+      2.1196491718292236,
+      -3.936082124710083,
+      1
+    ],
+    "objectMetadataList" : [
+      [
+        "FB7FFA70-6DCF-4B0F-A512-C0760BFB4488",
+        "Root",
+        "heartLight"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "FB7FFA70-6DCF-4B0F-A512-C0760BFB4488",
+        "Root"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "FB7FFA70-6DCF-4B0F-A512-C0760BFB4488",
+        "Root",
+        "TurretHeart",
+        "M_TurretHeart"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "FB7FFA70-6DCF-4B0F-A512-C0760BFB4488",
+        "Root",
+        "heartLight",
+        "M_TurretHeart"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      }
+    ]
+  }
+}

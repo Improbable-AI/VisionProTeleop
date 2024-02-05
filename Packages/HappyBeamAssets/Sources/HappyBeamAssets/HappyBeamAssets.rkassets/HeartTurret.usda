@@ -1,0 +1,142 @@
+#usda 1.0
+(
+    defaultPrim = "Root"
+    metersPerUnit = 1
+    upAxis = "Y"
+)
+
+def Xform "Root"
+{
+    reorder nameChildren = ["heartTurret", "M_HeartTurret"]
+    def "heartTurret" (
+        active = true
+        customData = {
+            float3 rotationEulerHint = (-1.5707964, -1.1920929e-7, -1.5707959)
+        }
+        references = @heartTurret.usdc@
+    )
+    {
+        reorder nameChildren = ["heartTurret_geo_geometry_001", "M_HeartTurret"]
+        quatf xformOp:orient = (0.50000006, -0.5000001, 0.4999999, -0.49999994)
+        float3 xformOp:scale = (0.009999998, 0.009999999, 0.009999998)
+        float3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        def Material "M_HeartTurret" (
+            active = true
+        )
+        {
+            token inputs:frame:stPrimvarName = "st"
+            token outputs:mtlx:surface
+            token outputs:realitykit:vertex
+            prepend token outputs:surface.connect = </Root/heartTurret/M_HeartTurret/UsdPreviewSurface.outputs:surface>
+
+            def Shader "UsdPreviewSurface" (
+                active = true
+            )
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.18, 0.18, 0.18)
+                color3f inputs:diffuseColor.connect = </Root/heartTurret/M_HeartTurret/diffuseColor.outputs:rgb>
+                float inputs:metallic = 0
+                float inputs:metallic.connect = </Root/heartTurret/M_HeartTurret/metallic.outputs:r>
+                normal3f inputs:normal = (0, 0, 1)
+                normal3f inputs:normal.connect = </Root/heartTurret/M_HeartTurret/normal.outputs:rgb>
+                float inputs:roughness = 0.5
+                float inputs:roughness.connect = </Root/heartTurret/M_HeartTurret/roughness.outputs:r>
+                token outputs:surface
+            }
+
+            def Shader "diffuseColor"
+            {
+                uniform token info:id = "UsdUVTexture"
+                asset inputs:file = @M_heartTurret_baseColor_1.png@
+                float2 inputs:st.connect = </Root/heartTurret/M_HeartTurret/diffuseColor/TexCoordReader.outputs:result>
+                color3f outputs:rgb
+
+                def Shader "TexCoordReader"
+                {
+                    uniform token info:id = "UsdPrimvarReader_float2"
+                    token inputs:varname.connect = </Root/heartTurret/M_HeartTurret/UsdPreviewSurface.inputs:frame:stPrimvarName>
+                    float2 outputs:result
+                }
+            }
+
+            def Shader "roughness"
+            {
+                uniform token info:id = "UsdUVTexture"
+                asset inputs:file = @M_heartTurret_roughness_1.jpg@
+                float2 inputs:st.connect = </Root/heartTurret/M_HeartTurret/roughness/TexCoordReader.outputs:result>
+                float outputs:r
+
+                def Shader "TexCoordReader"
+                {
+                    uniform token info:id = "UsdPrimvarReader_float2"
+                    token inputs:varname.connect = </Root/heartTurret/M_HeartTurret/UsdPreviewSurface.inputs:frame:stPrimvarName>
+                    float2 outputs:result
+                }
+            }
+
+            def Shader "metallic"
+            {
+                uniform token info:id = "UsdUVTexture"
+                asset inputs:file = @M_heartTurret_metallic_1.jpg@
+                float2 inputs:st.connect = </Root/heartTurret/M_HeartTurret/metallic/TexCoordReader.outputs:result>
+                float outputs:r
+
+                def Shader "TexCoordReader"
+                {
+                    uniform token info:id = "UsdPrimvarReader_float2"
+                    token inputs:varname.connect = </Root/heartTurret/M_HeartTurret/UsdPreviewSurface.inputs:frame:stPrimvarName>
+                    float2 outputs:result
+                }
+            }
+
+            def Shader "normal"
+            {
+                uniform token info:id = "UsdUVTexture"
+                asset inputs:file = @M_heartTurret_normal_1.png@
+                float2 inputs:st.connect = </Root/heartTurret/M_HeartTurret/normal/TexCoordReader.outputs:result>
+                normal3f outputs:rgb
+
+                def Shader "TexCoordReader"
+                {
+                    uniform token info:id = "UsdPrimvarReader_float2"
+                    token inputs:varname.connect = </Root/heartTurret/M_HeartTurret/UsdPreviewSurface.inputs:frame:stPrimvarName>
+                    float2 outputs:result
+                }
+            }
+        }
+
+        over "heartTurret_geo_geometry_001" (
+            prepend apiSchemas = ["MaterialBindingAPI"]
+            customData = {
+                float3 rotationEulerHint = (-1.5707965, -1.490116e-7, -1.5707959)
+            }
+        )
+        {
+            rel material:binding = </Root/heartTurret/M_HeartTurret> (
+                bindMaterialAs = "weakerThanDescendants"
+            )
+
+            over "m_heartTurret_001" (
+                prepend apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                rel material:binding = </Root/heartTurret/M_HeartTurret> (
+                    bindMaterialAs = "weakerThanDescendants"
+                )
+            }
+
+            over "M_turretGems_001" (
+                prepend apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                rel material:binding = </Root/heartTurret/M_HeartTurret> (
+                    bindMaterialAs = "weakerThanDescendants"
+                )
+            }
+        }
+    }
+}
+

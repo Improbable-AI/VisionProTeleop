@@ -1,0 +1,391 @@
+#usda 1.0
+(
+    defaultPrim = "Root"
+    metersPerUnit = 1
+    upAxis = "Y"
+)
+
+def Xform "Root"
+{
+    def "UpdatedGrumpyScene2" (
+        active = true
+        references = @UpdatedGrumpyScene2.usdz@
+    )
+    {
+        float3 xformOp:scale = (1, 1, 1)
+        float3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        over "RainbowBody"
+        {
+            reorder nameChildren = ["MaterialXPreviewSurface", "oneminus", "saturate", "roughness", "occlusion", "normal", "diffuse", "emissive", "dot", "dot2", "dot3", "dot4", "should_animate", "UV0", "UV1"]
+            bool inputs:animate_texture (
+                customData = {
+                    dictionary realitykit = {
+                        float2 positionInSubgraph = (-778.69635, -619.689)
+                        float2 sizeInSubgraph = (169, 43)
+                        int stackingOrderInSubgraph = 6903
+                    }
+                }
+            )
+            float inputs:Rainbowfy = 0 (
+                customData = {
+                    dictionary realitykit = {
+                        float2 positionInSubgraph = (-1035.3308, -553.523)
+                        float2 sizeInSubgraph = (133, 43)
+                        int stackingOrderInSubgraph = 6339
+                    }
+                }
+            )
+            float inputs:saturation (
+                customData = {
+                    dictionary realitykit = {
+                        float2 positionInSubgraph = (-234.733, -547.65045)
+                        float2 sizeInSubgraph = (131, 43)
+                        int stackingOrderInSubgraph = 5747
+                    }
+                }
+            )
+            float2 ui:nodegraph:realitykit:subgraphOutputs:size = (181.5, 89)
+
+            over "MaterialXPreviewSurface"
+            {
+                float2 ui:nodegraph:node:size = (207.5, 297)
+            }
+
+            over "saturate"
+            {
+                float2 ui:nodegraph:node:size = (138.5, 135)
+                int ui:nodegraph:node:stackingOrder = 6899
+            }
+
+            over "roughness"
+            {
+                float2 inputs:texcoord.connect = </Root/UpdatedGrumpyScene2/RainbowBody/UV0.outputs:out>
+                float2 ui:nodegraph:node:size = (148.5, 189)
+                int ui:nodegraph:node:stackingOrder = 6548
+            }
+
+            over "dot"
+            {
+                float2 ui:nodegraph:node:size = (44, 18)
+            }
+
+            over "dot2"
+            {
+                float2 ui:nodegraph:node:size = (44, 18)
+            }
+
+            over "normal"
+            {
+                float3 inputs:default
+                float2 inputs:texcoord.connect = </Root/UpdatedGrumpyScene2/RainbowBody/UV0.outputs:out>
+                float2 ui:nodegraph:node:size = (148.5, 189)
+                int ui:nodegraph:node:stackingOrder = 6547
+                string[] ui:nodegraph:realitykit:node:attributesShowingChildren = ["inputs:uaddressmode", "inputs:texcoord", "inputs:uaddressmode"]
+            }
+
+            over "occlusion"
+            {
+                float2 inputs:texcoord.connect = </Root/UpdatedGrumpyScene2/RainbowBody/UV0.outputs:out>
+                float2 ui:nodegraph:node:size = (148.5, 189)
+            }
+
+            over "dot3"
+            {
+                float2 ui:nodegraph:node:size = (44, 18)
+            }
+
+            over "dot4"
+            {
+                float2 ui:nodegraph:node:size = (44, 18)
+            }
+
+            over "diffuse"
+            {
+                float inputs:rainbowfy (
+                    customData = {
+                        dictionary realitykit = {
+                            float2 positionInSubgraph = (330.09073, 337.35092)
+                            float2 sizeInSubgraph = (129.5, 43)
+                            int stackingOrderInSubgraph = 6898
+                        }
+                    }
+                )
+                float2 inputs:texture_coordinates (
+                    customData = {
+                        dictionary realitykit = {
+                            float2 positionInSubgraph = (-93.94474, -22.258865)
+                            float2 sizeInSubgraph = (193, 43)
+                            int stackingOrderInSubgraph = 6895
+                        }
+                    }
+                )
+                float2 ui:nodegraph:node:size = (148.5, 117)
+                int ui:nodegraph:node:stackingOrder = 6906
+                string[] ui:nodegraph:realitykit:node:attributesShowingChildren = ["inputs:rainbowfy", "inputs:rainbowfy"]
+                float2 ui:nodegraph:realitykit:subgraphOutputs:pos = (764.85815, 295.59732)
+                float2 ui:nodegraph:realitykit:subgraphOutputs:size = (195.74379, 71)
+                int ui:nodegraph:realitykit:subgraphOutputs:stackingOrder = 6897
+
+                over "mix"
+                {
+                    float2 ui:nodegraph:node:size = (109, 135)
+                }
+
+                over "rainbowDiffuse"
+                {
+                    float2 inputs:texcoord.connect = </Root/UpdatedGrumpyScene2/RainbowBody/diffuse.inputs:texture_coordinates>
+                    float2 ui:nodegraph:node:size = (148.5, 189)
+                }
+
+                over "grumpyDiffuse"
+                {
+                    float2 inputs:texcoord.connect = </Root/UpdatedGrumpyScene2/RainbowBody/diffuse/Texcoord_1.outputs:out>
+                    float2 ui:nodegraph:node:size = (148.5, 189)
+                    int ui:nodegraph:node:stackingOrder = 6893
+                }
+
+                def Shader "Texcoord_1"
+                {
+                    uniform token info:id = "ND_texcoord_vector2"
+                    float2 outputs:out
+                    float2 ui:nodegraph:node:pos = (-83.5517, 211.99309)
+                    float2 ui:nodegraph:node:size = (180.5, 43)
+                    int ui:nodegraph:node:stackingOrder = 6894
+                }
+            }
+
+            over "should_animate"
+            {
+                bool inputs:should_animate (
+                    customData = {
+                        dictionary realitykit = {
+                            float2 positionInSubgraph = (159.95312, 23.664062)
+                            float2 sizeInSubgraph = (167, 43)
+                            int stackingOrderInSubgraph = 5823
+                        }
+                    }
+                )
+                float2 inputs:texture_coordinates = (0, 0) (
+                    customData = {
+                        dictionary realitykit = {
+                            float2 positionInSubgraph = (281.192, 261.14487)
+                            float2 sizeInSubgraph = (193, 43)
+                            int stackingOrderInSubgraph = 5834
+                        }
+                    }
+                )
+                float2 inputs:texture_coordinates.connect = </Root/UpdatedGrumpyScene2/RainbowBody/UV1.outputs:out>
+                float2 ui:nodegraph:node:pos = (-570.0232, -626.9469)
+                float2 ui:nodegraph:node:size = (151, 117)
+                int ui:nodegraph:node:stackingOrder = 6911
+                float2 ui:nodegraph:realitykit:subgraphOutputs:pos = (1581.1615, 207.89091)
+                float2 ui:nodegraph:realitykit:subgraphOutputs:size = (207.55948, 71)
+                int ui:nodegraph:realitykit:subgraphOutputs:stackingOrder = 5836
+
+                over "multiply3"
+                {
+                    float2 ui:nodegraph:node:size = (60, 36)
+                }
+
+                over "subtract"
+                {
+                    float2 ui:nodegraph:node:size = (61.5, 36)
+                    string[] ui:nodegraph:realitykit:node:attributesShowingChildren = ["outputs:out"]
+                }
+
+                over "subtract2"
+                {
+                    float2 ui:nodegraph:node:size = (61.5, 36)
+                }
+
+                over "multiply2"
+                {
+                    float2 ui:nodegraph:node:size = (60, 36)
+                }
+
+                over "separate2"
+                {
+                    float2 inputs:in.connect = </Root/UpdatedGrumpyScene2/RainbowBody/should_animate.inputs:texture_coordinates>
+                    float2 ui:nodegraph:node:size = (113.5, 117)
+                }
+
+                over "floor"
+                {
+                    float2 ui:nodegraph:node:size = (116, 43)
+                }
+
+                over "multiply"
+                {
+                    float2 ui:nodegraph:node:size = (60, 36)
+                }
+
+                over "uvScale"
+                {
+                    float2 ui:nodegraph:node:size = (134, 43)
+                    int ui:nodegraph:node:stackingOrder = 5824
+                }
+
+                over "combine2"
+                {
+                    float2 ui:nodegraph:node:size = (142.5, 43)
+                }
+
+                over "time"
+                {
+                    float2 ui:nodegraph:node:pos = (466.68893, 95.5859)
+                    float2 ui:nodegraph:node:size = (124.5, 43)
+                    int ui:nodegraph:node:stackingOrder = 5833
+                }
+
+                over "convert"
+                {
+                    float2 ui:nodegraph:node:size = (133.5, 43)
+                    int ui:nodegraph:node:stackingOrder = 5830
+                }
+
+                over "texcoord" (
+                    active = false
+                )
+                {
+                    int inputs:index = 0
+                    float2 ui:nodegraph:node:pos = (554.6855, 326.8197)
+                    float2 ui:nodegraph:node:size = (180.5, 43)
+                    int ui:nodegraph:node:stackingOrder = 5837
+                }
+            }
+
+            over "emissive"
+            {
+                float inputs:rainbowfy (
+                    customData = {
+                        dictionary realitykit = {
+                            float2 positionInSubgraph = (81.20703, 310.0703)
+                            float2 sizeInSubgraph = (129.5, 43)
+                            int stackingOrderInSubgraph = 5795
+                        }
+                    }
+                )
+                float2 inputs:texture_coordinates = (0, 0) (
+                    customData = {
+                        dictionary realitykit = {
+                            float2 positionInSubgraph = (-533.2551, 177.10081)
+                            float2 sizeInSubgraph = (193, 43)
+                            int stackingOrderInSubgraph = 6470
+                        }
+                    }
+                )
+                float2 inputs:texture_coordinates.connect = </Root/UpdatedGrumpyScene2/RainbowBody/should_animate.outputs:texture_coordinates>
+                float2 ui:nodegraph:node:size = (148.5, 117)
+                int ui:nodegraph:node:stackingOrder = 6915
+                float2 ui:nodegraph:realitykit:subgraphOutputs:size = (200, 71)
+
+                over "mix2"
+                {
+                    float2 ui:nodegraph:node:size = (109, 135)
+                }
+
+                over "emissive_grumpy"
+                {
+                    color3f inputs:default
+                    float2 inputs:texcoord.connect = None
+                    float2 ui:nodegraph:node:size = (160.5, 189)
+                }
+
+                over "emissive_happy"
+                {
+                    color3f inputs:default
+                    float2 inputs:texcoord.connect = </Root/UpdatedGrumpyScene2/RainbowBody/emissive.inputs:texture_coordinates>
+                    string inputs:uaddressmode
+                    float2 ui:nodegraph:node:size = (151.5, 189)
+                }
+            }
+
+            over "oneminus" (
+                active = false
+            )
+            {
+                float2 ui:nodegraph:node:pos = (-60.04377, -555.14355)
+                float2 ui:nodegraph:node:size = (158, 99)
+                int ui:nodegraph:node:stackingOrder = 6902
+            }
+
+            def Shader "UV0"
+            {
+                uniform token info:id = "ND_texcoord_vector2"
+                float2 outputs:out
+                float2 ui:nodegraph:node:pos = (-477.8819, -138.40622)
+                float2 ui:nodegraph:node:size = (180.5, 43)
+                int ui:nodegraph:node:stackingOrder = 6908
+            }
+
+            def Shader "UV1"
+            {
+                uniform token info:id = "ND_texcoord_vector2"
+                int inputs:index = 1
+                float2 outputs:out
+                float2 ui:nodegraph:node:pos = (-837.79474, -529.65027)
+                float2 ui:nodegraph:node:size = (180.5, 43)
+                int ui:nodegraph:node:stackingOrder = 6914
+            }
+        }
+
+        over "RainbowFace"
+        {
+            float inputs:saturation (
+                customData = {
+                    dictionary realitykit = {
+                        float2 positionInSubgraph = (-148.70644, -517.1421)
+                        float2 sizeInSubgraph = (131, 43)
+                        int stackingOrderInSubgraph = 6466
+                    }
+                }
+            )
+            float2 ui:nodegraph:realitykit:subgraphOutputs:size = (181.5, 89)
+
+            over "MaterialXPreviewSurface"
+            {
+                color3f inputs:emissiveColor.connect = </Root/UpdatedGrumpyScene2/RainbowFace/saturate.outputs:out>
+                float2 ui:nodegraph:node:size = (207.5, 297)
+                string[] ui:nodegraph:realitykit:node:attributesShowingChildren = ["inputs:opacity", "inputs:normal", "inputs:diffuseColor", "Advanced", "inputs:opacity", "inputs:metallic", "inputs:emissiveColor"]
+            }
+
+            over "saturate"
+            {
+                float2 ui:nodegraph:node:size = (138.5, 135)
+            }
+
+            over "rainbowDiffuse"
+            {
+                float2 ui:nodegraph:node:size = (148.5, 189)
+            }
+
+            over "roughness"
+            {
+                float2 ui:nodegraph:node:size = (148.5, 189)
+            }
+
+            over "normal"
+            {
+                float2 ui:nodegraph:node:size = (148.5, 189)
+            }
+        }
+
+        over "cloud_002_anim"
+        {
+            over "cloud_ref_root_jnt"
+            {
+                over "cloud_ref_r_bottomEyelid_new_geometry" (
+                    prepend apiSchemas = ["MaterialBindingAPI"]
+                )
+                {
+                    rel material:binding = </Root/UpdatedGrumpyScene2/RainbowBody> (
+                        bindMaterialAs = "weakerThanDescendants"
+                    )
+                }
+            }
+        }
+    }
+}
+

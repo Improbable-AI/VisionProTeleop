@@ -1,0 +1,17 @@
+{
+  "pathsToIds" : {
+    "\/HappyBeamAssets\/Sources\/HappyBeamAssets\/HappyBeamAssets.rkassets\/Cloud.usda" : "A1F5B4F1-E42D-40EB-87A8-55C9E76C7D42",
+    "\/HappyBeamAssets\/Sources\/HappyBeamAssets\/HappyBeamAssets.rkassets\/Heart.usda" : "9D769A97-8213-4A0A-9C67-83770550C4D5",
+    "\/HappyBeamAssets\/Sources\/HappyBeamAssets\/HappyBeamAssets.rkassets\/HeartBeam.usd" : "9F2A50FF-E397-459E-9687-B2BA675FD8A4",
+    "\/HappyBeamAssets\/Sources\/HappyBeamAssets\/HappyBeamAssets.rkassets\/HeartBlaster.usda" : "3D46857A-D11F-4C2A-88CF-9B6A3644D9D0",
+    "\/HappyBeamAssets\/Sources\/HappyBeamAssets\/HappyBeamAssets.rkassets\/HeartLight.usda" : "FB7FFA70-6DCF-4B0F-A512-C0760BFB4488",
+    "\/HappyBeamAssets\/Sources\/HappyBeamAssets\/HappyBeamAssets.rkassets\/HeartTurret.usda" : "F9B07DEE-6F9A-4A44-9843-B8774502663A",
+    "\/HappyBeamAssets\/Sources\/HappyBeamAssets\/HappyBeamAssets.rkassets\/Scene.usda" : "303016AD-4EF2-42DD-BFFC-26F346FA1405",
+    "HappyBeamAssets\/Sources\/HappyBeamAssets\/HappyBeamAssets.rkassets\/Cloud.usda" : "D69CB11A-0917-4549-A10A-6B5515B8FF7A",
+    "HappyBeamAssets\/Sources\/HappyBeamAssets\/HappyBeamAssets.rkassets\/Heart.usda" : "1C2BBE17-BE04-4F3C-AA19-CAA7798D8D3D",
+    "HappyBeamAssets\/Sources\/HappyBeamAssets\/HappyBeamAssets.rkassets\/HeartBeam.usdc" : "41638A40-3F3C-42A4-8610-F00A7C47D32F",
+    "HappyBeamAssets\/Sources\/HappyBeamAssets\/HappyBeamAssets.rkassets\/HeartBlaster.usda" : "E6525C04-8218-4AE7-986D-7FBA370DC12E",
+    "HappyBeamAssets\/Sources\/HappyBeamAssets\/HappyBeamAssets.rkassets\/HeartLight.usda" : "0111CAB9-D9BB-428E-B589-823BC6A3C1FF",
+    "HappyBeamAssets\/Sources\/HappyBeamAssets\/HappyBeamAssets.rkassets\/HeartTurret.usda" : "3A00D4E3-904C-4AFC-9B4B-E77ED416E7C9"
+  }
+}

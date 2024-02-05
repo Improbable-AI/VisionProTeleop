@@ -1,0 +1,456 @@
+#usda 1.0
+(
+    defaultPrim = "Root"
+    metersPerUnit = 1
+    upAxis = "Y"
+)
+
+def Xform "Root"
+{
+    reorder nameChildren = ["HeartBeam", "HeartBeam_old"]
+    def "HeartBeam" (
+        active = true
+        customData = {
+            float3 rotationEulerHint = (0, 0, 0)
+        }
+        references = @heartLight_longer.usdc@
+    )
+    {
+        reorder nameChildren = ["heartLight2_geometry", "M_HeartBlaster"]
+        quatf xformOp:orient = (1, -1.0587914e-22, -2.9802326e-8, -3.552714e-15)
+        float3 xformOp:scale = (0.01, 0.01, 0.01)
+        float3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        def Material "M_HeartBlaster" (
+            active = true
+        )
+        {
+            reorder nameChildren = ["UsdPreviewSurface", "ramplr", "add4", "subtract3", "beam_length", "ifgreater2", "ifgreater3", "multiply2", "base_color", "dot2", "dot", "UnlitSurface_1", "debug_animate_beam", "Ifgreater", "Oneminus_1", "Multiply", "Dot_1", "Dot_2", "opacity_ramp", "uv_animate"]
+            float inputs:beam_position = 0.05 (
+                customData = {
+                    dictionary realitykit = {
+                        float2 positionInSubgraph = (-2518.832, 658.0897)
+                        float2 sizeInSubgraph = (160, 43)
+                        int stackingOrderInSubgraph = 6015
+                    }
+                }
+            )
+            float inputs:speed_multiplier = 0.2 (
+                customData = {
+                    dictionary realitykit = {
+                        float2 positionInSubgraph = (-1803.3237, -20.824205)
+                        float2 sizeInSubgraph = (172.5, 43)
+                        int stackingOrderInSubgraph = 6016
+                    }
+                }
+            )
+            token outputs:mtlx:surface.connect = </Root/HeartBeam/M_HeartBlaster/UnlitSurface_1.outputs:out>
+            token outputs:realitykit:vertex
+            token outputs:surface
+            float2 ui:nodegraph:realitykit:subgraphOutputs:pos = (10.340662, 222.4169)
+            float2 ui:nodegraph:realitykit:subgraphOutputs:size = (181.5, 89)
+            int ui:nodegraph:realitykit:subgraphOutputs:stackingOrder = 5977
+
+            def Shader "UsdPreviewSurface" (
+                active = true
+            )
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                token outputs:surface
+            }
+
+            def Shader "ramplr"
+            {
+                uniform token info:id = "ND_ramplr_float"
+                float2 inputs:texcoord
+                float inputs:valuel.connect = None
+                float inputs:valuer = 1.2
+                float outputs:out
+                float2 ui:nodegraph:node:pos = (-2286.9734, 91.6592)
+                float2 ui:nodegraph:node:size = (148.5, 135)
+                int ui:nodegraph:node:stackingOrder = 5625
+            }
+
+            def Shader "add4"
+            {
+                uniform token info:id = "ND_add_float"
+                float inputs:in1.connect = </Root/HeartBeam/M_HeartBlaster/Dot_1.outputs:out>
+                float inputs:in2.connect = </Root/HeartBeam/M_HeartBlaster/Dot_2.outputs:out>
+                float outputs:out
+                float2 ui:nodegraph:node:pos = (-1724.1621, 376.842)
+                float2 ui:nodegraph:node:size = (61.5, 36)
+                int ui:nodegraph:node:stackingOrder = 5550
+            }
+
+            def Shader "subtract3"
+            {
+                uniform token info:id = "ND_subtract_float"
+                float inputs:in1.connect = </Root/HeartBeam/M_HeartBlaster/Dot_1.outputs:out>
+                float inputs:in2.connect = None
+                float outputs:out
+                float2 ui:nodegraph:node:pos = (-1736.2444, 266.21658)
+                float2 ui:nodegraph:node:size = (61.5, 36)
+                int ui:nodegraph:node:stackingOrder = 5769
+            }
+
+            def Shader "beam_length"
+            {
+                uniform token info:id = "ND_constant_float"
+                float inputs:value = 0.25
+                float outputs:out
+                float2 ui:nodegraph:node:pos = (-2249.2295, 352.52444)
+                float2 ui:nodegraph:node:size = (166.5, 43)
+                int ui:nodegraph:node:stackingOrder = 5771
+            }
+
+            def Shader "ifgreater2"
+            {
+                uniform token info:id = "ND_ifgreater_float"
+                float inputs:in1 = 1
+                float inputs:in2 = 0
+                float inputs:value1.connect = </Root/HeartBeam/M_HeartBlaster/ramplr.outputs:out>
+                float inputs:value2.connect = </Root/HeartBeam/M_HeartBlaster/subtract3.outputs:out>
+                float outputs:out
+                float2 ui:nodegraph:node:pos = (-1510.1622, 162.3072)
+                float2 ui:nodegraph:node:size = (109.5, 153)
+                int ui:nodegraph:node:stackingOrder = 3360
+                string[] ui:nodegraph:realitykit:node:attributesShowingChildren = ["inputs:in2", "inputs:in1", "inputs:in2", "inputs:in1", "inputs:in1", "outputs:out", "inputs:in1"]
+            }
+
+            def Shader "ifgreater3"
+            {
+                uniform token info:id = "ND_ifgreater_float"
+                float inputs:in1 = 1
+                float inputs:in2 = 0
+                float inputs:value1.connect = </Root/HeartBeam/M_HeartBlaster/add4.outputs:out>
+                float inputs:value2.connect = </Root/HeartBeam/M_HeartBlaster/dot2.outputs:out>
+                float outputs:out
+                float2 ui:nodegraph:node:pos = (-1506.0737, 370.41928)
+                float2 ui:nodegraph:node:size = (109.5, 153)
+                int ui:nodegraph:node:stackingOrder = 3360
+            }
+
+            def Shader "multiply2"
+            {
+                uniform token info:id = "ND_multiply_float"
+                float inputs:in1.connect = </Root/HeartBeam/M_HeartBlaster/ifgreater2.outputs:out>
+                float inputs:in2.connect = </Root/HeartBeam/M_HeartBlaster/ifgreater3.outputs:out>
+                float outputs:out
+                float2 ui:nodegraph:node:pos = (-1327.1674, 240.57002)
+                float2 ui:nodegraph:node:size = (60, 36)
+                int ui:nodegraph:node:stackingOrder = 3360
+            }
+
+            def Shader "dot2"
+            {
+                uniform token info:id = "ND_dot_float"
+                float inputs:in.connect = </Root/HeartBeam/M_HeartBlaster/dot.outputs:out>
+                float outputs:out
+                float2 ui:nodegraph:node:pos = (-1702.7311, 490.45206)
+                float2 ui:nodegraph:node:size = (44, 18)
+                int ui:nodegraph:node:stackingOrder = 3360
+            }
+
+            def Shader "dot"
+            {
+                uniform token info:id = "ND_dot_float"
+                float inputs:in.connect = </Root/HeartBeam/M_HeartBlaster/ramplr.outputs:out>
+                float outputs:out
+                float2 ui:nodegraph:node:pos = (-1928.575, 492.51413)
+                float2 ui:nodegraph:node:size = (44, 18)
+                int ui:nodegraph:node:stackingOrder = 3360
+            }
+
+            def Shader "UnlitSurface_1"
+            {
+                uniform token info:id = "ND_realitykit_unlit_surfaceshader"
+                color3f inputs:color.connect = </Root/HeartBeam/M_HeartBlaster/Multiply.outputs:out>
+                bool inputs:hasPremultipliedAlpha
+                float inputs:opacity.connect = </Root/HeartBeam/M_HeartBlaster/Oneminus.outputs:out>
+                float inputs:opacityThreshold
+                token outputs:out
+                float2 ui:nodegraph:node:pos = (-165.8035, 172.1444)
+                float2 ui:nodegraph:node:size = (169.5, 171)
+                int ui:nodegraph:node:stackingOrder = 6011
+                string[] ui:nodegraph:realitykit:node:attributesShowingChildren = ["inputs:matchUnlitColor", "inputs:opacityThreshold"]
+            }
+
+            def NodeGraph "uv_animate"
+            {
+                float inputs:speed_multiplier = 0 (
+                    customData = {
+                        dictionary realitykit = {
+                            float2 positionInSubgraph = (-29.768684, 239.8743)
+                            float2 sizeInSubgraph = (172.5, 43)
+                            int stackingOrderInSubgraph = 3124
+                        }
+                    }
+                )
+                float inputs:speed_multiplier.connect = </Root/HeartBeam/M_HeartBlaster.inputs:speed_multiplier>
+                float2 outputs:texture_coordinates.connect = </Root/HeartBeam/M_HeartBlaster/uv_animate/combine2.outputs:out>
+                float2 ui:nodegraph:node:pos = (-1448.4315, -26.048662)
+                float2 ui:nodegraph:node:size = (130, 99)
+                int ui:nodegraph:node:stackingOrder = 5818
+                string[] ui:nodegraph:realitykit:node:attributesShowingChildren = ["outputs:combine2_out"]
+                float2 ui:nodegraph:realitykit:subgraphOutputs:pos = (1031.75, 87.5)
+                float2 ui:nodegraph:realitykit:subgraphOutputs:size = (207.5377, 71)
+
+                def Shader "separate2"
+                {
+                    uniform token info:id = "ND_separate2_vector2"
+                    float2 inputs:in.connect = </Root/HeartBeam/M_HeartBlaster/uv_animate/texcoord.outputs:out>
+                    float outputs:outx
+                    float outputs:outy
+                    float2 ui:nodegraph:node:pos = (500.75, 220.5)
+                    float2 ui:nodegraph:node:size = (113.5, 117)
+                    int ui:nodegraph:node:stackingOrder = 3118
+                }
+
+                def Shader "floor2"
+                {
+                    uniform token info:id = "ND_floor_float"
+                    float inputs:in.connect = </Root/HeartBeam/M_HeartBlaster/uv_animate/time2.outputs:out>
+                    float outputs:out
+                    float2 ui:nodegraph:node:pos = (293.75, 21.5)
+                    float2 ui:nodegraph:node:size = (123, 43)
+                    int ui:nodegraph:node:stackingOrder = 3118
+                }
+
+                def Shader "texcoord"
+                {
+                    uniform token info:id = "ND_texcoord_vector2"
+                    int inputs:index = 0
+                    float2 outputs:out
+                    float2 ui:nodegraph:node:pos = (293.75, 220.5)
+                    float2 ui:nodegraph:node:size = (180.5, 43)
+                    int ui:nodegraph:node:stackingOrder = 3118
+                }
+
+                def Shader "subtract2"
+                {
+                    uniform token info:id = "ND_subtract_float"
+                    float inputs:in1.connect = </Root/HeartBeam/M_HeartBlaster/uv_animate/multiply.outputs:out>
+                    float inputs:in2.connect = </Root/HeartBeam/M_HeartBlaster/uv_animate/floor2.outputs:out>
+                    float outputs:out
+                    float2 ui:nodegraph:node:pos = (500.75, 51.5)
+                    float2 ui:nodegraph:node:size = (61.5, 36)
+                    int ui:nodegraph:node:stackingOrder = 3118
+                }
+
+                def Shader "add"
+                {
+                    uniform token info:id = "ND_add_float"
+                    float inputs:in1.connect = </Root/HeartBeam/M_HeartBlaster/uv_animate/separate2.outputs:outx>
+                    float inputs:in2.connect = </Root/HeartBeam/M_HeartBlaster/uv_animate/subtract2.outputs:out>
+                    float outputs:out
+                    float2 ui:nodegraph:node:pos = (648.25, 57.5)
+                    float2 ui:nodegraph:node:size = (61.5, 36)
+                    int ui:nodegraph:node:stackingOrder = 3118
+                }
+
+                def Shader "time2"
+                {
+                    uniform token info:id = "ND_time_float"
+                    float outputs:out
+                    float2 ui:nodegraph:node:pos = (76.62657, 96.148224)
+                    float2 ui:nodegraph:node:size = (124.5, 43)
+                    int ui:nodegraph:node:stackingOrder = 3122
+                }
+
+                def Shader "multiply"
+                {
+                    uniform token info:id = "ND_multiply_float"
+                    float inputs:in1.connect = </Root/HeartBeam/M_HeartBlaster/uv_animate/time2.outputs:out>
+                    float inputs:in2.connect = </Root/HeartBeam/M_HeartBlaster/uv_animate.inputs:speed_multiplier>
+                    float outputs:out
+                    float2 ui:nodegraph:node:pos = (293.75, 121)
+                    float2 ui:nodegraph:node:size = (60, 36)
+                    int ui:nodegraph:node:stackingOrder = 3118
+                }
+
+                def Shader "combine2"
+                {
+                    uniform token info:id = "ND_combine2_vector2"
+                    float inputs:in1.connect = </Root/HeartBeam/M_HeartBlaster/uv_animate/add.outputs:out>
+                    float inputs:in2.connect = </Root/HeartBeam/M_HeartBlaster/uv_animate/separate2.outputs:outy>
+                    float2 outputs:out
+                    float2 ui:nodegraph:node:pos = (810.25, 87.5)
+                    float2 ui:nodegraph:node:size = (142.5, 43)
+                    int ui:nodegraph:node:stackingOrder = 3119
+                }
+            }
+
+            def NodeGraph "debug_animate_beam"
+            {
+                float outputs:animating_float.connect = </Root/HeartBeam/M_HeartBlaster/debug_animate_beam/multiply4.outputs:out>
+                float2 ui:nodegraph:node:pos = (-2534.511, 525.44543)
+                float2 ui:nodegraph:node:size = (191, 71)
+                int ui:nodegraph:node:stackingOrder = 6013
+                float2 ui:nodegraph:realitykit:subgraphOutputs:pos = (934.25, 86.25)
+                float2 ui:nodegraph:realitykit:subgraphOutputs:size = (167.5, 71)
+                int ui:nodegraph:realitykit:subgraphOutputs:stackingOrder = 3068
+
+                def Shader "multiply4"
+                {
+                    uniform token info:id = "ND_multiply_float"
+                    float inputs:in1.connect = </Root/HeartBeam/M_HeartBlaster/debug_animate_beam/subtract4.outputs:out>
+                    float inputs:in2.connect = </Root/HeartBeam/M_HeartBlaster/debug_animate_beam/time_multiplier.outputs:out>
+                    float outputs:out
+                    float2 ui:nodegraph:node:pos = (756, 86.25)
+                    float2 ui:nodegraph:node:size = (60, 36)
+                    int ui:nodegraph:node:stackingOrder = 3067
+                }
+
+                def Shader "time_multiplier"
+                {
+                    uniform token info:id = "ND_constant_float"
+                    float inputs:value = 2
+                    float outputs:out
+                    float2 ui:nodegraph:node:pos = (577, 160.5)
+                    float2 ui:nodegraph:node:size = (178, 43)
+                    int ui:nodegraph:node:stackingOrder = 3069
+                }
+
+                def Shader "floor3"
+                {
+                    uniform token info:id = "ND_floor_float"
+                    float inputs:in.connect = </Root/HeartBeam/M_HeartBlaster/debug_animate_beam/time3.outputs:out>
+                    float outputs:out
+                    float2 ui:nodegraph:node:pos = (366.25, 21.5)
+                    float2 ui:nodegraph:node:size = (123.5, 43)
+                    int ui:nodegraph:node:stackingOrder = 3067
+                }
+
+                def Shader "subtract4"
+                {
+                    uniform token info:id = "ND_subtract_float"
+                    float inputs:in1.connect = </Root/HeartBeam/M_HeartBlaster/debug_animate_beam/time3.outputs:out>
+                    float inputs:in2.connect = </Root/HeartBeam/M_HeartBlaster/debug_animate_beam/floor3.outputs:out>
+                    float outputs:out
+                    float2 ui:nodegraph:node:pos = (577, 51.5)
+                    float2 ui:nodegraph:node:size = (61.5, 36)
+                    int ui:nodegraph:node:stackingOrder = 3067
+                }
+
+                def Shader "time3"
+                {
+                    uniform token info:id = "ND_time_float"
+                    float outputs:out
+                    float2 ui:nodegraph:node:pos = (62.25, 39.5)
+                    float2 ui:nodegraph:node:size = (124.5, 43)
+                    int ui:nodegraph:node:stackingOrder = 3067
+                }
+            }
+
+            def Shader "Ifgreater"
+            {
+                uniform token info:id = "ND_ifgreater_float"
+                float inputs:in1 = 1
+                float inputs:in2 = 0.05
+                float inputs:value1.connect = </Root/HeartBeam/M_HeartBlaster/multiply2.outputs:out>
+                float inputs:value2
+                float outputs:out
+                float2 ui:nodegraph:node:pos = (-1098.1992, 243.66016)
+                float2 ui:nodegraph:node:size = (109, 153)
+                int ui:nodegraph:node:stackingOrder = 5944
+                string[] ui:nodegraph:realitykit:node:attributesShowingChildren = ["inputs:in2", "inputs:value2", "inputs:in1", "inputs:in2"]
+            }
+
+            def Shader "Oneminus_1"
+            {
+                uniform token info:id = "ND_realitykit_oneminus_float"
+                float inputs:in.connect = </Root/HeartBeam/M_HeartBlaster.inputs:beam_position>
+                float outputs:out
+                float2 ui:nodegraph:node:pos = (-2175.0967, 538.36383)
+                float2 ui:nodegraph:node:size = (158, 99)
+                int ui:nodegraph:node:stackingOrder = 5795
+            }
+
+            def Shader "Multiply"
+            {
+                uniform token info:id = "ND_multiply_color3FA"
+                color3f inputs:in1.connect = </Root/HeartBeam/M_HeartBlaster/base_color.outputs:out>
+                float inputs:in2.connect = </Root/HeartBeam/M_HeartBlaster/Ifgreater.outputs:out>
+                color3f outputs:out
+                float2 ui:nodegraph:node:pos = (-947.3545, 103.53442)
+                float2 ui:nodegraph:node:size = (60, 36)
+                int ui:nodegraph:node:stackingOrder = 5961
+            }
+
+            def Shader "Dot_1"
+            {
+                uniform token info:id = "ND_dot_float"
+                float inputs:in.connect = </Root/HeartBeam/M_HeartBlaster/Oneminus_1.outputs:out>
+                float outputs:out
+                float2 ui:nodegraph:node:pos = (-1990.2073, 568.592)
+                float2 ui:nodegraph:node:size = (44, 18)
+                int ui:nodegraph:node:stackingOrder = 5793
+            }
+
+            def Shader "Dot_2"
+            {
+                uniform token info:id = "ND_dot_float"
+                float inputs:in.connect = </Root/HeartBeam/M_HeartBlaster/beam_length.outputs:out>
+                float outputs:out
+                float2 ui:nodegraph:node:pos = (-1924.1876, 339.45676)
+                float2 ui:nodegraph:node:size = (44, 18)
+                int ui:nodegraph:node:stackingOrder = 5705
+            }
+
+            def Shader "base_color"
+            {
+                uniform token info:id = "ND_image_color3"
+                color3f inputs:default
+                asset inputs:file = @heartBeam_basecolor_1.png@
+                string inputs:filtertype
+                float2 inputs:texcoord.connect = </Root/HeartBeam/M_HeartBlaster/uv_animate.outputs:texture_coordinates>
+                string inputs:uaddressmode
+                string inputs:vaddressmode
+                color3f outputs:out
+                float2 ui:nodegraph:node:pos = (-1132.4176, 7.4389143)
+                float2 ui:nodegraph:node:size = (148.5, 189)
+                int ui:nodegraph:node:stackingOrder = 5799
+            }
+
+            def Shader "opacity_ramp"
+            {
+                uniform token info:id = "ND_image_float"
+                float inputs:default
+                asset inputs:file = @new_heart_ramp.png@
+                string inputs:filtertype
+                float2 inputs:texcoord
+                string inputs:uaddressmode
+                string inputs:vaddressmode
+                float outputs:out
+                float2 ui:nodegraph:node:pos = (-1271.6516, 421.64172)
+                float2 ui:nodegraph:node:size = (148.5, 189)
+                int ui:nodegraph:node:stackingOrder = 6010
+                string[] ui:nodegraph:realitykit:node:attributesShowingChildren = ["inputs:default"]
+            }
+
+            def Shader "Oneminus"
+            {
+                uniform token info:id = "ND_realitykit_oneminus_float"
+                float inputs:in.connect = </Root/HeartBeam/M_HeartBlaster/opacity_ramp.outputs:out>
+                float outputs:out
+                float2 ui:nodegraph:node:pos = (-900.6466, 448.6939)
+                float2 ui:nodegraph:node:size = (158, 99)
+                int ui:nodegraph:node:stackingOrder = 5964
+            }
+        }
+
+        over "heartLight2_geometry" (
+            prepend apiSchemas = ["MaterialBindingAPI"]
+            customData = {
+                float3 rotationEulerHint = (0, 0, 0)
+            }
+        )
+        {
+            rel material:binding = </Root/HeartBeam/M_HeartBlaster> (
+                bindMaterialAs = "weakerThanDescendants"
+            )
+        }
+    }
+}
+
