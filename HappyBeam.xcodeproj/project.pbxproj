@@ -38,6 +38,10 @@
 		32BD3B6A299C2729005798DF /* Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32BD3B69299C2729005798DF /* Extensions.swift */; };
 		32C96CBF2A2FED900030AA37 /* Packages in Resources */ = {isa = PBXBuildFile; fileRef = 32C96CBE2A2FED900030AA37 /* Packages */; };
 		32D0FA0F291EE85800FF07D8 /* HappyBeamSpace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32D0FA0E291EE85800FF07D8 /* HappyBeamSpace.swift */; };
+		C11EC0572B7A9B2C0092646F /* GRPC in Frameworks */ = {isa = PBXBuildFile; productRef = C11EC0562B7A9B2C0092646F /* GRPC */; };
+		C11EC0592B7A9B8C0092646F /* protoc-gen-grpc-swift in Frameworks */ = {isa = PBXBuildFile; productRef = C11EC0582B7A9B8C0092646F /* protoc-gen-grpc-swift */; };
+		C11EC0662B7A9E4F0092646F /* hand.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = C11EC0632B7A9DD90092646F /* hand.pb.swift */; };
+		C11EC0672B7A9E520092646F /* hand.grpc.swift in Sources */ = {isa = PBXBuildFile; fileRef = C11EC0622B7A9DD90092646F /* hand.grpc.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -78,6 +82,8 @@
 		32D0FA0E291EE85800FF07D8 /* HappyBeamSpace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HappyBeamSpace.swift; sourceTree = "<group>"; };
 		69D019E13699007BC04C1F1F /* SampleCode.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = SampleCode.xcconfig; path = Configuration/SampleCode.xcconfig; sourceTree = "<group>"; };
 		9823BBED79461E85755AF17F /* LICENSE.txt */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text; path = LICENSE.txt; sourceTree = "<group>"; };
+		C11EC0622B7A9DD90092646F /* hand.grpc.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = hand.grpc.swift; sourceTree = "<group>"; };
+		C11EC0632B7A9DD90092646F /* hand.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = hand.pb.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -85,7 +91,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C11EC0572B7A9B2C0092646F /* GRPC in Frameworks */,
 				321C68312A2FEF1C00721BA7 /* HappyBeamAssets in Frameworks */,
+				C11EC0592B7A9B8C0092646F /* protoc-gen-grpc-swift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -180,6 +188,8 @@
 		32791FAF2A30CEF3000290A2 /* Gameplay */ = {
 			isa = PBXGroup;
 			children = (
+				C11EC0622B7A9DD90092646F /* hand.grpc.swift */,
+				C11EC0632B7A9DD90092646F /* hand.pb.swift */,
 				32791FB02A30CF24000290A2 /* BeamCollisions.swift */,
 				32665A94299AAFE200EBA549 /* Clouds.swift */,
 				322C5442291D892800C32983 /* HeartGestureModel.swift */,
@@ -233,6 +243,8 @@
 			name = HappyBeam;
 			packageProductDependencies = (
 				321C68302A2FEF1C00721BA7 /* HappyBeamAssets */,
+				C11EC0562B7A9B2C0092646F /* GRPC */,
+				C11EC0582B7A9B8C0092646F /* protoc-gen-grpc-swift */,
 			);
 			productName = HappyBeamX;
 			productReference = 321A0C0B291C02B80042A987 /* HappyBeam.app */;
@@ -263,6 +275,9 @@
 				Base,
 			);
 			mainGroup = 321A0C02291C02B70042A987;
+			packageReferences = (
+				C11EC0552B7A9B2B0092646F /* XCRemoteSwiftPackageReference "grpc-swift" */,
+			);
 			productRefGroup = 321A0C0C291C02B80042A987 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -300,6 +315,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C11EC0672B7A9E520092646F /* hand.grpc.swift in Sources */,
+				C11EC0662B7A9E4F0092646F /* hand.pb.swift in Sources */,
 				32665A97299AB02200EBA549 /* Lobby.swift in Sources */,
 				321A0C13291C02B80042A987 /* HappyBeamApp.swift in Sources */,
 				322C5443291D892800C32983 /* HeartGestureModel.swift in Sources */,
@@ -453,7 +470,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "$(TARGET_NAME)/Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "Happy Beam";
+				INFOPLIST_KEY_CFBundleDisplayName = DexterousTeleop;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -461,7 +478,7 @@
 				);
 				MARKETING_VERSION = 1.0;
 				ONLY_ACTIVE_ARCH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.example.apple-samplecode.happybeam${SAMPLE_CODE_DISAMBIGUATOR}";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.younghyo.apple-samplecode.happybeam--SAMPLE-CODE-DISAMBIGUATOR-";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = xros;
@@ -486,7 +503,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "$(TARGET_NAME)/Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "Happy Beam";
+				INFOPLIST_KEY_CFBundleDisplayName = DexterousTeleop;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -494,7 +511,7 @@
 				);
 				MARKETING_VERSION = 1.0;
 				ONLY_ACTIVE_ARCH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.example.apple-samplecode.happybeam${SAMPLE_CODE_DISAMBIGUATOR}";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.younghyo.apple-samplecode.happybeam--SAMPLE-CODE-DISAMBIGUATOR-";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = xros;
@@ -528,10 +545,31 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		C11EC0552B7A9B2B0092646F /* XCRemoteSwiftPackageReference "grpc-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/grpc/grpc-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.21.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		321C68302A2FEF1C00721BA7 /* HappyBeamAssets */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = HappyBeamAssets;
+		};
+		C11EC0562B7A9B2C0092646F /* GRPC */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C11EC0552B7A9B2B0092646F /* XCRemoteSwiftPackageReference "grpc-swift" */;
+			productName = GRPC;
+		};
+		C11EC0582B7A9B8C0092646F /* protoc-gen-grpc-swift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C11EC0552B7A9B2B0092646F /* XCRemoteSwiftPackageReference "grpc-swift" */;
+			productName = "protoc-gen-grpc-swift";
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

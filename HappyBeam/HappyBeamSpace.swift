@@ -86,6 +86,7 @@ struct HappyBeamSpace: View {
             }
         } update: { updateContent in
             let handsCenterTransform = gestureModel.computeTransformOfUserPerformedHeartGesture()
+            var x = gestureModel.streamHandUpdatesToServer()
             if let handsCenter = handsCenterTransform {
                 let position = Pose3D(handsCenter)!.position
                 let rotation = Pose3D(handsCenter)!.rotation

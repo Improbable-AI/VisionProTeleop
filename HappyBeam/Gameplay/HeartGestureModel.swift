@@ -7,6 +7,9 @@ Hand tracking updates.
 
 import ARKit
 import SwiftUI
+import GRPC
+import NIO
+
 
 /// A model that contains up-to-date hand coordinate information.
 @MainActor
@@ -14,7 +17,8 @@ class HeartGestureModel: ObservableObject, @unchecked Sendable {
     let session = ARKitSession()
     var handTracking = HandTrackingProvider()
     @Published var latestHandTracking: HandsUpdates = .init(left: nil, right: nil)
-    
+    var grpcClient: GrpcClient?
+
     struct HandsUpdates {
         var left: HandAnchor?
         var right: HandAnchor?
@@ -97,6 +101,8 @@ class HeartGestureModel: ObservableObject, @unchecked Sendable {
             return nil
         }
         
+        print(leftHandThumbKnuckle, leftHandThumbTipPosition)
+        
         // Get the position of all joints in world coordinates.
         let originFromLeftHandThumbKnuckleTransform = matrix_multiply(
             leftHandAnchor.originFromAnchorTransform, leftHandThumbKnuckle.anchorFromJointTransform
@@ -147,5 +153,43 @@ class HeartGestureModel: ObservableObject, @unchecked Sendable {
             SIMD4(heartMidpoint.x, heartMidpoint.y, heartMidpoint.z, 1)
         )
         return heartMidpointWorldTransform
+    }
+}
+
+
+class GrpcClient {
+    var client: Handtracking_HandTrackingServiceNIOClient?
+    var call: BidirectionalStreamingCall<Handtracking_HandUpdate, Handtracking_HandUpdateAck>?
+
+    init() {
+        let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        let channel = ClientConnection.insecure(group: group).connect(host: "0.0.0.0", port: 50051)
+        client = Handtracking_HandTrackingServiceNIOClient(channel: channel)
+        call = client?.streamHandUpdates(handler: { ack in
+            print("Received ack: \(ack.message)")
+        })
+    }
+
+    func sendHandUpdate(_ update: Handtracking_HandUpdate) {
+        call?.sendMessage(update, promise: nil)
+    }
+}
+
+// Extend HeartGestureModel to include GrpcClient
+extension HeartGestureModel {
+
+    func setupGrpcClient() {
+        grpcClient = GrpcClient()
+    }
+
+    func streamHandUpdatesToServer() {
+        // Example to send a dummy hand update, integrate with actual hand tracking update logic
+        var handUpdate = Handtracking_HandUpdate()
+        handUpdate.leftHand.x = 0.1  // Populate with actual data
+        handUpdate.leftHand.y = 0.2 // Populate with actual data
+        // ... set other fields
+        print("updating hand")
+
+        grpcClient?.sendHandUpdate(handUpdate)
     }
 }

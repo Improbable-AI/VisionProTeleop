@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package handtracking;
+
+// The hand tracking information message.
+message HandUpdate {
+  message Hand {
+    float x = 1;
+    float y = 2;
+    float z = 3;
+    float qx = 4;
+    float qy = 5;
+    float qz = 6;
+    float qw = 7;
+  }
+  Hand left_hand = 1;
+  Hand right_hand = 2;
+}
+
+// The hand tracking service definition.
+service HandTrackingService {
+  // Sends a stream of hand updates from the client (Swift) to the server (Python)
+  rpc StreamHandUpdates (stream HandUpdate) returns (stream HandUpdateAck) {}
+}
+
+message HandUpdateAck {
+  string message = 1;
+}
+
