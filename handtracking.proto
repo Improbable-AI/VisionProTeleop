@@ -19,11 +19,9 @@ message HandUpdate {
 
 // The hand tracking service definition.
 service HandTrackingService {
-  // Sends a stream of hand updates from the client (Swift) to the server (Python)
-  rpc StreamHandUpdates (stream HandUpdate) returns (stream HandUpdateAck) {}
+  rpc StreamHandUpdates(HandUpdate) returns (stream HandUpdate) {}
 }
 
 message HandUpdateAck {
   string message = 1;
 }
-
