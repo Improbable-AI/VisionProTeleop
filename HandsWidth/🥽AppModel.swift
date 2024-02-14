@@ -117,7 +117,7 @@ fileprivate extension 🥽AppModel {
 
             case .right:
                 DispatchQueue.main.async {
-                    DataManager.shared.latestHandTrackingData.leftWrist = handAnchor.originFromAnchorTransform
+                    DataManager.shared.latestHandTrackingData.rightWrist = handAnchor.originFromAnchorTransform
                     
                     let jointTypes: [HandSkeleton.JointName] = [
                         .indexFingerTip, .indexFingerKnuckle, .indexFingerMetacarpal, .indexFingerIntermediateTip, .indexFingerIntermediateBase,
