@@ -36,6 +36,7 @@ class 🥽AppModel: ObservableObject {
     
     private let session = ARKitSession()
     private let handTracking = HandTrackingProvider()
+    private let worldTracking = WorldTrackingProvider()
 
     let rootEntity = Entity()
 //    private let lineEntity = 🧩Entity.line()
@@ -70,7 +71,7 @@ extension 🥽AppModel {
         Task {
             @MainActor in
             do {
-                try await self.session.run([self.handTracking])
+                try await self.session.run([self.handTracking, self.worldTracking])
                 await self.processHandUpdates();
             } catch {
                 print(error)
@@ -82,14 +83,30 @@ extension 🥽AppModel {
 
     func startserver() {
         Task { startServer() }
+//        Task { await self.processDeviceUpdates() }
     }
+    
 }
 
 fileprivate extension 🥽AppModel {
+    
+//    private func processDeviceUpdates() async {
+//        for await update in self.worldTracking.anchorUpdates {
+//            
+//            guard let device_pose = self.worldTracking.queryDeviceAnchor(atTimestamp: TimeInterval(0.0)), device_pose.isTracked else {
+//                continue
+//            }
+//            print("device_pose: ", device_pose.originFromAnchorTransform)
+//        }
+//    }
+    
     private func processHandUpdates() async {
         for await update in self.handTracking.anchorUpdates {
             let handAnchor = update.anchor
-            
+//            guard let device_pose = self.worldTracking.queryDeviceAnchor(atTimestamp: TimeInterval(0.0)), device_pose.isTracked else {
+//                continue
+//            }
+//            print("device_pose: ", device_pose.originFromAnchorTransform)
             print("processHandUpates is running.")
             switch handAnchor.chirality {
             case .left:

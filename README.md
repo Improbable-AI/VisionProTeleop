@@ -1,8 +1,10 @@
 VisionProTeleop
 ===========
 
+![](assets/main.png)
+
 Wanna use your new Apple Vision Pro to control your robot?  Wanna record your manipulation demos? 
- 
+
 This app streams your 
 
 1. Hand (Wrist + Finger) Tracking
