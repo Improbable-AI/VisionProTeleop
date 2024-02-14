@@ -23,7 +23,6 @@ def run(args):
         # Correctly invoking a server-streaming RPC
         responses = stub.StreamHandUpdates(request)
         for response in responses:
-            print(response)
             print(f"Received update for left hand: {response.left_hand.wristMatrix}")
             print(f"Received update for right hand: {response.right_hand.wristMatrix}")
 
