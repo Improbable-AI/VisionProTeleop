@@ -28,7 +28,7 @@ def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     handtracking_pb2_grpc.add_HandTrackingServiceServicer_to_server(
         HandTrackingService(), server)
-    server.add_insecure_port('localhost:12345')
+    server.add_insecure_port('0.0.0.0:12345')
     server.start()
     print("Server started, listening on 'localhost:50051'.")
     server.wait_for_termination()

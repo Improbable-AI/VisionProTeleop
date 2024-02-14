@@ -1,6 +1,77 @@
-# Happy Beam
-Leverage an immersive space to create a fun game using ARKit.
+VisionProTeleop
+===========
 
-In visionOS, you can create fun, dynamic games and apps using several different frameworks to create new kinds of spatial experiences: RealityKit, ARKit, SwiftUI, and Group Activities. This sample introduces Happy Beam, a game where you and your friends can hop on a FaceTime call and play together. To learn more about the features that this sample implements, see [Happy Beam](https://developer.apple.com/documentation/visionos/happybeam).
+Wanna use your new Apple Vision Pro for your robot?  This app streams your 
+1. Hand (Wrist + Finger) Tracking
+2. Eye Tracking
+3. Head Tracking 
+result via gRPC over local netwrk so any machines can subscribe and use. 
 
-> Features in this sample that rely on ARKit or Group Activities only run on device, not in Simulator.
+## Data Type 
+
+The `HandUpdate` structure contains (1) wristMatrix and (2) skeleton containing spatial poses of 24 hand joints.  
+
+```yaml
+
+HandUpdate
+├── left_hand: Hand
+│   ├── wristMatrix: Matrix4x4
+│   └── skeleton: Skeleton
+│       └── jointMatrices: Matrix4x4[]
+└── right_hand: Hand
+    ├── wristMatrix: Matrix4x4
+    └── skeleton: Skeleton
+        └── jointMatrices: Matrix4x4[]
+```
+
+where individual values of `Matrix4x4` can be accessed like: 
+
+```
+Matrix4x4
+┌─────┬─────┬─────┬─────┐
+│ m00 │ m01 │ m02 │ m03 │
+├─────┼─────┼─────┼─────┤
+│ m10 │ m11 │ m12 │ m13 │
+├─────┼─────┼─────┼─────┤
+│ m20 │ m21 │ m22 │ m23 │
+├─────┼─────┼─────┼─────┤
+│ m30 │ m31 │ m32 │ m33 │
+└─────┴─────┴─────┴─────┘
+```
+
+
+## Usage
+
+### Vision Pro (Publisher)
+
+Click on DexTeleop app and click `Start`. Remember the IP address you're seeing before you click start -- you might need it to subscribe the streaming data. 
+
+Click on the digital crown to stop streaming. 
+
+### Python (Subscriber)
+
+Execute below on any machine attached to the same network. 
+
+```bash
+python subscriber.py --vision-pro-ip 10.29.230.57
+```
+
+Note that you should change `--vision-pro-ip` . You can check the IP address of yours by going to "settings". 
+
+
+
+## Recompiling Proto
+
+In any case you want to recompile your `.proto` file, this is how you do it. 
+
+### for Python
+
+```bash
+python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. handtracking.proto
+```
+
+
+### for Swift
+```bash
+protoc handtracking.proto --swift_out=. --grpc-swift_out=.
+```

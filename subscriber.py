@@ -16,7 +16,7 @@ def run():
 
     request = handtracking_pb2.HandUpdate()
 
-    with grpc.insecure_channel('localhost:12345') as channel:
+    with grpc.insecure_channel('169.254.58.205:12345') as channel:
         stub = handtracking_pb2_grpc.HandTrackingServiceStub(channel)
         # Correctly invoking a server-streaming RPC
         responses = stub.StreamHandUpdates(request)
