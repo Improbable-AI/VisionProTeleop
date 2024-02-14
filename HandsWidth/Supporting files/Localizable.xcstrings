@@ -97,15 +97,8 @@
         }
       }
     },
-    "You're on [%@] with IP address [%@]" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "You're on [%1$@] with IP address [%2$@]"
-          }
-        }
-      }
+    "You're on IP address [%@]" : {
+
     }
   },
   "version" : "1.0"

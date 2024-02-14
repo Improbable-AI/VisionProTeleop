@@ -1,11 +1,15 @@
 VisionProTeleop
 ===========
 
-Wanna use your new Apple Vision Pro for your robot?  This app streams your 
+Wanna use your new Apple Vision Pro to control your robot?  Wanna record your manipulation demos? 
+ 
+This app streams your 
+
 1. Hand (Wrist + Finger) Tracking
 2. Eye Tracking
 3. Head Tracking 
-result via gRPC over local netwrk so any machines can subscribe and use. 
+
+data via gRPC over local network, so any machines can subscribe and use. 
 
 ## Data Type 
 
@@ -58,6 +62,7 @@ python subscriber.py --vision-pro-ip 10.29.230.57
 
 Note that you should change `--vision-pro-ip` . You can check the IP address of yours by going to "settings". 
 
+**Disclaimer:**  Maybe don't use it over MIT network unless absolutely necessary -- TIG might not like it ... Try to use it in your own local network. 
 
 
 ## Recompiling Proto

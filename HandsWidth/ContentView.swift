@@ -20,10 +20,10 @@ struct ContentView: View {
                 Image(.graph2)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: 1000)
+                    .frame(width: 1200)
                     .clipShape(.rect(cornerRadius: 24))
             }
-            Text("You're on [\(String(describing: getWiFiName()))] with IP address [\(getIPAddress())]")
+            Text("You're on IP address [\(getIPAddress())]")
                 .font(.largeTitle.weight(.medium))
                 
             Button {

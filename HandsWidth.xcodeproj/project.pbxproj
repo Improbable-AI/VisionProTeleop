@@ -27,10 +27,10 @@
 		16EA6A632B68629200A3A740 /* screenshot1280w2.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 16EA6A602B68629100A3A740 /* screenshot1280w2.jpg */; };
 		16EE5E992B576DA800D354ED /* 🧩Name.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16EE5E982B576DA800D354ED /* 🧩Name.swift */; };
 		16EE5E9B2B576DB000D354ED /* 🧩Model.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16EE5E9A2B576DB000D354ED /* 🧩Model.swift */; };
-		C14DAF4F2B7C373200A7333E /* handtracking.grpc.swift in Sources */ = {isa = PBXBuildFile; fileRef = C14DAF4D2B7C373200A7333E /* handtracking.grpc.swift */; };
-		C14DAF502B7C373200A7333E /* handtracking.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = C14DAF4E2B7C373200A7333E /* handtracking.pb.swift */; };
 		C14DAF532B7C375D00A7333E /* GRPC in Frameworks */ = {isa = PBXBuildFile; productRef = C14DAF522B7C375D00A7333E /* GRPC */; };
 		C14DAF552B7C375D00A7333E /* protoc-gen-grpc-swift in Frameworks */ = {isa = PBXBuildFile; productRef = C14DAF542B7C375D00A7333E /* protoc-gen-grpc-swift */; };
+		C19896FF2B7D58A3003BAF99 /* handtracking.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = C19896FD2B7D58A3003BAF99 /* handtracking.pb.swift */; };
+		C19897002B7D58A3003BAF99 /* handtracking.grpc.swift in Sources */ = {isa = PBXBuildFile; fileRef = C19896FE2B7D58A3003BAF99 /* handtracking.grpc.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -62,9 +62,9 @@
 		16EE5E962B576B9F00D354ED /* HandToGround.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = HandToGround.md; sourceTree = "<group>"; };
 		16EE5E982B576DA800D354ED /* 🧩Name.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "🧩Name.swift"; sourceTree = "<group>"; };
 		16EE5E9A2B576DB000D354ED /* 🧩Model.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "🧩Model.swift"; sourceTree = "<group>"; };
-		C14DAF4D2B7C373200A7333E /* handtracking.grpc.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = handtracking.grpc.swift; sourceTree = "<group>"; };
-		C14DAF4E2B7C373200A7333E /* handtracking.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = handtracking.pb.swift; sourceTree = "<group>"; };
 		C19896F42B7D5099003BAF99 /* HandsWidth.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HandsWidth.entitlements; sourceTree = "<group>"; };
+		C19896FD2B7D58A3003BAF99 /* handtracking.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = handtracking.pb.swift; sourceTree = SOURCE_ROOT; };
+		C19896FE2B7D58A3003BAF99 /* handtracking.grpc.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = handtracking.grpc.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -136,9 +136,9 @@
 		165ADB492B4B71B0008A756F /* HandsWidth */ = {
 			isa = PBXGroup;
 			children = (
+				C19896FE2B7D58A3003BAF99 /* handtracking.grpc.swift */,
+				C19896FD2B7D58A3003BAF99 /* handtracking.pb.swift */,
 				C19896F42B7D5099003BAF99 /* HandsWidth.entitlements */,
-				C14DAF4D2B7C373200A7333E /* handtracking.grpc.swift */,
-				C14DAF4E2B7C373200A7333E /* handtracking.pb.swift */,
 				165ADB4E2B4B71B0008A756F /* App.swift */,
 				165ADB502B4B71B0008A756F /* ContentView.swift */,
 				16688DE52B59F35F004CE12B /* 🥽AppModel.swift */,
@@ -253,15 +253,15 @@
 				1642FAB92B4D6CAA0084F9ED /* 🌐RealityView.swift in Sources */,
 				1642FAB52B4D54A60084F9ED /* 🛠️SettingPanel.swift in Sources */,
 				16253CFB2B4E2FCB0028F0E2 /* 📏Unit.swift in Sources */,
+				C19897002B7D58A3003BAF99 /* handtracking.grpc.swift in Sources */,
 				16C95AE72B5E7BFF00CF0FED /* 🛠️AboutPanel.swift in Sources */,
 				165ADB512B4B71B0008A756F /* ContentView.swift in Sources */,
 				16EE5E9B2B576DB000D354ED /* 🧩Model.swift in Sources */,
+				C19896FF2B7D58A3003BAF99 /* handtracking.pb.swift in Sources */,
 				164C78032B5746AD008FF872 /* 🧩Entity.swift in Sources */,
 				16688DE62B59F35F004CE12B /* 🥽AppModel.swift in Sources */,
 				165ADB4F2B4B71B0008A756F /* App.swift in Sources */,
 				16C95AE52B5E762400CF0FED /* 🛠️MenuTop.swift in Sources */,
-				C14DAF4F2B7C373200A7333E /* handtracking.grpc.swift in Sources */,
-				C14DAF502B7C373200A7333E /* handtracking.pb.swift in Sources */,
 				16C95AE32B5E75D800CF0FED /* 🛠️Panel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

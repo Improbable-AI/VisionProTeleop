@@ -41,7 +41,7 @@ message HandUpdate {
 
 // The hand tracking service definition.
 service HandTrackingService {
-  rpc StreamHandUpdates(stream HandUpdate) returns (stream HandUpdate) {}
+  rpc StreamHandUpdates(HandUpdate) returns (stream HandUpdate) {}
 }
 
 // Acknowledgement message for hand updates
