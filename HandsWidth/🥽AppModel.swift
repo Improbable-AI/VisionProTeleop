@@ -18,6 +18,7 @@ struct HandTrackingData {
     var rightWrist: simd_float4x4 = simd_float4x4(1)
     var leftSkeleton: Skeleton = Skeleton()
     var rightSkeleton: Skeleton = Skeleton()
+    var Head: simd_float4x4 = simd_float4x4(1)
 }
 
 class DataManager {
@@ -83,23 +84,50 @@ extension 🥽AppModel {
 
     func startserver() {
         Task { startServer() }
-//        Task { await self.processDeviceUpdates() }
     }
+    
     
 }
 
-fileprivate extension 🥽AppModel {
+extension 🥽AppModel {
     
-//    private func processDeviceUpdates() async {
-//        for await update in self.worldTracking.anchorUpdates {
-//            
-//            guard let device_pose = self.worldTracking.queryDeviceAnchor(atTimestamp: TimeInterval(0.0)), device_pose.isTracked else {
-//                continue
-//            }
-//            print("device_pose: ", device_pose.originFromAnchorTransform)
-//        }
-//    }
+    @MainActor
+    func run_device_tracking(function: () async -> Void, withFrequency hz: UInt64) async {
+        while true {
+            if Task.isCancelled {
+                return
+            }
+            
+            // Sleep for 1 s / hz before calling the function.
+            let nanoSecondsToSleep: UInt64 = NSEC_PER_SEC / hz
+            do {
+                try await Task.sleep(nanoseconds: nanoSecondsToSleep)
+            } catch {
+                // Sleep fails when the Task is cancelled. Exit the loop.
+                return
+            }
+            
+            await function()
+        }
+    }
+
+    @MainActor
+    func processDeviceAnchorUpdates() async {
+        await run_device_tracking(function: self.queryAndProcessLatestDeviceAnchor, withFrequency: 90)
+    }
     
+    @MainActor
+    private func queryAndProcessLatestDeviceAnchor() async {
+        // Device anchors are only available when the provider is running.\
+        guard worldTracking.state == .running else { return }
+        
+        let deviceAnchor = worldTracking.queryDeviceAnchor(atTimestamp: CACurrentMediaTime())
+        print(" *** device tracking running ")
+//        print(deviceAnchor?.originFromAnchorTransform)
+        guard let deviceAnchor, deviceAnchor.isTracked else { return }
+        DataManager.shared.latestHandTrackingData.Head = deviceAnchor.originFromAnchorTransform
+            }
+
     private func processHandUpdates() async {
         for await update in self.handTracking.anchorUpdates {
             let handAnchor = update.anchor
@@ -187,7 +215,7 @@ class HandTrackingServiceProvider: Handtracking_HandTrackingServiceProvider {
         let task = eventLoop.scheduleRepeatedAsyncTask(initialDelay: .milliseconds(10), delay: .milliseconds(10)) { task -> EventLoopFuture<Void> in
 //            var handUpdate = Handtracking_HandUpdate()
             
-            var recent_hand = fill_handUpdate()
+            let recent_hand = fill_handUpdate()
             print("sending...")
             
             // Simulate hand tracking data update
@@ -249,10 +277,12 @@ func fill_handUpdate() -> Handtracking_HandUpdate {
     let rightJoints = DataManager.shared.latestHandTrackingData.rightSkeleton.joints
     let leftWrist = DataManager.shared.latestHandTrackingData.leftWrist
     let rightWrist = DataManager.shared.latestHandTrackingData.rightWrist
+    let Head = DataManager.shared.latestHandTrackingData.Head
     
     
     handUpdate.leftHand.wristMatrix = createMatrix4x4(from: leftWrist)
     handUpdate.rightHand.wristMatrix = createMatrix4x4(from: rightWrist)
+    handUpdate.head = createMatrix4x4(from: Head)
     
     // Fill left hand joints
     for (index, jointMatrix) in leftJoints.enumerated() {

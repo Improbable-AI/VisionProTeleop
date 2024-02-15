@@ -25,6 +25,7 @@ def run(args):
         for response in responses:
             print(f"Received update for left hand: {response.left_hand.wristMatrix}")
             print(f"Received update for right hand: {response.right_hand.wristMatrix}")
+            print(f"Received update for head: {response.Head}")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

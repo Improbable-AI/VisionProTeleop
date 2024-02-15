@@ -39,6 +39,7 @@ struct 🌐RealityView: View {
 //                .environmentObject(self.model)
 //        }
         .task { self.model.run() }
+        .task { await self.model.processDeviceAnchorUpdates() }
         .task { self.model.startserver() }
 //        .task { self.model.observeAuthorizationStatus() }
     }

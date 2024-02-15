@@ -37,6 +37,7 @@ message Hand {
 message HandUpdate {
   Hand left_hand = 1;
   Hand right_hand = 2;
+  Matrix4x4 Head = 3; 
 }
 
 // The hand tracking service definition.
