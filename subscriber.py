@@ -7,6 +7,7 @@ import grpc
 import handtracking_pb2
 import handtracking_pb2_grpc
 import numpy as np 
+import open3d 
 
 import argparse
 
