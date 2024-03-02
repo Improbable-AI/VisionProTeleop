@@ -13,7 +13,7 @@ Wanna use your new Apple Vision Pro to control your robot?  Wanna record your ho
 
 ![](assets/visionpro_main.png)
 
-Click on the installed app on Vision Pro and click `Start` -- that's it!  Vision Pro is now streaming the tracking data over local network. To know about how to install the app, take a look at this [documentation](). 
+Click on the installed app on Vision Pro and click `Start` -- that's it!  Vision Pro is now streaming the tracking data over local network. To know about how to install the app, take a look at this [documentation](/how_to_install.md). 
 
 Tip -- Remember the IP address before you click start; you need to specify this IP address to subscribe to the streaming data. Once you click start, the app will immediately enter into pass-through mode. Click on the digital crown to stop streaming.  
 

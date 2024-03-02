@@ -10,8 +10,6 @@
 
 ## Installing the App
 
-> This document is written for those roboticists who doesn't have any experience in developing Apple Apps. 
-
 
 ### Step 1. Open Xcode Project
 
