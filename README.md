@@ -4,14 +4,9 @@ VisionProTeleop
 ![](assets/visionpro_main.png)
 
 
-Wanna use your new Apple Vision Pro to control your robot?  Wanna record your manipulation demos? 
+Wanna use your new Apple Vision Pro to control your robot?  Wanna record your human manipulation demos? 
 
-This app streams your 
-
-1. Hand (Wrist + Finger) Tracking
-2. Head Tracking 
-
-data via gRPC over local network, so any machines can subscribe and use. 
+This app streams your (a) Wrist / Hand Tracking, and (b) Head Tracking result via gRPC over network, so any machines can subscribe and use. 
 
 ## Data Type 
 
@@ -19,15 +14,15 @@ The `HandUpdate` structure contains (1) wristMatrix and (2) skeleton containing 
 
 ```yaml
 HandUpdate
-├── Head: Matrix4x4
-├── left_hand: Hand
-│   ├── wristMatrix: Matrix4x4
+├── Head: Matrix4x4   # from global frame 
+├── left_hand: Hand   
+│   ├── wristMatrix: Matrix4x4   # from glboal frame
 │   └── skeleton: Skeleton
-│       └── jointMatrices: Matrix4x4[]
+│       └── jointMatrices: Matrix4x4[]   # from wrist frame 
 └── right_hand: Hand
-    ├── wristMatrix: Matrix4x4
+    ├── wristMatrix: Matrix4x4  # from global frame
     └── skeleton: Skeleton
-        └── jointMatrices: Matrix4x4[]
+        └── jointMatrices: Matrix4x4[]   # from wrist frame
 ```
 
 
@@ -55,25 +50,31 @@ Your device ip will be shown in the first start screen once you start the app.
 
 **Disclaimer:**  Maybe don't use it over MIT network unless absolutely necessary -- TIG might not like it ... Try to use it in your own local network. 
 
+## Details 
 
-## Axis Convention
+### Axis Convention
 
 ![](assets/coord_system.png)
 
+### Hand Skeleton used in VisionOS
 
 
-## Recompiling Proto
+![](assets/hand_skeleton_convention.png)
+
+
+
+### Recompiling Proto
 
 In any case you want to recompile your `.proto` file, this is how you do it. 
 
-### for Python
+#### for Python
 
 ```bash
 python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. handtracking.proto
 ```
 
 
-### for Swift
+#### for Swift
 ```bash
 protoc handtracking.proto --swift_out=. --grpc-swift_out=.
 ```
