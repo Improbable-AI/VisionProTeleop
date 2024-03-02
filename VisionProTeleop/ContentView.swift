@@ -9,8 +9,8 @@ struct ContentView: View {
     @Environment(\.dismissWindow) var dismissWindow
     var body: some View {
         VStack(spacing: 32) {
-            Text("Vision Pro Streaming to Linux")
-                .font(.largeTitle.weight(.semibold))
+//            Text("")
+//                .font(.largeTitle.weight(.semibold))
             HStack(spacing: 28) {
                 Image(.graph2)
                     .resizable()

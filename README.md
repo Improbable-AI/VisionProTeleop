@@ -1,7 +1,8 @@
 VisionProTeleop
 ===========
 
-![](assets/main.png)
+![](assets/visionpro_main.png)
+
 
 Wanna use your new Apple Vision Pro to control your robot?  Wanna record your manipulation demos? 
 
@@ -29,21 +30,6 @@ HandUpdate
         └── jointMatrices: Matrix4x4[]
 ```
 
-where individual values of `Matrix4x4` can be accessed like: 
-
-```
-Matrix4x4
-┌─────┬─────┬─────┬─────┐
-│ m00 │ m01 │ m02 │ m03 │
-├─────┼─────┼─────┼─────┤
-│ m10 │ m11 │ m12 │ m13 │
-├─────┼─────┼─────┼─────┤
-│ m20 │ m21 │ m22 │ m23 │
-├─────┼─────┼─────┼─────┤
-│ m30 │ m31 │ m32 │ m33 │
-└─────┴─────┴─────┴─────┘
-```
-
 
 ## Usage
 
@@ -57,13 +43,23 @@ Click on the digital crown to stop streaming.
 
 Execute below on any machine attached to the same network. 
 
-```bash
-python subscriber.py --vision-pro-ip 10.29.230.57
+```python
+s = VisionProStreamer(ip = VISIONPRO_IP, record = True, up_axis = 'Z')
+
+while True:
+    latest = s.latest
+    print(latest['head'], latest['right_wrist'], latest['right_fingers'])
 ```
 
-Note that you should change `--vision-pro-ip` . The start screen shows your current IP address. 
+Your device ip will be shown in the first start screen once you start the app. 
 
 **Disclaimer:**  Maybe don't use it over MIT network unless absolutely necessary -- TIG might not like it ... Try to use it in your own local network. 
+
+
+## Axis Convention
+
+![](assets/coord_system.png)
+
 
 
 ## Recompiling Proto
