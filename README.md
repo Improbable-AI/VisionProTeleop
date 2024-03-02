@@ -1,12 +1,45 @@
 VisionProTeleop
 ===========
 
+
+
+Wanna use your new Apple Vision Pro to control your robot?  Wanna record your how humans navigate and manipulate the world to train robots? This app streams your (a) Wrist / Hand Tracking, and (b) Head Tracking result via gRPC over network, so any machines can subscribe and use. 
+
+
+## Usage
+
+
+### Run the app on Vision Pro 
+
 ![](assets/visionpro_main.png)
 
+Click on the app installed on Vision Pro and click `Start` -- that's it!  Vision Pro is now streaming the tracking data over local network. To know about how to install the app, refer to this documentation. 
 
-Wanna use your new Apple Vision Pro to control your robot?  Wanna record your human manipulation demos? 
+Tip -- Remember the IP address before you click start; you need to specify this IP address to subscribe to the streaming data. Once you click start, the app will immediately enter into pass-through mode. Click on the digital crown to stop streaming.  
 
-This app streams your (a) Wrist / Hand Tracking, and (b) Head Tracking result via gRPC over network, so any machines can subscribe and use. 
+
+### Subscribe to data from anywhere
+
+You can `git clone` this repository and install the pacakge: 
+
+```
+pip install -e . -v
+```
+
+Then, add this code snippet to any of your projects you were developing: 
+
+```python
+from avp_stream import VisionProStreamer
+s = VisionProStreamer(ip = avp_ip, record = True, up_axis = 'Z')
+
+while True:
+    latest = s.latest
+    print(latest['head'], latest['right_wrist'], latest['right_fingers'])
+```
+
+### Vision Pro (gRPC server)
+
+
 
 ## Data Type 
 
@@ -26,29 +59,6 @@ HandUpdate
 ```
 
 
-## Usage
-
-### Vision Pro (Publisher)
-
-Click on DexTeleop app and click `Start`. Remember the IP address you're seeing before you click start -- you might need it to subscribe the streaming data. 
-
-Click on the digital crown to stop streaming. 
-
-### Python (Subscriber)
-
-Execute below on any machine attached to the same network. 
-
-```python
-s = VisionProStreamer(ip = VISIONPRO_IP, record = True, up_axis = 'Z')
-
-while True:
-    latest = s.latest
-    print(latest['head'], latest['right_wrist'], latest['right_fingers'])
-```
-
-Your device ip will be shown in the first start screen once you start the app. 
-
-**Disclaimer:**  Maybe don't use it over MIT network unless absolutely necessary -- TIG might not like it ... Try to use it in your own local network. 
 
 ## Details 
 

@@ -4,6 +4,6 @@ authors:
 - family-names: "Park"
   given-names: "Younghyo"
   orcid: "https://orcid.org/0000-0000-0000-0000"
-title: "Teleop System using Apple Vision Pro"
+title: "Teleopeation System using Apple Vision Pro"
 version: 0.1.0
 url: "https://github.com/Improbable-AI/VisionProTeleop"
