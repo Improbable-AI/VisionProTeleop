@@ -6,21 +6,21 @@ VisionProTeleop
 Wanna use your new Apple Vision Pro to control your robot?  Wanna record your how humans navigate and manipulate the world to train robots? This app streams your (a) Wrist / Hand Tracking, and (b) Head Tracking result via gRPC over network, so any machines can subscribe and use. 
 
 
-## Usage
+## How to Use
 
 
 ### Run the app on Vision Pro 
 
 ![](assets/visionpro_main.png)
 
-Click on the installed app on Vision Pro and click `Start` -- that's it!  Vision Pro is now streaming the tracking data over local network. To know about how to install the app, take a look at this [documentation](/how_to_install.md). 
+Click on the installed app on Vision Pro and click `Start`. That's it!  Vision Pro is now streaming the tracking data over local network. To learn how to install this app on your own Vision Pro, take a look at this [documentation](/how_to_install.md). 
 
-Tip -- Remember the IP address before you click start; you need to specify this IP address to subscribe to the streaming data. Once you click start, the app will immediately enter into pass-through mode. Click on the digital crown to stop streaming.  
+**Tip**  Remember the IP address before you click start; you need to specify this IP address to subscribe to the data. Once you click start, the app will immediately enter into pass-through mode. Click on the digital crown to stop streaming.  
 
 
 ### Subscribe to data from anywhere
 
-You can `git clone` this repository and install the pacakge: 
+You can `git clone` this repository and install the python pacakge: 
 
 ```
 pip install -e . -v
@@ -37,8 +37,6 @@ while True:
     print(latest['head'], latest['right_wrist'], latest['right_fingers'])
 ```
 
-### Vision Pro (gRPC server)
-
 
 
 ## Data Type 
@@ -47,35 +45,35 @@ The `HandUpdate` structure contains (1) wristMatrix and (2) skeleton containing 
 
 ```yaml
 HandUpdate
-├── Head: Matrix4x4   # from global frame 
+├── Head: Matrix4x4   # from global frame (1, 4, 4)
 ├── left_hand: Hand   
-│   ├── wristMatrix: Matrix4x4   # from glboal frame
+│   ├── wristMatrix: Matrix4x4   # from glboal frame (1, 4, 4)
 │   └── skeleton: Skeleton
-│       └── jointMatrices: Matrix4x4[]   # from wrist frame 
+│       └── jointMatrices: Matrix4x4[]   # from wrist frame  (1, 4, 4)
 └── right_hand: Hand
-    ├── wristMatrix: Matrix4x4  # from global frame
+    ├── wristMatrix: Matrix4x4  # from global frame  (25, 4, 4)
     └── skeleton: Skeleton
-        └── jointMatrices: Matrix4x4[]   # from wrist frame
+        └── jointMatrices: Matrix4x4[]   # from wrist frame  (25, 4, 4)
 ```
 
 
-
-## Details 
 
 ### Axis Convention
 
 ![](assets/coord_system.png)
 
-### Hand Skeleton used in VisionOS
+You can specify the axis convention you want to use by specifying the `up_axis`. 
 
+### Hand Skeleton used in VisionOS
 
 ![](assets/hand_skeleton_convention.png)
 
+Refer to the image above to see what order the joints are represented in each hand's skeleton. 
 
 
-### Recompiling Proto
+## Misc 
 
-In any case you want to recompile your `.proto` file, this is how you do it. 
+If you want to add the message type we defined, feel free to modify the `.proto` file. You can recompile the gRPC proto file as follows: 
 
 #### for Python
 
