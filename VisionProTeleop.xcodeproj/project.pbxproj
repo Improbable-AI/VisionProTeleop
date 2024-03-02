@@ -1,0 +1,497 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		160ED7982B4B74C5002AD987 /* 🧑HeadTrackingComponent&System.swift in Sources */ = {isa = PBXBuildFile; fileRef = 160ED7972B4B74C5002AD987 /* 🧑HeadTrackingComponent&System.swift */; };
+		16253CFB2B4E2FCB0028F0E2 /* 📏Unit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16253CFA2B4E2FCB0028F0E2 /* 📏Unit.swift */; };
+		16267B502B57D172000CA8AD /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 16267B4F2B57D172000CA8AD /* Localizable.xcstrings */; };
+		16267B522B57D362000CA8AD /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 16267B512B57D362000CA8AD /* InfoPlist.xcstrings */; };
+		1642FAB52B4D54A60084F9ED /* 🛠️SettingPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1642FAB42B4D54A60084F9ED /* 🛠️SettingPanel.swift */; };
+		1642FAB92B4D6CAA0084F9ED /* 🌐RealityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1642FAB82B4D6CAA0084F9ED /* 🌐RealityView.swift */; };
+		165ADB4F2B4B71B0008A756F /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 165ADB4E2B4B71B0008A756F /* App.swift */; };
+		165ADB512B4B71B0008A756F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 165ADB502B4B71B0008A756F /* ContentView.swift */; };
+		165ADB532B4B71B2008A756F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 165ADB522B4B71B2008A756F /* Assets.xcassets */; };
+		16688DE62B59F35F004CE12B /* 🥽AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16688DE52B59F35F004CE12B /* 🥽AppModel.swift */; };
+		169D84AF2B5A319500BB5606 /* sound2.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 169D84AD2B5A319000BB5606 /* sound2.m4a */; };
+		169D84B02B5A319500BB5606 /* sound1.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 169D84AE2B5A319400BB5606 /* sound1.m4a */; };
+		16C95AE32B5E75D800CF0FED /* 🛠️Panel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16C95AE22B5E75D800CF0FED /* 🛠️Panel.swift */; };
+		16C95AE52B5E762400CF0FED /* 🛠️MenuTop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16C95AE42B5E762400CF0FED /* 🛠️MenuTop.swift */; };
+		16EA6A612B68629100A3A740 /* screenshot1280w3.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 16EA6A5E2B68629100A3A740 /* screenshot1280w3.jpg */; };
+		16EA6A632B68629200A3A740 /* screenshot1280w2.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 16EA6A602B68629100A3A740 /* screenshot1280w2.jpg */; };
+		16EE5E992B576DA800D354ED /* 🧩Name.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16EE5E982B576DA800D354ED /* 🧩Name.swift */; };
+		16EE5E9B2B576DB000D354ED /* 🧩Model.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16EE5E9A2B576DB000D354ED /* 🧩Model.swift */; };
+		C14DAF532B7C375D00A7333E /* GRPC in Frameworks */ = {isa = PBXBuildFile; productRef = C14DAF522B7C375D00A7333E /* GRPC */; };
+		C14DAF552B7C375D00A7333E /* protoc-gen-grpc-swift in Frameworks */ = {isa = PBXBuildFile; productRef = C14DAF542B7C375D00A7333E /* protoc-gen-grpc-swift */; };
+		C19896FF2B7D58A3003BAF99 /* handtracking.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = C19896FD2B7D58A3003BAF99 /* handtracking.pb.swift */; };
+		C19897002B7D58A3003BAF99 /* handtracking.grpc.swift in Sources */ = {isa = PBXBuildFile; fileRef = C19896FE2B7D58A3003BAF99 /* handtracking.grpc.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		160ED7972B4B74C5002AD987 /* 🧑HeadTrackingComponent&System.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "🧑HeadTrackingComponent&System.swift"; sourceTree = "<group>"; };
+		160F46BB2B5A57AF001FE696 /* icon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = icon.png; sourceTree = "<group>"; };
+		160F46BC2B5A57D4001FE696 /* appstore_badge.svg */ = {isa = PBXFileReference; lastKnownFileType = text; path = appstore_badge.svg; sourceTree = "<group>"; };
+		16253CFA2B4E2FCB0028F0E2 /* 📏Unit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "📏Unit.swift"; sourceTree = "<group>"; };
+		16267B4F2B57D172000CA8AD /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		16267B512B57D362000CA8AD /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
+		16267B532B57D387000CA8AD /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		1638F80C2B50BC9700E0CAD2 /* DebugView.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = DebugView.md; sourceTree = "<group>"; };
+		1642FAB42B4D54A60084F9ED /* 🛠️SettingPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "🛠️SettingPanel.swift"; sourceTree = "<group>"; };
+		1642FAB82B4D6CAA0084F9ED /* 🌐RealityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "🌐RealityView.swift"; sourceTree = "<group>"; };
+		165ADB472B4B71B0008A756F /* VisionProTeleop.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VisionProTeleop.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		165ADB4E2B4B71B0008A756F /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
+		165ADB502B4B71B0008A756F /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		165ADB522B4B71B2008A756F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		165ADB572B4B71B2008A756F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		16688DE52B59F35F004CE12B /* 🥽AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "🥽AppModel.swift"; sourceTree = "<group>"; };
+		167817E02B61FABE00BE0067 /* screenshot1280w.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = screenshot1280w.jpg; sourceTree = "<group>"; };
+		169D84AD2B5A319000BB5606 /* sound2.m4a */ = {isa = PBXFileReference; lastKnownFileType = file; path = sound2.m4a; sourceTree = "<group>"; };
+		169D84AE2B5A319400BB5606 /* sound1.m4a */ = {isa = PBXFileReference; lastKnownFileType = file; path = sound1.m4a; sourceTree = "<group>"; };
+		16C95AE22B5E75D800CF0FED /* 🛠️Panel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "🛠️Panel.swift"; sourceTree = "<group>"; };
+		16C95AE42B5E762400CF0FED /* 🛠️MenuTop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "🛠️MenuTop.swift"; sourceTree = "<group>"; };
+		16EA6A5E2B68629100A3A740 /* screenshot1280w3.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = screenshot1280w3.jpg; sourceTree = "<group>"; };
+		16EA6A602B68629100A3A740 /* screenshot1280w2.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = screenshot1280w2.jpg; sourceTree = "<group>"; };
+		16EE5E962B576B9F00D354ED /* HandToGround.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = HandToGround.md; sourceTree = "<group>"; };
+		16EE5E982B576DA800D354ED /* 🧩Name.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "🧩Name.swift"; sourceTree = "<group>"; };
+		16EE5E9A2B576DB000D354ED /* 🧩Model.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "🧩Model.swift"; sourceTree = "<group>"; };
+		C19896F42B7D5099003BAF99 /* VisionProTeleop.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VisionProTeleop.entitlements; sourceTree = "<group>"; };
+		C19896FD2B7D58A3003BAF99 /* handtracking.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = handtracking.pb.swift; sourceTree = SOURCE_ROOT; };
+		C19896FE2B7D58A3003BAF99 /* handtracking.grpc.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = handtracking.grpc.swift; sourceTree = SOURCE_ROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		165ADB442B4B71B0008A756F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C14DAF552B7C375D00A7333E /* protoc-gen-grpc-swift in Frameworks */,
+				C14DAF532B7C375D00A7333E /* GRPC in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		160F46BA2B5A5613001FE696 /* README assets */ = {
+			isa = PBXGroup;
+			children = (
+				160F46BB2B5A57AF001FE696 /* icon.png */,
+				160F46BC2B5A57D4001FE696 /* appstore_badge.svg */,
+				167817E02B61FABE00BE0067 /* screenshot1280w.jpg */,
+				16EA6A602B68629100A3A740 /* screenshot1280w2.jpg */,
+				16EA6A5E2B68629100A3A740 /* screenshot1280w3.jpg */,
+			);
+			path = "README assets";
+			sourceTree = "<group>";
+		};
+		16267B4E2B57D148000CA8AD /* Supporting files */ = {
+			isa = PBXGroup;
+			children = (
+				165ADB522B4B71B2008A756F /* Assets.xcassets */,
+				169D84AE2B5A319400BB5606 /* sound1.m4a */,
+				169D84AD2B5A319000BB5606 /* sound2.m4a */,
+				165ADB572B4B71B2008A756F /* Info.plist */,
+				16267B4F2B57D172000CA8AD /* Localizable.xcstrings */,
+				16267B512B57D362000CA8AD /* InfoPlist.xcstrings */,
+				160F46BA2B5A5613001FE696 /* README assets */,
+				1638F80B2B50BC8800E0CAD2 /* Archive */,
+			);
+			path = "Supporting files";
+			sourceTree = "<group>";
+		};
+		1638F80B2B50BC8800E0CAD2 /* Archive */ = {
+			isa = PBXGroup;
+			children = (
+				1638F80C2B50BC9700E0CAD2 /* DebugView.md */,
+				16EE5E962B576B9F00D354ED /* HandToGround.md */,
+			);
+			path = Archive;
+			sourceTree = "<group>";
+		};
+		165ADB3E2B4B71B0008A756F = {
+			isa = PBXGroup;
+			children = (
+				16267B532B57D387000CA8AD /* README.md */,
+				165ADB492B4B71B0008A756F /* VisionProTeleop */,
+				165ADB482B4B71B0008A756F /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		165ADB482B4B71B0008A756F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				165ADB472B4B71B0008A756F /* VisionProTeleop.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		165ADB492B4B71B0008A756F /* VisionProTeleop */ = {
+			isa = PBXGroup;
+			children = (
+				C19896FE2B7D58A3003BAF99 /* handtracking.grpc.swift */,
+				C19896FD2B7D58A3003BAF99 /* handtracking.pb.swift */,
+				C19896F42B7D5099003BAF99 /* VisionProTeleop.entitlements */,
+				165ADB4E2B4B71B0008A756F /* App.swift */,
+				165ADB502B4B71B0008A756F /* ContentView.swift */,
+				16688DE52B59F35F004CE12B /* 🥽AppModel.swift */,
+				1642FAB82B4D6CAA0084F9ED /* 🌐RealityView.swift */,
+				16EE5E982B576DA800D354ED /* 🧩Name.swift */,
+				16EE5E9A2B576DB000D354ED /* 🧩Model.swift */,
+				160ED7972B4B74C5002AD987 /* 🧑HeadTrackingComponent&System.swift */,
+				16253CFA2B4E2FCB0028F0E2 /* 📏Unit.swift */,
+				16C95ADF2B5E74FD00CF0FED /* 🛠️Menu */,
+				16267B4E2B57D148000CA8AD /* Supporting files */,
+			);
+			path = VisionProTeleop;
+			sourceTree = "<group>";
+		};
+		16C95ADF2B5E74FD00CF0FED /* 🛠️Menu */ = {
+			isa = PBXGroup;
+			children = (
+				16C95AE42B5E762400CF0FED /* 🛠️MenuTop.swift */,
+				16C95AE22B5E75D800CF0FED /* 🛠️Panel.swift */,
+				1642FAB42B4D54A60084F9ED /* 🛠️SettingPanel.swift */,
+			);
+			path = "🛠️Menu";
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		165ADB462B4B71B0008A756F /* VisionProTeleop */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 165ADB5A2B4B71B2008A756F /* Build configuration list for PBXNativeTarget "VisionProTeleop" */;
+			buildPhases = (
+				165ADB432B4B71B0008A756F /* Sources */,
+				165ADB442B4B71B0008A756F /* Frameworks */,
+				165ADB452B4B71B0008A756F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = VisionProTeleop;
+			packageProductDependencies = (
+				C14DAF522B7C375D00A7333E /* GRPC */,
+				C14DAF542B7C375D00A7333E /* protoc-gen-grpc-swift */,
+			);
+			productName = HandsWidth;
+			productReference = 165ADB472B4B71B0008A756F /* VisionProTeleop.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		165ADB3F2B4B71B0008A756F /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1520;
+				LastUpgradeCheck = 1530;
+				TargetAttributes = {
+					165ADB462B4B71B0008A756F = {
+						CreatedOnToolsVersion = 15.2;
+					};
+				};
+			};
+			buildConfigurationList = 165ADB422B4B71B0008A756F /* Build configuration list for PBXProject "VisionProTeleop" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+				ja,
+			);
+			mainGroup = 165ADB3E2B4B71B0008A756F;
+			packageReferences = (
+				C14DAF512B7C375D00A7333E /* XCRemoteSwiftPackageReference "grpc-swift" */,
+			);
+			productRefGroup = 165ADB482B4B71B0008A756F /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				165ADB462B4B71B0008A756F /* VisionProTeleop */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		165ADB452B4B71B0008A756F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				169D84B02B5A319500BB5606 /* sound1.m4a in Resources */,
+				169D84AF2B5A319500BB5606 /* sound2.m4a in Resources */,
+				16EA6A612B68629100A3A740 /* screenshot1280w3.jpg in Resources */,
+				16267B522B57D362000CA8AD /* InfoPlist.xcstrings in Resources */,
+				16EA6A632B68629200A3A740 /* screenshot1280w2.jpg in Resources */,
+				16267B502B57D172000CA8AD /* Localizable.xcstrings in Resources */,
+				165ADB532B4B71B2008A756F /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		165ADB432B4B71B0008A756F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				16EE5E992B576DA800D354ED /* 🧩Name.swift in Sources */,
+				160ED7982B4B74C5002AD987 /* 🧑HeadTrackingComponent&System.swift in Sources */,
+				1642FAB92B4D6CAA0084F9ED /* 🌐RealityView.swift in Sources */,
+				1642FAB52B4D54A60084F9ED /* 🛠️SettingPanel.swift in Sources */,
+				16253CFB2B4E2FCB0028F0E2 /* 📏Unit.swift in Sources */,
+				C19897002B7D58A3003BAF99 /* handtracking.grpc.swift in Sources */,
+				165ADB512B4B71B0008A756F /* ContentView.swift in Sources */,
+				16EE5E9B2B576DB000D354ED /* 🧩Model.swift in Sources */,
+				C19896FF2B7D58A3003BAF99 /* handtracking.pb.swift in Sources */,
+				16688DE62B59F35F004CE12B /* 🥽AppModel.swift in Sources */,
+				165ADB4F2B4B71B0008A756F /* App.swift in Sources */,
+				16C95AE52B5E762400CF0FED /* 🛠️MenuTop.swift in Sources */,
+				16C95AE32B5E75D800CF0FED /* 🛠️Panel.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		165ADB582B4B71B2008A756F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = xros;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				XROS_DEPLOYMENT_TARGET = 1.0;
+			};
+			name = Debug;
+		};
+		165ADB592B4B71B2008A756F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = xros;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+				XROS_DEPLOYMENT_TARGET = 1.0;
+			};
+			name = Release;
+		};
+		165ADB5B2B4B71B2008A756F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = VisionProTeleop/VisionProTeleop.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = ATTMC2WVK2;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "$(TARGET_NAME)/Supporting files/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = VisionProTeleop;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = improbable.younghyo.DexTeleop2;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SUPPORTED_PLATFORMS = "xros xrsimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+			};
+			name = Debug;
+		};
+		165ADB5C2B4B71B2008A756F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = VisionProTeleop/VisionProTeleop.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = ATTMC2WVK2;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "$(TARGET_NAME)/Supporting files/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = VisionProTeleop;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = improbable.younghyo.DexTeleop2;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SUPPORTED_PLATFORMS = "xros xrsimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		165ADB422B4B71B0008A756F /* Build configuration list for PBXProject "VisionProTeleop" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				165ADB582B4B71B2008A756F /* Debug */,
+				165ADB592B4B71B2008A756F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		165ADB5A2B4B71B2008A756F /* Build configuration list for PBXNativeTarget "VisionProTeleop" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				165ADB5B2B4B71B2008A756F /* Debug */,
+				165ADB5C2B4B71B2008A756F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		C14DAF512B7C375D00A7333E /* XCRemoteSwiftPackageReference "grpc-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/grpc/grpc-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.21.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		C14DAF522B7C375D00A7333E /* GRPC */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C14DAF512B7C375D00A7333E /* XCRemoteSwiftPackageReference "grpc-swift" */;
+			productName = GRPC;
+		};
+		C14DAF542B7C375D00A7333E /* protoc-gen-grpc-swift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C14DAF512B7C375D00A7333E /* XCRemoteSwiftPackageReference "grpc-swift" */;
+			productName = "protoc-gen-grpc-swift";
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 165ADB3F2B4B71B0008A756F /* Project object */;
+}
