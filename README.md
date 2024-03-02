@@ -3,7 +3,7 @@ VisionProTeleop
 
 
 
-Wanna use your new Apple Vision Pro to control your robot?  Wanna record your how humans navigate and manipulate the world to train robots? This app streams your (a) Wrist / Hand Tracking, and (b) Head Tracking result via gRPC over network, so any machines can subscribe and use. 
+Wanna use your new Apple Vision Pro to control your robot?  Wanna record how you navigate and manipulate the world to train your robot? This app records / streams your (a) Wrist + Hand Tracking, and (b) Head Tracking result via gRPC over network, so any machines can subscribe and use. 
 
 
 ## How to Use
@@ -18,7 +18,7 @@ Click on the installed app on Vision Pro and click `Start`. That's it!  Vision P
 **Tip**  Remember the IP address before you click start; you need to specify this IP address to subscribe to the data. Once you click start, the app will immediately enter into pass-through mode. Click on the digital crown to stop streaming.  
 
 
-### Subscribe to data from anywhere
+### Subscribe the data from anywhere
 
 You can `git clone` this repository and install the python pacakge: 
 
@@ -73,7 +73,7 @@ Refer to the image above to see what order the joints are represented in each ha
 
 ## Misc 
 
-If you want to add the message type we defined, feel free to modify the `.proto` file. You can recompile the gRPC proto file as follows: 
+If you want to modify the message type, feel free to modify the `.proto` file. You can recompile the gRPC proto file as follows: 
 
 #### for Python
 
@@ -86,3 +86,4 @@ python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. handtracking.
 ```bash
 protoc handtracking.proto --swift_out=. --grpc-swift_out=.
 ```
+After you recompile it, make sure you add it to the Xcode so the app can use the latest version of the swift_proto file. 
