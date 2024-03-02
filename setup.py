@@ -8,7 +8,7 @@ setup(
     author_email='younghyo@mit.edu',
     packages=find_packages(),
     install_requires=[
-        # 'numpy', 'grpcio', 'grpcio-tools'
+        'numpy', 'grpcio', 'grpcio-tools'
     ],
     extras_require={
         # Optional dependencies
