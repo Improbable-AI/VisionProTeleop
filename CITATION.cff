@@ -1,1 +1,12 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Park"
+  given-names: "Younghyo"
+  orcid: "https://orcid.org/0000-0000-0000-0000"
+title: "Teleop System using Apple Vision Pro"
+version: 0.1.0
+url: "https://github.com/Improbable-AI/VisionProTeleop"
+
+
 Younghyo P. (2024). Vision-Pro-Tracking-Streamer. 
