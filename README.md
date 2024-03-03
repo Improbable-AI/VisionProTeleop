@@ -31,7 +31,7 @@ Then, add this code snippet to any of your projects you were developing:
 
 ```python
 from avp_stream import VisionProStreamer
-s = VisionProStreamer(ip = avp_ip, record = True, up_axis = 'Z')
+s = VisionProStreamer(ip = avp_ip, record = True, axis_up = 'Z')
 
 while True:
     latest = s.latest
@@ -63,7 +63,7 @@ HandUpdate
 
 ![](assets/coord_system.png)
 
-You can specify the axis convention you want to use by specifying the `up_axis`. 
+You can specify the axis convention you want to use by specifying the `axis_up`. 
 
 ### Hand Skeleton used in VisionOS
 
