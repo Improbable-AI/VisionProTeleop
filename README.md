@@ -1,10 +1,12 @@
 VisionProTeleop
 ===========
 
-![CleanShot 2024-03-03 at 09 31 30@2x](https://github.com/Improbable-AI/VisionProTeleop/assets/68195716/2fc6b0b6-4bca-4896-ab22-28f74f11b97f)
+![CleanShot 2024-03-03 at 13 55 11@2x](https://github.com/Improbable-AI/VisionProTeleop/assets/68195716/d87a906c-ccf3-4e2d-bd25-a66dc0df803b)
 
 
-Wanna use your new Apple Vision Pro to control your robot?  Wanna record how you navigate and manipulate the world to train your robot? This app records / streams your (a) Wrist + Hand Tracking, and (b) Head Tracking result via gRPC over network, so any machines can subscribe and use. 
+
+Wanna use your new Apple Vision Pro to control your robot?  Wanna record how you navigate and manipulate the world to train your robot? 
+This VisionOS app and python library streams your Head + Wrist + Hand Tracking result via gRPC over a WiFi network, so any robots connected to the same wifi network can subscribe and use. 
 
 
 ## How to Use
@@ -31,6 +33,7 @@ Then, add this code snippet to any of your projects you were developing:
 
 ```python
 from avp_stream import VisionProStreamer
+avp_ip = "10.31.181.201"   # example IP 
 s = VisionProStreamer(ip = avp_ip, record = True, axis_up = 'Z')
 
 while True:
