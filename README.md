@@ -1,6 +1,7 @@
 VisionProTeleop
 ===========
 
+![CleanShot 2024-03-03 at 09 31 30@2x](https://github.com/Improbable-AI/VisionProTeleop/assets/68195716/2fc6b0b6-4bca-4896-ab22-28f74f11b97f)
 
 
 Wanna use your new Apple Vision Pro to control your robot?  Wanna record how you navigate and manipulate the world to train your robot? This app records / streams your (a) Wrist + Hand Tracking, and (b) Head Tracking result via gRPC over network, so any machines can subscribe and use. 
