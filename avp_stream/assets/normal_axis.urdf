@@ -1,0 +1,36 @@
+<?xml version="1.0" ?>
+<robot name="axis">
+    <link name="axis">
+        <visual name="x_axis">
+            <geometry>
+                <cylinder length="0.1" radius="0.005"/>
+            </geometry>
+            <origin xyz="0.05 0 0" rpy="0 1.5707 0"/> <!-- Rotate 90 degrees around Z -->
+            <material name="red">
+                <color rgba="1 0 0 1"/> <!-- Red Color -->
+            </material>
+        </visual>
+
+        <!-- Green Arrow for Y-axis -->
+        <visual name="z_axis">
+            <geometry>
+                <cylinder length="0.1" radius="0.005"/>
+            </geometry>
+            <origin xyz="0 0 0.05" rpy="0 0 1.5707"/> <!-- Rotate -90 degrees around Y -->
+            <material name="blue">
+                <color rgba="0 0 1 1"/> <!-- Green Color -->
+            </material>
+        </visual>
+
+        <!-- Blue Arrow for Z-axis -->
+        <visual name="y_axis">
+            <geometry>
+                <cylinder length="0.1" radius="0.005"/>
+            </geometry>
+            <origin xyz="0 0.05 0" rpy="1.5707 0 0"/> <!-- No rotation needed -->
+            <material name="green">
+                <color rgba="0 1 0 1"/> <!-- Blue Color -->
+            </material>
+        </visual>
+    </link>
+</robot>

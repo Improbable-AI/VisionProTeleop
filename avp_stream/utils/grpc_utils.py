@@ -1,4 +1,5 @@
 import numpy as np 
+from typing import * 
 
 def process_matrix(message):
     m = np.array([[[message.m00, message.m01, message.m02, message.m03],
@@ -9,3 +10,4 @@ def process_matrix(message):
 
 def process_matrices(skeleton, matrix = np.eye(4)):
     return np.concatenate([matrix @ process_matrix(joint) for joint in skeleton], axis = 0)
+
