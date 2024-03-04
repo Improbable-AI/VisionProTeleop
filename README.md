@@ -12,11 +12,11 @@ This VisionOS app and python library streams your Head + Wrist + Hand Tracking r
 ## How to Use
 
 
-### Run the app on Vision Pro 
+### Install and Run the app on Vision Pro 
 
 ![](assets/visionpro_main.png)
 
-Click on the installed app on Vision Pro and click `Start`. That's it!  Vision Pro is now streaming the tracking data over local network. To learn how to install this app on your own Vision Pro, take a look at this [documentation](/how_to_install.md). 
+This app is not on the App Store yet. To learn how to install this app on your own Vision Pro using Xcode, take a look at this [documentation](/how_to_install.md). After installation, click on the app on Vision Pro and click `Start`. That's it!  Vision Pro is now streaming the tracking data over your wifi network. 
 
 **Tip**  Remember the IP address before you click start; you need to specify this IP address to subscribe to the data. Once you click start, the app will immediately enter into pass-through mode. Click on the digital crown to stop streaming.  
 
