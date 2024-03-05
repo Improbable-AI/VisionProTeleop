@@ -24,7 +24,6 @@ def rotate_head(R, degrees=-90):
         [0, 0, 0, 1]
     ]])
     R_rotated = R @ R_x 
-    print(R_rotated.shape)
     return R_rotated
 
 
