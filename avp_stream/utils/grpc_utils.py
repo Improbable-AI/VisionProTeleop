@@ -1,6 +1,5 @@
 import numpy as np 
 from typing import * 
-from scipy.spatial.transform import Rotation 
 import math 
 
 def process_matrix(message):
