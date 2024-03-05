@@ -4,11 +4,10 @@ from isaacgym import gymapi
 from isaacgym import gymutil
 from isaacgym import gymtorch
 
-import math
 import numpy as np
 import torch
-import random
 import time
+from pathlib import Path
 
 from avp_stream import VisionProStreamer
 from avp_stream.utils.isaac_utils import * 
@@ -17,6 +16,7 @@ from avp_stream.utils.trn_constants import *
 from copy import deepcopy
 from typing import * 
 
+CUR_PATH = Path(__file__).parent.resolve()
 
 class IsaacVisualizer: 
 
@@ -61,9 +61,9 @@ class IsaacVisualizer:
 
     def _load_asset(self):
 
-        self.axis = load_axis(self.gym, self.sim, self.device, 'normal', './avp_stream/assets')
-        self.small_axis = load_axis(self.gym, self.sim, self.device, 'small', './avp_stream/assets')
-        self.huge_axis = load_axis(self.gym, self.sim, self.device, 'huge', './avp_stream/assets')
+        self.axis = load_axis(self.gym, self.sim, self.device, 'normal', f'{CUR_PATH}/assets')
+        self.small_axis = load_axis(self.gym, self.sim, self.device, 'small', f'{CUR_PATH}/assets')
+        self.huge_axis = load_axis(self.gym, self.sim, self.device, 'huge', f'{CUR_PATH}/assets')
 
         asset_options = gymapi.AssetOptions()
         asset_options.disable_gravity = True
@@ -135,7 +135,6 @@ class IsaacVisualizer:
         _root_states = self.gym.acquire_actor_root_state_tensor(self.sim)
         root_states = gymtorch.wrap_tensor(_root_states).view(self.num_envs, -1, 13)
         self.root_state = root_states
-
 
         self.gym.simulate(self.sim)
         self.gym.fetch_results(self.sim, True)

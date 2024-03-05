@@ -1,5 +1,7 @@
 import numpy as np 
 from typing import * 
+from scipy.spatial.transform import Rotation 
+import math 
 
 def process_matrix(message):
     m = np.array([[[message.m00, message.m01, message.m02, message.m03],
@@ -11,3 +13,10 @@ def process_matrix(message):
 def process_matrices(skeleton, matrix = np.eye(4)):
     return np.concatenate([matrix @ process_matrix(joint) for joint in skeleton], axis = 0)
 
+
+def get_pinch_distance(finger_messages): 
+    fingers = process_matrices(finger_messages)
+    thumb = fingers[4, :3, 3]
+    index = fingers[9, :3, 3]
+
+    return np.linalg.norm(thumb - index)

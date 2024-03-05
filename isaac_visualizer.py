@@ -28,6 +28,5 @@ if __name__ == "__main__":
         t0 = time.time()
         latest = s.latest
         env.step(np2tensor(latest, env.device)) 
+        print(latest["left_pinch_distance"], latest["right_pinch_distance"])
         print(time.time() - t0)
-
-
