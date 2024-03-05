@@ -119,7 +119,6 @@ class IsaacVisualizer:
             for i in range(25):
                 finger_2 = self.gym.create_actor(env, self.small_axis, gymapi.Transform(), f'left_finger_{i}', 78 + i )
 
-
             self.env_axis = self.gym.create_actor(env, self.huge_axis, gymapi.Transform(), 'env_axis', 103 )
 
 
@@ -193,6 +192,7 @@ class IsaacVisualizer:
         new_root_state[:, 28:53, :7] = mat2posquat(self.sim_left_fingers )# 
         new_root_state[:, 53:78, :7] = mat2posquat(self.sim_right_fingers)#
         new_root_state[:, 78:103, :7] = mat2posquat(self.sim_left_fingers )
+        # new_root_state[:, 103, :7] = mat2posquat(transformed_wrist_right)
         new_root_state = new_root_state.view(-1, 13)
 
         return new_root_state

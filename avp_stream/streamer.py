@@ -56,6 +56,8 @@ class VisionProStreamer:
                         "right_pinch_distance": get_pinch_distance(response.right_hand.skeleton.jointMatrices),
                         # "rgb": response.rgb, # TODO: should figure out how to get the rgb image from vision pro 
                     }
+                    transformations["right_wrist_roll"] = get_wrist_roll(transformations["right_wrist"])
+                    transformations["left_wrist_roll"] = get_wrist_roll(transformations["left_wrist"])
                     if self.record: 
                         self.recording.append(transformations)
                     self.latest = transformations 
