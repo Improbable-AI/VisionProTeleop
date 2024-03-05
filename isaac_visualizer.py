@@ -29,6 +29,6 @@ if __name__ == "__main__":
         latest = s.latest
         env.step(np2tensor(latest, env.device)) 
         # print("right_wrist_roll: ", latest["right_wrist_roll"])
-        print("left_wrist_roll: ", latest["left_wrist_roll"])
+        print("right_wrist_roll: ", latest["right_wrist_roll"])
         # print(latest["left_pinch_distance"], latest["right_pinch_distance"])
         # print(time.time() - t0)

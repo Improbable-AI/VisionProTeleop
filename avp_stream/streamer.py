@@ -51,7 +51,7 @@ class VisionProStreamer:
                         "right_wrist": self.axis_transform @  process_matrix(response.right_hand.wristMatrix),
                         "left_fingers":   process_matrices(response.left_hand.skeleton.jointMatrices),
                         "right_fingers":  process_matrices(response.right_hand.skeleton.jointMatrices),
-                        "head": self.axis_transform @  process_matrix(response.Head), 
+                        "head": rotate_head(self.axis_transform @  process_matrix(response.Head)) , 
                         "left_pinch_distance": get_pinch_distance(response.left_hand.skeleton.jointMatrices),
                         "right_pinch_distance": get_pinch_distance(response.right_hand.skeleton.jointMatrices),
                         # "rgb": response.rgb, # TODO: should figure out how to get the rgb image from vision pro 

@@ -13,6 +13,21 @@ def process_matrices(skeleton, matrix = np.eye(4)):
     return np.concatenate([matrix @ process_matrix(joint) for joint in skeleton], axis = 0)
 
 
+def rotate_head(R, degrees=-90):
+    # Convert degrees to radians
+    theta = np.radians(degrees)
+    # Create the rotation matrix for rotating around the x-axis
+    R_x = np.array([[
+        [1, 0, 0, 0],
+        [0, np.cos(theta), -np.sin(theta), 0],
+        [0, np.sin(theta), np.cos(theta), 0],
+        [0, 0, 0, 1]
+    ]])
+    R_rotated = R @ R_x 
+    print(R_rotated.shape)
+    return R_rotated
+
+
 def get_pinch_distance(finger_messages): 
     fingers = process_matrices(finger_messages)
     thumb = fingers[4, :3, 3]
