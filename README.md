@@ -12,16 +12,31 @@ This VisionOS app and python library streams your Head + Wrist + Hand Tracking r
 ## How to Use
 
 
-### Install and Run the app on Vision Pro 
+### Install the app on Vision Pro 
 
 ![](assets/visionpro_main.png)
 
-This app is not on the App Store yet. To learn how to install this app on your own Vision Pro using Xcode, take a look at this [documentation](/how_to_install.md). After installation, click on the app on Vision Pro and click `Start`. That's it!  Vision Pro is now streaming the tracking data over your wifi network. 
+There are currently two ways to install the app. 
+
+**Method 1: Apple TestFlight**
+
+Click this [link]() to install the app from TestFlight. You don't need Apple Developer Account. 
+
+**Method 2: Build yourself!** 
+
+To learn how to build this app yourself and install it on your own Vision Pro using Xcode, take a look at this [documentation](/how_to_install.md). This requires (a) Apple Developer Account, (b) Vision Pro Developer Strap, and (c) a Mac with Xcode installed. 
+
+
+### Run the app on Vision Pro 
+
+After installation, click on the app on Vision Pro and click `Start`. That's it!  Vision Pro is now streaming the tracking data over your wifi network. 
 
 **Tip**  Remember the IP address before you click start; you need to specify this IP address to subscribe to the data. Once you click start, the app will immediately enter into pass-through mode. Click on the digital crown to stop streaming.  
 
 
-### Subscribe the data from anywhere
+### Receive the stream from anywhere
+
+The following python package allows you to receive the data stream from any device that's connected to the same WiFi network. First, install the package: 
 
 ```
 pip install avp_stream
@@ -32,11 +47,11 @@ Then, add this code snippet to any of your projects you were developing:
 ```python
 from avp_stream import VisionProStreamer
 avp_ip = "10.31.181.201"   # example IP 
-s = VisionProStreamer(ip = avp_ip, record = True, axis_up = 'Z')
+s = VisionProStreamer(ip = avp_ip, record = True)
 
 while True:
-    latest = s.latest
-    print(latest['head'], latest['right_wrist'], latest['right_fingers'])
+    r = s.latest
+    print(r['head'], r['right_wrist'], r['right_fingers'])
 ```
 
 
@@ -64,6 +79,7 @@ HandUpdate
 
 ![](assets/axis_convention.png)
 
+Refer to the image above to see how the axis are defined for your head, wrist, and fingers. 
 
 ### Hand Skeleton used in VisionOS
 
