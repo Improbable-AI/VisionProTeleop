@@ -1,11 +1,9 @@
 import isaacgym
 import torch 
 from isaacgym import gymapi
-import numpy as np 
 import numpy as np
 import argparse
 import torch.nn.functional as F
-from bidex_sim.utils.liegroup_utils import * 
 from typing import * 
 import yaml 
 import os 

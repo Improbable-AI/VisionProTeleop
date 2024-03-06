@@ -1,6 +1,5 @@
 import numpy as np 
 from typing import * 
-import math 
 
 def process_matrix(message):
     m = np.array([[[message.m00, message.m01, message.m02, message.m03],
