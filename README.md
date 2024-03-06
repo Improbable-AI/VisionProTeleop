@@ -23,10 +23,8 @@ This app is not on the App Store yet. To learn how to install this app on your o
 
 ### Subscribe the data from anywhere
 
-You can `git clone` this repository and install the python pacakge: 
-
 ```
-pip install -e . -v
+pip install avp_stream
 ```
 
 Then, add this code snippet to any of your projects you were developing: 
