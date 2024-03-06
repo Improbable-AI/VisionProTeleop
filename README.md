@@ -12,7 +12,7 @@ This VisionOS app and python library streams your Head + Wrist + Hand Tracking r
 ## How to Use
 
 
-### Install the app on Vision Pro 
+### Step 1. Install the app on Vision Pro 
 
 ![](assets/visionpro_main.png)
 
@@ -27,14 +27,14 @@ Click this [link]() to install the app from TestFlight. You don't need Apple Dev
 To learn how to build this app yourself and install it on your own Vision Pro using Xcode, take a look at this [documentation](/how_to_install.md). This requires (a) Apple Developer Account, (b) Vision Pro Developer Strap, and (c) a Mac with Xcode installed. 
 
 
-### Run the app on Vision Pro 
+### Step 2. Run the app on Vision Pro 
 
 After installation, click on the app on Vision Pro and click `Start`. That's it!  Vision Pro is now streaming the tracking data over your wifi network. 
 
 **Tip**  Remember the IP address before you click start; you need to specify this IP address to subscribe to the data. Once you click start, the app will immediately enter into pass-through mode. Click on the digital crown to stop streaming.  
 
 
-### Receive the stream from anywhere
+### Step 3. Receive the stream from anywhere
 
 The following python package allows you to receive the data stream from any device that's connected to the same WiFi network. First, install the package: 
 
@@ -56,30 +56,42 @@ while True:
 
 
 
-## Data Type 
+## Available Data
 
-The `HandUpdate` structure contains (1) wristMatrix and (2) skeleton containing spatial poses of 24 hand joints.  
-
-```yaml
-HandUpdate
-├── Head: Matrix4x4   # from global frame (1, 4, 4)
-├── left_hand: Hand   
-│   ├── wristMatrix: Matrix4x4   # from glboal frame (1, 4, 4)
-│   └── skeleton: Skeleton
-│       └── jointMatrices: Matrix4x4[]   # from wrist frame  (1, 4, 4)
-└── right_hand: Hand
-    ├── wristMatrix: Matrix4x4  # from global frame  (25, 4, 4)
-    └── skeleton: Skeleton
-        └── jointMatrices: Matrix4x4[]   # from wrist frame  (25, 4, 4)
+```python
+r = s.latest
 ```
 
+`r` is a dictionary containing the following data streamed from AVP: 
+
+```python
+r['head']: np.ndarray  
+  # shape (1,4,4) / measured from ground frame
+r['right_wrist']: np.ndarray 
+  # shape (1,4,4) / measured from ground frame
+r['left_wrist']: np.ndarray 
+  # shape (1,4,4) / measured from ground frame
+r['right_fingers']: np.ndarray 
+  # shape (25,4,4) / measured from right wrist frame 
+r['left_fingers']: np.ndarray 
+  # shape (25,4,4) / measured from left wrist frame 
+r['right_pinch_distance']: float  
+  # distance between right index tip and thumb tip 
+r['left_pinch_distance']: float  
+  # distance between left index tip and thumb tip 
+r['right_wrist_roll']: float 
+  # rotation angle of your right wrist around your arm axis
+r['left_wrist_roll']: float 
+ # rotation angle of your left wrist around your arm axis
+```
 
 
 ### Axis Convention
 
+Refer to the image below to see how the axis are defined for your head, wrist, and fingers. 
+
 ![](assets/axis_convention.png)
 
-Refer to the image above to see how the axis are defined for your head, wrist, and fingers. 
 
 ### Hand Skeleton used in VisionOS
 
