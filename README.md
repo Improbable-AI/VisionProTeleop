@@ -64,9 +64,8 @@ HandUpdate
 
 ### Axis Convention
 
-![](assets/coord_system.png)
+![](assets/axis_convention.png)
 
-You can specify the axis convention you want to use by specifying the `axis_up`. 
 
 ### Hand Skeleton used in VisionOS
 
