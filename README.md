@@ -20,7 +20,7 @@ There are currently two ways to install the app.
 
 **Method 1: Apple TestFlight**
 
-Click this [link]() to install the app from TestFlight. You don't need Apple Developer Account. 
+Click this [link](https://testflight.apple.com/join/CqYv49fG) to install the app from TestFlight. You have to install TestFlight to install this app. 
 
 **Method 2: Build yourself!** 
 
