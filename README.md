@@ -20,7 +20,8 @@ There are currently two ways to install the app.
 
 **Method 1: Apple TestFlight**
 
-Click this [link](https://testflight.apple.com/join/CqYv49fG) to install the app from TestFlight. You have to install TestFlight to install this app. 
+Click this [link](https://testflight.apple.com/join/CqYv49fG) to install the app from [TestFlight](https://testflight.apple.com/). See the following video to see the installation process. 
+
 
 **Method 2: Build yourself!** 
 
