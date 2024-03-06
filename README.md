@@ -9,10 +9,10 @@ Wanna use your new Apple Vision Pro to control your robot?  Wanna record how you
 This VisionOS app and python library streams your Head + Wrist + Hand Tracking result via gRPC over a WiFi network, so any robots connected to the same wifi network can subscribe and use. 
 
 
-## How to Use
+# How to Use
 
 
-### Step 1. Install the app on Vision Pro 
+## Step 1. Install the app on Vision Pro 
 
 ![](assets/visionpro_main.png)
 
@@ -28,14 +28,14 @@ Click this [link](https://testflight.apple.com/join/CqYv49fG) to install the app
 To learn how to build this app yourself and install it on your own Vision Pro using Xcode, take a look at this [documentation](/how_to_install.md). This requires (a) Apple Developer Account, (b) Vision Pro Developer Strap, and (c) a Mac with Xcode installed. 
 
 
-### Step 2. Run the app on Vision Pro 
+## Step 2. Run the app on Vision Pro 
 
 After installation, click on the app on Vision Pro and click `Start`. That's it!  Vision Pro is now streaming the tracking data over your wifi network. 
 
 **Tip**  Remember the IP address before you click start; you need to specify this IP address to subscribe to the data. Once you click start, the app will immediately enter into pass-through mode. Click on the digital crown to stop streaming.  
 
 
-### Step 3. Receive the stream from anywhere
+## Step 3. Receive the stream from anywhere
 
 The following python package allows you to receive the data stream from any device that's connected to the same WiFi network. First, install the package: 
 
@@ -57,7 +57,7 @@ while True:
 
 
 
-## Available Data
+# Available Data
 
 ```python
 r = s.latest
@@ -87,14 +87,14 @@ r['left_wrist_roll']: float
 ```
 
 
-### Axis Convention
+## Axis Convention
 
 Refer to the image below to see how the axis are defined for your head, wrist, and fingers. 
 
 ![](assets/axis_convention.png)
 
 
-### Hand Skeleton used in VisionOS
+## Hand Skeleton used in VisionOS
 
 ![](assets/hand_skeleton_convention.png)
 
