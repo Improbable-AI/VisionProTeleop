@@ -16,16 +16,9 @@ This VisionOS app and python library streams your Head + Wrist + Hand Tracking r
 
 ![](assets/visionpro_main.png)
 
-There are currently two ways to install the app. 
+This app is now officially on VisionOS App Store! You can search for **[Tracking Streamer]** from the App Store and install the app. 
 
-**Method 1: Apple TestFlight**
-
-Click this [link](https://testflight.apple.com/join/CqYv49fG) to install the app from [TestFlight](https://testflight.apple.com/). See the following video to see the installation process. 
-
-
-**Method 2: Build yourself!** 
-
-To learn how to build this app yourself and install it on your own Vision Pro using Xcode, take a look at this [documentation](/how_to_install.md). This requires (a) Apple Developer Account, (b) Vision Pro Developer Strap, and (c) a Mac with Xcode installed. 
+If you want to play around with the app, you can build/install the app yourself too. To learn how to do that, take a look at this [documentation](/how_to_install.md). This requires (a) Apple Developer Account, (b) Vision Pro Developer Strap, and (c) a Mac with Xcode installed. 
 
 
 ### Step 2. Run the app on Vision Pro 
