@@ -8,7 +8,7 @@ import torch
 class IsaacVisualizer:
 
     def __init__(self, args): 
-        self.s = VisionProStreamer(args.ip, args.record, args.up_axis)
+        self.s = VisionProStreamer(args.ip, args.record)
         self.env = IsaacVisualizerEnv(args)
 
     def run(self):
@@ -31,7 +31,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--ip', type = str, required = True)
     parser.add_argument('--record', action = 'store_true')
-    parser.add_argument('--up_axis', type = str, default = 'Z')
     parser.add_argument('--follow', action = 'store_true', help = "The viewpoint follows the users head")
     args = parser.parse_args()
 

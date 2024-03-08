@@ -12,7 +12,7 @@ class LocalizationVisualizer:
 
         self.args = args 
 
-        self.s = VisionProStreamer(args.ip, args.record, args.up_axis)
+        self.s = VisionProStreamer(args.ip, args.record)
 
     def background_localization_visualization(self):
 
@@ -74,7 +74,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--ip', type = str, required = True)
     parser.add_argument('--record', action = 'store_true')
-    parser.add_argument('--up_axis', type = str, default = 'Z')
     args = parser.parse_args()
 
     env = LocalizationVisualizer(args)

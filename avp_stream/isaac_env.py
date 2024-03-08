@@ -224,13 +224,9 @@ if __name__=="__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--ip', type = str, required = True)
     parser.add_argument('--record', action = 'store_true')
-    parser.add_argument('--up_axis', type = str, default = 'Z')
     args = parser.parse_args()
 
-    # assert args.up_axis == 'Z' and if not, print a message
-    assert args.up_axis == 'Z' 
-
-    s = VisionProStreamer(args.ip, args.record, args.up_axis)
+    s = VisionProStreamer(args.ip, args.record)
 
     env = IsaacVisualizerEnv(args)
     while True: 
