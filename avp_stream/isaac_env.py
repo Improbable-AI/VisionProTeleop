@@ -22,6 +22,8 @@ class IsaacVisualizerEnv:
 
     def __init__(self, args):
 
+        self.args = args 
+
         # acquire gym interface
         self.gym = gymapi.acquire_gym()
  
@@ -160,6 +162,10 @@ class IsaacVisualizerEnv:
 
         cam_pos = head_xyz - head_ydir * 0.5
         cam_target = head_xyz + head_ydir * 0.5
+        cam_target[..., -1] -= 0.2
+
+        cam_pos = gymapi.Vec3(*cam_pos[0])
+        cam_target = gymapi.Vec3(*cam_target[0])
 
         self.gym.viewer_camera_look_at(self.viewer, self.envs[0], cam_pos, cam_target)
 
@@ -224,6 +230,7 @@ if __name__=="__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--ip', type = str, required = True)
     parser.add_argument('--record', action = 'store_true')
+    parser.add_argument('--follow', action = 'store_true', help = "The viewpoint follows the users head")
     args = parser.parse_args()
 
     s = VisionProStreamer(args.ip, args.record)
