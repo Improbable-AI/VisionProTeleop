@@ -13,12 +13,15 @@ class LocalizationVisualizer:
         self.args = args 
 
         self.s = VisionProStreamer(args.ip, args.record, args.up_axis)
-        self.run_visualize()
 
     def background_localization_visualization(self):
 
 
         fig, ax = plt.subplots()
+
+        # set fig size
+        fig.set_size_inches(10, 10)
+
         ax.set_xlim(-0.05, 0.1)
         ax.set_ylim(-0.05, 0.1)
         ax.set_aspect('equal')
@@ -26,7 +29,7 @@ class LocalizationVisualizer:
         ax.set_ylabel('Y')
 
         position_history = np.array([[0.0, 0.0]])
-        scat = ax.scatter(position_history[:, 0], position_history[:, 1])
+        scat = ax.scatter(position_history[:, 0], position_history[:, 1], s = 100)
         
         def update(interval):
             nonlocal position_history
@@ -49,12 +52,16 @@ class LocalizationVisualizer:
             ax.set_xlim(xmin - 0.1, xmax + 0.1)
             ax.set_ylim(ymin - 0.1, ymax + 0.1)
 
+            # make x, y axis text size larger
+            for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] +
+                        ax.get_xticklabels() + ax.get_yticklabels()):
+                item.set_fontsize(20)
+
         ani = animation.FuncAnimation(fig, update, frames=10000, interval=1)
         plt.show()
 
-    def run_visualize(self):
+    def run(self):
             
-
         thread = Thread(target=self.background_localization_visualization)
         thread.start()
 
@@ -70,6 +77,6 @@ if __name__ == "__main__":
     parser.add_argument('--up_axis', type = str, default = 'Z')
     args = parser.parse_args()
 
-    s = VisionProStreamer(args.ip, args.record, args.up_axis)
-
     env = LocalizationVisualizer(args)
+
+    env.run()

@@ -18,7 +18,7 @@ from typing import *
 
 CUR_PATH = Path(__file__).parent.resolve()
 
-class IsaacVisualizer: 
+class IsaacVisualizerEnv: 
 
     def __init__(self, args):
 
@@ -232,7 +232,7 @@ if __name__=="__main__":
 
     s = VisionProStreamer(args.ip, args.record, args.up_axis)
 
-    env = IsaacVisualizer(args)
+    env = IsaacVisualizerEnv(args)
     while True: 
         t0 = time.time()
         latest = s.latest

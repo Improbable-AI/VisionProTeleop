@@ -14,19 +14,15 @@ YUP2ZUP = np.array([[[1, 0, 0, 0],
 
 class VisionProStreamer:
 
-    def __init__(self, ip, record = True, axis_up = 'Z'): 
+    def __init__(self, ip, record = True): 
 
         # Vision Pro IP 
         self.ip = ip
         self.record = record 
         self.recording = [] 
         self.latest = None 
-        if axis_up == 'Z': 
-            self.axis_transform = YUP2ZUP
-        else:
-            self.axis_transform = np.expand_dims(np.eye(4), axis = 0)
+        self.axis_transform = YUP2ZUP
         self.start_streaming()
-
 
     def start_streaming(self): 
 
