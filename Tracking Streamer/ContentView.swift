@@ -9,8 +9,6 @@ struct ContentView: View {
     @Environment(\.dismissWindow) var dismissWindow
     var body: some View {
         VStack(spacing: 32) {
-//            Text("")
-//                .font(.largeTitle.weight(.semibold))
             HStack(spacing: 28) {
                 Image(.graph2)
                     .resizable()

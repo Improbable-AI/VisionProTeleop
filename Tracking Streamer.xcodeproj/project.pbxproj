@@ -42,7 +42,7 @@
 		1638F80C2B50BC9700E0CAD2 /* DebugView.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = DebugView.md; sourceTree = "<group>"; };
 		1642FAB42B4D54A60084F9ED /* 🛠️SettingPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "🛠️SettingPanel.swift"; sourceTree = "<group>"; };
 		1642FAB82B4D6CAA0084F9ED /* 🌐RealityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "🌐RealityView.swift"; sourceTree = "<group>"; };
-		165ADB472B4B71B0008A756F /* VisionProTeleop.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VisionProTeleop.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		165ADB472B4B71B0008A756F /* Tracking Streamer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Tracking Streamer.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		165ADB4E2B4B71B0008A756F /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
 		165ADB502B4B71B0008A756F /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		165ADB522B4B71B2008A756F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -116,7 +116,7 @@
 			isa = PBXGroup;
 			children = (
 				16267B532B57D387000CA8AD /* README.md */,
-				165ADB492B4B71B0008A756F /* VisionProTeleop */,
+				165ADB492B4B71B0008A756F /* Tracking Streamer */,
 				165ADB482B4B71B0008A756F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -124,12 +124,12 @@
 		165ADB482B4B71B0008A756F /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				165ADB472B4B71B0008A756F /* VisionProTeleop.app */,
+				165ADB472B4B71B0008A756F /* Tracking Streamer.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		165ADB492B4B71B0008A756F /* VisionProTeleop */ = {
+		165ADB492B4B71B0008A756F /* Tracking Streamer */ = {
 			isa = PBXGroup;
 			children = (
 				C1893C742B93C1AC00F2269D /* handtracking.grpc.swift */,
@@ -146,7 +146,7 @@
 				16C95ADF2B5E74FD00CF0FED /* 🛠️Menu */,
 				16267B4E2B57D148000CA8AD /* Supporting files */,
 			);
-			path = VisionProTeleop;
+			path = "Tracking Streamer";
 			sourceTree = "<group>";
 		};
 		16C95ADF2B5E74FD00CF0FED /* 🛠️Menu */ = {
@@ -162,9 +162,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		165ADB462B4B71B0008A756F /* VisionProTeleop */ = {
+		165ADB462B4B71B0008A756F /* Tracking Streamer */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 165ADB5A2B4B71B2008A756F /* Build configuration list for PBXNativeTarget "VisionProTeleop" */;
+			buildConfigurationList = 165ADB5A2B4B71B2008A756F /* Build configuration list for PBXNativeTarget "Tracking Streamer" */;
 			buildPhases = (
 				165ADB432B4B71B0008A756F /* Sources */,
 				165ADB442B4B71B0008A756F /* Frameworks */,
@@ -174,13 +174,13 @@
 			);
 			dependencies = (
 			);
-			name = VisionProTeleop;
+			name = "Tracking Streamer";
 			packageProductDependencies = (
 				C14DAF522B7C375D00A7333E /* GRPC */,
 				C14DAF542B7C375D00A7333E /* protoc-gen-grpc-swift */,
 			);
 			productName = HandsWidth;
-			productReference = 165ADB472B4B71B0008A756F /* VisionProTeleop.app */;
+			productReference = 165ADB472B4B71B0008A756F /* Tracking Streamer.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -198,7 +198,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 165ADB422B4B71B0008A756F /* Build configuration list for PBXProject "VisionProTeleop" */;
+			buildConfigurationList = 165ADB422B4B71B0008A756F /* Build configuration list for PBXProject "Tracking Streamer" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -215,7 +215,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				165ADB462B4B71B0008A756F /* VisionProTeleop */,
+				165ADB462B4B71B0008A756F /* Tracking Streamer */,
 			);
 		};
 /* End PBXProject section */
@@ -388,7 +388,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
-				CODE_SIGN_ENTITLEMENTS = VisionProTeleop/VisionProTeleop.entitlements;
+				CODE_SIGN_ENTITLEMENTS = "Tracking Streamer/VisionProTeleop.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -397,7 +397,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "$(TARGET_NAME)/Supporting files/Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = VisionProTeleop;
+				INFOPLIST_KEY_CFBundleDisplayName = "Tracking Streamer";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -420,7 +420,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
-				CODE_SIGN_ENTITLEMENTS = VisionProTeleop/VisionProTeleop.entitlements;
+				CODE_SIGN_ENTITLEMENTS = "Tracking Streamer/VisionProTeleop.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -429,7 +429,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "$(TARGET_NAME)/Supporting files/Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = VisionProTeleop;
+				INFOPLIST_KEY_CFBundleDisplayName = "Tracking Streamer";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -449,7 +449,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		165ADB422B4B71B0008A756F /* Build configuration list for PBXProject "VisionProTeleop" */ = {
+		165ADB422B4B71B0008A756F /* Build configuration list for PBXProject "Tracking Streamer" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				165ADB582B4B71B2008A756F /* Debug */,
@@ -458,7 +458,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		165ADB5A2B4B71B2008A756F /* Build configuration list for PBXNativeTarget "VisionProTeleop" */ = {
+		165ADB5A2B4B71B2008A756F /* Build configuration list for PBXNativeTarget "Tracking Streamer" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				165ADB5B2B4B71B2008A756F /* Debug */,

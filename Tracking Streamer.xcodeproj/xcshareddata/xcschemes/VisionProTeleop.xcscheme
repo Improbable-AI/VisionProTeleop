@@ -16,9 +16,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "165ADB462B4B71B0008A756F"
-               BuildableName = "VisionProTeleop.app"
-               BlueprintName = "VisionProTeleop"
-               ReferencedContainer = "container:VisionProTeleop.xcodeproj">
+               BuildableName = "Tracking Streamer.app"
+               BlueprintName = "Tracking Streamer"
+               ReferencedContainer = "container:Tracking Streamer.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -45,9 +45,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "165ADB462B4B71B0008A756F"
-            BuildableName = "VisionProTeleop.app"
-            BlueprintName = "VisionProTeleop"
-            ReferencedContainer = "container:VisionProTeleop.xcodeproj">
+            BuildableName = "Tracking Streamer.app"
+            BlueprintName = "Tracking Streamer"
+            ReferencedContainer = "container:Tracking Streamer.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -62,9 +62,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "165ADB462B4B71B0008A756F"
-            BuildableName = "VisionProTeleop.app"
-            BlueprintName = "VisionProTeleop"
-            ReferencedContainer = "container:VisionProTeleop.xcodeproj">
+            BuildableName = "Tracking Streamer.app"
+            BlueprintName = "Tracking Streamer"
+            ReferencedContainer = "container:Tracking Streamer.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

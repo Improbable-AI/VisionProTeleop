@@ -8,7 +8,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "VisionProTeleop"
+            "value" : "Tracking Streamer"
           }
         }
       }
@@ -20,7 +20,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "VisionProTeleop"
+            "value" : "Tracking Streamer"
           }
         },
         "ja" : {
