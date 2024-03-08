@@ -1,68 +1,91 @@
 VisionProTeleop
 ===========
 
+![CleanShot 2024-03-03 at 13 55 11@2x](https://github.com/Improbable-AI/VisionProTeleop/assets/68195716/d87a906c-ccf3-4e2d-bd25-a66dc0df803b)
 
 
-Wanna use your new Apple Vision Pro to control your robot?  Wanna record how you navigate and manipulate the world to train your robot? This app records / streams your (a) Wrist + Hand Tracking, and (b) Head Tracking result via gRPC over network, so any machines can subscribe and use. 
+
+Wanna use your new Apple Vision Pro to control your robot?  Wanna record how you navigate and manipulate the world to train your robot? 
+This VisionOS app and python library streams your Head + Wrist + Hand Tracking result via gRPC over a WiFi network, so any robots connected to the same wifi network can subscribe and use. 
 
 
 ## How to Use
 
 
-### Run the app on Vision Pro 
+### Step 1. Install the app on Vision Pro 
 
 ![](assets/visionpro_main.png)
 
-Click on the installed app on Vision Pro and click `Start`. That's it!  Vision Pro is now streaming the tracking data over local network. To learn how to install this app on your own Vision Pro, take a look at this [documentation](/how_to_install.md). 
+This app is now officially on VisionOS App Store! You can search for **[Tracking Streamer]** from the App Store and install the app. 
+
+If you want to play around with the app, you can build/install the app yourself too. To learn how to do that, take a look at this [documentation](/how_to_install.md). This requires (a) Apple Developer Account, (b) Vision Pro Developer Strap, and (c) a Mac with Xcode installed. 
+
+
+### Step 2. Run the app on Vision Pro 
+
+After installation, click on the app on Vision Pro and click `Start`. That's it!  Vision Pro is now streaming the tracking data over your wifi network. 
 
 **Tip**  Remember the IP address before you click start; you need to specify this IP address to subscribe to the data. Once you click start, the app will immediately enter into pass-through mode. Click on the digital crown to stop streaming.  
 
 
-### Subscribe the data from anywhere
+### Step 3. Receive the stream from anywhere
 
-You can `git clone` this repository and install the python pacakge: 
+The following python package allows you to receive the data stream from any device that's connected to the same WiFi network. First, install the package: 
 
 ```
-pip install -e . -v
+pip install avp_stream
 ```
 
 Then, add this code snippet to any of your projects you were developing: 
 
 ```python
 from avp_stream import VisionProStreamer
-s = VisionProStreamer(ip = avp_ip, record = True, up_axis = 'Z')
+avp_ip = "10.31.181.201"   # example IP 
+s = VisionProStreamer(ip = avp_ip, record = True)
 
 while True:
-    latest = s.latest
-    print(latest['head'], latest['right_wrist'], latest['right_fingers'])
+    r = s.latest
+    print(r['head'], r['right_wrist'], r['right_fingers'])
 ```
 
 
 
-## Data Type 
+## Available Data
 
-The `HandUpdate` structure contains (1) wristMatrix and (2) skeleton containing spatial poses of 24 hand joints.  
-
-```yaml
-HandUpdate
-├── Head: Matrix4x4   # from global frame (1, 4, 4)
-├── left_hand: Hand   
-│   ├── wristMatrix: Matrix4x4   # from glboal frame (1, 4, 4)
-│   └── skeleton: Skeleton
-│       └── jointMatrices: Matrix4x4[]   # from wrist frame  (1, 4, 4)
-└── right_hand: Hand
-    ├── wristMatrix: Matrix4x4  # from global frame  (25, 4, 4)
-    └── skeleton: Skeleton
-        └── jointMatrices: Matrix4x4[]   # from wrist frame  (25, 4, 4)
+```python
+r = s.latest
 ```
 
+`r` is a dictionary containing the following data streamed from AVP: 
+
+```python
+r['head']: np.ndarray  
+  # shape (1,4,4) / measured from ground frame
+r['right_wrist']: np.ndarray 
+  # shape (1,4,4) / measured from ground frame
+r['left_wrist']: np.ndarray 
+  # shape (1,4,4) / measured from ground frame
+r['right_fingers']: np.ndarray 
+  # shape (25,4,4) / measured from right wrist frame 
+r['left_fingers']: np.ndarray 
+  # shape (25,4,4) / measured from left wrist frame 
+r['right_pinch_distance']: float  
+  # distance between right index tip and thumb tip 
+r['left_pinch_distance']: float  
+  # distance between left index tip and thumb tip 
+r['right_wrist_roll']: float 
+  # rotation angle of your right wrist around your arm axis
+r['left_wrist_roll']: float 
+ # rotation angle of your left wrist around your arm axis
+```
 
 
 ### Axis Convention
 
-![](assets/coord_system.png)
+Refer to the image below to see how the axis are defined for your head, wrist, and fingers. 
 
-You can specify the axis convention you want to use by specifying the `up_axis`. 
+![](assets/axis_convention.png)
+
 
 ### Hand Skeleton used in VisionOS
 

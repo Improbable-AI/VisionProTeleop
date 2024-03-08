@@ -1,7 +1,7 @@
 import grpc
 from avp_stream.grpc_msg import * 
 from threading import Thread
-from avp_stream.utils import * 
+from avp_stream.utils.grpc_utils import * 
 import time 
 import numpy as np 
 
@@ -14,7 +14,7 @@ YUP2ZUP = np.array([[[1, 0, 0, 0],
 
 class VisionProStreamer:
 
-    def __init__(self, ip, record = True, axis_up = 'Y'): 
+    def __init__(self, ip, record = True, axis_up = 'Y', type = 'numpy'): 
 
         # Vision Pro IP 
         self.ip = ip
@@ -49,11 +49,15 @@ class VisionProStreamer:
                     transformations = {
                         "left_wrist": self.axis_transform @  process_matrix(response.left_hand.wristMatrix),
                         "right_wrist": self.axis_transform @  process_matrix(response.right_hand.wristMatrix),
-                        "left_fingers": self.axis_transform @  process_matrices(response.left_hand.skeleton.jointMatrices),
-                        "right_fingers": self.axis_transform @  process_matrices(response.right_hand.skeleton.jointMatrices),
-                        "head": self.axis_transform @  process_matrix(response.Head), 
+                        "left_fingers":   process_matrices(response.left_hand.skeleton.jointMatrices),
+                        "right_fingers":  process_matrices(response.right_hand.skeleton.jointMatrices),
+                        "head": rotate_head(self.axis_transform @  process_matrix(response.Head)) , 
+                        "left_pinch_distance": get_pinch_distance(response.left_hand.skeleton.jointMatrices),
+                        "right_pinch_distance": get_pinch_distance(response.right_hand.skeleton.jointMatrices),
                         # "rgb": response.rgb, # TODO: should figure out how to get the rgb image from vision pro 
                     }
+                    transformations["right_wrist_roll"] = get_wrist_roll(transformations["right_wrist"])
+                    transformations["left_wrist_roll"] = get_wrist_roll(transformations["left_wrist"])
                     if self.record: 
                         self.recording.append(transformations)
                     self.latest = transformations 
