@@ -153,6 +153,16 @@ class IsaacVisualizer:
         # update viewer
         self.render(sync_frame_time)
 
+    def move_camera(self):
+
+        head_xyz = self.visionos_head[:, :3, 3]
+        head_ydir = self.visionos_head[:, :3, 1]
+
+        cam_pos = head_xyz - head_ydir * 0.5
+        cam_target = head_xyz + head_ydir * 0.5
+
+        self.gym.viewer_camera_look_at(self.viewer, self.envs[0], cam_pos, cam_target)
+
     def simulate(self): 
         # step the physics
         self.gym.simulate(self.sim)
@@ -164,6 +174,8 @@ class IsaacVisualizer:
     def render(self, sync_frame_time = True): 
 
         # update viewer
+        if self.args.follow:
+            self.move_camera()
         self.gym.step_graphics(self.sim)
         self.gym.draw_viewer(self.viewer, self.sim, False)
         if sync_frame_time:
@@ -173,7 +185,7 @@ class IsaacVisualizer:
 
         new_root_state = self.root_state
 
-        visionos_head = transformations['head'] 
+        self.visionos_head = transformations['head'] 
         
         self.sim_right_wrist = transformations['right_wrist'] #@ VISIONOS_RIGHT_HAND_TO_LEAP 
         self.sim_left_wrist = transformations['left_wrist'] # @ VISIONOS_LEFT_HAND_TO_LEAP
@@ -185,7 +197,7 @@ class IsaacVisualizer:
         self.sim_left_fingers = sim_left_fingers 
 
         new_root_state = deepcopy(self.root_state)
-        new_root_state[:, 0, :7] = mat2posquat(visionos_head )
+        new_root_state[:, 0, :7] = mat2posquat(self.visionos_head )
         new_root_state[:, 1, :7] = mat2posquat(self.sim_right_wrist )
         new_root_state[:, 2, :7] = mat2posquat(self.sim_left_wrist )
         new_root_state[:, 3:28, :7] = mat2posquat(self.sim_right_fingers )#  

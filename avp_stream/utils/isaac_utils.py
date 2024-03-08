@@ -105,3 +105,5 @@ def setup_viewer_camera(gym, env, viewer):
     middle_env = env
     gym.viewer_camera_look_at(viewer, middle_env, cam_pos, cam_target)
 
+def adjust_viewer_camera(gym, env, viewer, cam_pos, cam_target):
+    gym.viewer_camera_look_at(viewer, env, cam_pos, cam_target)
