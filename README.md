@@ -26,7 +26,7 @@ If you use this repository in your work, consider citing:
 
 ![](assets/visionpro_main.png)
 
-This app is now officially on VisionOS App Store! You can search for **[Tracking Streamer]** from the App Store and install the app. 
+This app is now officially on VisionOS App Store! You can search for **[Tracking Streamer](https://apps.apple.com/us/app/tracking-streamer/id6478969032)** from the App Store and install the app. 
 
 If you want to play around with the app, you can build/install the app yourself too. To learn how to do that, take a look at this [documentation](/how_to_install.md). This requires (a) Apple Developer Account, (b) Vision Pro Developer Strap, and (c) a Mac with Xcode installed. 
 
