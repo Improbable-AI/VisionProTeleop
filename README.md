@@ -16,7 +16,7 @@ This VisionOS app and python library streams your Head + Wrist + Hand Tracking r
 If you use this repository in your work, consider citing:
 
     @software{park2024avp,
-        title={Using Apple Vision Pro to Train/Control Robots},
+        title={Using Apple Vision Pro to Train and Control Robots},
         author={Park, Younghyo and Agrawal, Pulkit},
         year={2024},
         url = {https://github.com/Improbable-AI/VisionProTeleop},
@@ -104,7 +104,11 @@ Refer to the image below to see how the axis are defined for your head, wrist, a
 Refer to the image above to see what order the joints are represented in each hand's skeleton. 
 
 
-## Misc 
+## Acknowledgements 
+
+We acknowledge support from Hyundai Motor Company and ARO MURI grant number W911NF-23-1-0277. 
+
+<!-- Misc 
 
 If you want to modify the message type, feel free to modify the `.proto` file. You can recompile the gRPC proto file as follows: 
 
@@ -119,4 +123,4 @@ python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. handtracking.
 ```bash
 protoc handtracking.proto --swift_out=. --grpc-swift_out=.
 ```
-After you recompile it, make sure you add it to the Xcode so the app can use the latest version of the swift_proto file. 
+After you recompile it, make sure you add it to the Xcode so the app can use the latest version of the swift_proto file.  -->
