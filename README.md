@@ -8,9 +8,19 @@ VisionProTeleop
 Wanna use your new Apple Vision Pro to control your robot?  Wanna record how you navigate and manipulate the world to train your robot? 
 This VisionOS app and python library streams your Head + Wrist + Hand Tracking result via gRPC over a WiFi network, so any robots connected to the same wifi network can subscribe and use. 
 
+> **For a more detailed explanation, check out this short [paper](./assets/short_paper.pdf).**
+
 
 ## How to Use
 
+If you use this repository in your work, consider citing:
+
+    @software{park2024avp,
+        title={Using Apple Vision Pro to Train/Control Robots},
+        author={Park, Younghyo and Agrawal, Pulkit},
+        year={2024},
+        url = {https://github.com/Improbable-AI/VisionProTeleop},
+    }
 
 ### Step 1. Install the app on Vision Pro 
 
