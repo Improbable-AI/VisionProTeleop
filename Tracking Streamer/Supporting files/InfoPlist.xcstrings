@@ -30,6 +30,30 @@
           }
         }
       }
+    },
+    "NSHandsTrackingUsageDescription" : {
+      "comment" : "Privacy - Hands Tracking Usage Description",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "This app tracks your hand to teleoperate a robot. "
+          }
+        }
+      }
+    },
+    "NSWorldSensingUsageDescription" : {
+      "comment" : "Privacy - World Sensing Usage Description",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "This app senses your surronuding world to reconstruct a simulation."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

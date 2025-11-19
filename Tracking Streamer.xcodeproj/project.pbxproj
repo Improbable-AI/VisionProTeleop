@@ -29,6 +29,11 @@
 		C14DAF552B7C375D00A7333E /* protoc-gen-grpc-swift in Frameworks */ = {isa = PBXBuildFile; productRef = C14DAF542B7C375D00A7333E /* protoc-gen-grpc-swift */; };
 		C1893C762B93C1AC00F2269D /* handtracking.grpc.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1893C742B93C1AC00F2269D /* handtracking.grpc.swift */; };
 		C1893C772B93C1AC00F2269D /* handtracking.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1893C752B93C1AC00F2269D /* handtracking.pb.swift */; };
+		C1DA80C42ECE377600B55CC2 /* StatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1DA80C32ECE377600B55CC2 /* StatusView.swift */; };
+		C1E05F782ECD84DF0018C506 /* LiveKitWebRTC in Frameworks */ = {isa = PBXBuildFile; productRef = C1E05F772ECD84DF0018C506 /* LiveKitWebRTC */; };
+		C1E05F7C2ECD850B0018C506 /* ImmersiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E05F7A2ECD850B0018C506 /* ImmersiveView.swift */; };
+		C1E05F7D2ECD850B0018C506 /* ImageData.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E05F792ECD850B0018C506 /* ImageData.swift */; };
+		C1E05F7E2ECD850B0018C506 /* WebRTCClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E05F7B2ECD850B0018C506 /* WebRTCClient.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -61,6 +66,10 @@
 		C1893C742B93C1AC00F2269D /* handtracking.grpc.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = handtracking.grpc.swift; path = avp_stream/grpc_msg/handtracking.grpc.swift; sourceTree = SOURCE_ROOT; };
 		C1893C752B93C1AC00F2269D /* handtracking.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = handtracking.pb.swift; path = avp_stream/grpc_msg/handtracking.pb.swift; sourceTree = SOURCE_ROOT; };
 		C19896F42B7D5099003BAF99 /* VisionProTeleop.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VisionProTeleop.entitlements; sourceTree = "<group>"; };
+		C1DA80C32ECE377600B55CC2 /* StatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusView.swift; sourceTree = "<group>"; };
+		C1E05F792ECD850B0018C506 /* ImageData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageData.swift; sourceTree = "<group>"; };
+		C1E05F7A2ECD850B0018C506 /* ImmersiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImmersiveView.swift; sourceTree = "<group>"; };
+		C1E05F7B2ECD850B0018C506 /* WebRTCClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebRTCClient.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -70,6 +79,7 @@
 			files = (
 				C14DAF552B7C375D00A7333E /* protoc-gen-grpc-swift in Frameworks */,
 				C14DAF532B7C375D00A7333E /* GRPC in Frameworks */,
+				C1E05F782ECD84DF0018C506 /* LiveKitWebRTC in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -137,8 +147,12 @@
 				C19896F42B7D5099003BAF99 /* VisionProTeleop.entitlements */,
 				165ADB4E2B4B71B0008A756F /* App.swift */,
 				165ADB502B4B71B0008A756F /* ContentView.swift */,
+				C1E05F792ECD850B0018C506 /* ImageData.swift */,
+				C1E05F7A2ECD850B0018C506 /* ImmersiveView.swift */,
+				C1E05F7B2ECD850B0018C506 /* WebRTCClient.swift */,
 				16688DE52B59F35F004CE12B /* 🥽AppModel.swift */,
 				1642FAB82B4D6CAA0084F9ED /* 🌐RealityView.swift */,
+				C1DA80C32ECE377600B55CC2 /* StatusView.swift */,
 				16EE5E982B576DA800D354ED /* 🧩Name.swift */,
 				16EE5E9A2B576DB000D354ED /* 🧩Model.swift */,
 				160ED7972B4B74C5002AD987 /* 🧑HeadTrackingComponent&System.swift */,
@@ -178,6 +192,7 @@
 			packageProductDependencies = (
 				C14DAF522B7C375D00A7333E /* GRPC */,
 				C14DAF542B7C375D00A7333E /* protoc-gen-grpc-swift */,
+				C1E05F772ECD84DF0018C506 /* LiveKitWebRTC */,
 			);
 			productName = HandsWidth;
 			productReference = 165ADB472B4B71B0008A756F /* Tracking Streamer.app */;
@@ -210,6 +225,7 @@
 			mainGroup = 165ADB3E2B4B71B0008A756F;
 			packageReferences = (
 				C14DAF512B7C375D00A7333E /* XCRemoteSwiftPackageReference "grpc-swift" */,
+				C1E05F762ECD84DF0018C506 /* XCRemoteSwiftPackageReference "webrtc-xcframework" */,
 			);
 			productRefGroup = 165ADB482B4B71B0008A756F /* Products */;
 			projectDirPath = "";
@@ -252,6 +268,10 @@
 				16688DE62B59F35F004CE12B /* 🥽AppModel.swift in Sources */,
 				165ADB4F2B4B71B0008A756F /* App.swift in Sources */,
 				16C95AE52B5E762400CF0FED /* 🛠️MenuTop.swift in Sources */,
+				C1E05F7C2ECD850B0018C506 /* ImmersiveView.swift in Sources */,
+				C1E05F7D2ECD850B0018C506 /* ImageData.swift in Sources */,
+				C1DA80C42ECE377600B55CC2 /* StatusView.swift in Sources */,
+				C1E05F7E2ECD850B0018C506 /* WebRTCClient.swift in Sources */,
 				C1893C762B93C1AC00F2269D /* handtracking.grpc.swift in Sources */,
 				C1893C772B93C1AC00F2269D /* handtracking.pb.swift in Sources */,
 				16C95AE32B5E75D800CF0FED /* 🛠️Panel.swift in Sources */,
@@ -478,6 +498,14 @@
 				minimumVersion = 1.21.1;
 			};
 		};
+		C1E05F762ECD84DF0018C506 /* XCRemoteSwiftPackageReference "webrtc-xcframework" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "git@github.com:livekit/webrtc-xcframework.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 137.7151.10;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -490,6 +518,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = C14DAF512B7C375D00A7333E /* XCRemoteSwiftPackageReference "grpc-swift" */;
 			productName = "protoc-gen-grpc-swift";
+		};
+		C1E05F772ECD84DF0018C506 /* LiveKitWebRTC */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C1E05F762ECD84DF0018C506 /* XCRemoteSwiftPackageReference "webrtc-xcframework" */;
+			productName = LiveKitWebRTC;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

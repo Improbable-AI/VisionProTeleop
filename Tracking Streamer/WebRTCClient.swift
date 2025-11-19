@@ -1,0 +1,335 @@
+import Foundation
+import LiveKitWebRTC
+import UIKit
+
+/// WebRTC client that connects to the Python server and receives video frames
+class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
+    private var peerConnection: LKRTCPeerConnection?
+    private let factory: LKRTCPeerConnectionFactory
+    private var videoTrack: LKRTCVideoTrack?
+    
+    var onFrameReceived: ((CVPixelBuffer) -> Void)?
+    
+    private let stunServer = "stun:stun.l.google.com:19302"
+    
+    override init() {
+        // Initialize WebRTC factory
+        LKRTCInitializeSSL()
+        
+        let encoderFactory = LKRTCDefaultVideoEncoderFactory()
+        let decoderFactory = LKRTCDefaultVideoDecoderFactory()
+        
+        self.factory = LKRTCPeerConnectionFactory(
+            encoderFactory: encoderFactory,
+            decoderFactory: decoderFactory
+        )
+        
+        super.init()
+    }
+    
+    deinit {
+        LKRTCCleanupSSL()
+    }
+    
+    /// Connect to the WebRTC server at the given address
+    func connect(to serverAddress: String, port: Int) async throws {
+        // Create peer connection with STUN server for NAT traversal
+        let config = LKRTCConfiguration()
+        config.iceServers = [LKRTCIceServer(urlStrings: [stunServer])]
+        // Enable ICE candidate pool for faster connection
+        config.iceCandidatePoolSize = 10
+        // Try to use all network interfaces
+        config.continualGatheringPolicy = .gatherContinually
+        config.tcpCandidatePolicy = .disabled
+        // Set ICE transport policy to prefer local connections
+        config.iceTransportPolicy = .all
+        
+        let constraints = LKRTCMediaConstraints(
+            mandatoryConstraints: nil,
+            optionalConstraints: ["DtlsSrtpKeyAgreement": "true"]
+        )
+        
+        guard let pc = factory.peerConnection(
+            with: config,
+            constraints: constraints,
+            delegate: self
+        ) else {
+            throw WebRTCError.failedToCreatePeerConnection
+        }
+        
+        self.peerConnection = pc
+        
+        // Connect to server via TCP socket
+        try await connectToServer(host: serverAddress, port: port)
+    }
+    
+    private func connectToServer(host: String, port: Int) async throws {
+        print("DEBUG: Attempting to connect to \(host):\(port)")
+        let (inputStream, outputStream) = try await AsyncSocketConnection.connect(
+            host: host,
+            port: port
+        )
+        print("DEBUG: Socket connection established to \(host):\(port)")
+        
+        // Read offer from server
+        guard let offerData = try await inputStream.readLine(),
+              let offerJson = try? JSONDecoder().decode(SDPMessage.self, from: offerData) else {
+            throw WebRTCError.invalidOffer
+        }
+        
+        print("DEBUG: Received offer from server")
+        
+        // Set remote description (offer)
+        let remoteDesc = LKRTCSessionDescription(type: .offer, sdp: offerJson.sdp)
+        try await peerConnection?.setRemoteDescription(remoteDesc)
+        
+        // Create answer
+        guard let answer = try await peerConnection?.answer(for: LKRTCMediaConstraints(
+            mandatoryConstraints: nil,
+            optionalConstraints: nil
+        )) else {
+            throw WebRTCError.failedToCreateAnswer
+        }
+        
+        // Set local description (answer)
+        try await peerConnection?.setLocalDescription(answer)
+        
+        // Wait for ICE gathering to complete
+        print("DEBUG: Waiting for ICE gathering to complete")
+        try await waitForICEGatheringComplete()
+        
+        // Send answer to server
+        guard let localSDP = peerConnection?.localDescription else {
+            throw WebRTCError.noLocalDescription
+        }
+        
+        let answerMessage = SDPMessage(
+            sdp: localSDP.sdp,
+            type: localSDP.type.stringValue
+        )
+        
+        let answerData = try JSONEncoder().encode(answerMessage)
+        var answerString = String(data: answerData, encoding: .utf8)! + "\n"
+        try await outputStream.write(answerString.data(using: .utf8)!)
+        
+        print("DEBUG: Answer sent to server")
+    }
+    
+    @MainActor
+    private func waitForICEGatheringComplete() async throws {
+        return try await withCheckedThrowingContinuation { continuation in
+            var resumed = false
+            var checkCount = 0
+            let maxChecks = 50 // 5 seconds timeout
+            
+            Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { timer in
+                guard let pc = self.peerConnection else {
+                    if !resumed {
+                        resumed = true
+                        continuation.resume(throwing: WebRTCError.peerConnectionClosed)
+                    }
+                    timer.invalidate()
+                    return
+                }
+                
+                checkCount += 1
+                let state = pc.iceGatheringState
+                print("DEBUG: ICE gathering check #\(checkCount), state: \(state.rawValue)")
+                
+                // Complete if state is .complete (2) OR timeout after getting at least one candidate
+                if state == .complete || (checkCount >= maxChecks && checkCount > 5) {
+                    if !resumed {
+                        resumed = true
+                        print("DEBUG: ICE gathering finished - state: \(state.rawValue), checks: \(checkCount)")
+                        continuation.resume()
+                    }
+                    timer.invalidate()
+                }
+            }
+        }
+    }
+    
+    func addVideoRenderer(_ renderer: LKRTCVideoRenderer) {
+        if let track = videoTrack {
+            track.add(renderer)
+            print("DEBUG: Video renderer attached to track - track enabled: \(track.isEnabled)")
+        } else {
+            print("ERROR: Cannot attach renderer - no video track available")
+        }
+    }
+    
+    func disconnect() {
+        peerConnection?.close()
+        peerConnection = nil
+        videoTrack = nil
+    }
+}
+
+// MARK: - RTCPeerConnectionDelegate
+extension WebRTCClient {
+    func peerConnection(_ peerConnection: LKRTCPeerConnection, didChange stateChanged: LKRTCSignalingState) {
+        print("DEBUG: Signaling state changed to: \(stateChanged)")
+    }
+    
+    func peerConnection(_ peerConnection: LKRTCPeerConnection, didAdd stream: LKRTCMediaStream) {
+        print("DEBUG: Stream added - id: \(stream.streamId)")
+        print("DEBUG: Stream has \(stream.videoTracks.count) video tracks, \(stream.audioTracks.count) audio tracks")
+        if let videoTrack = stream.videoTracks.first {
+            self.videoTrack = videoTrack
+            print("DEBUG: Video track received - id: \(videoTrack.trackId), enabled: \(videoTrack.isEnabled)")
+        }
+    }
+    
+    func peerConnection(_ peerConnection: LKRTCPeerConnection, didRemove stream: LKRTCMediaStream) {
+        print("DEBUG: Stream removed")
+    }
+    
+    func peerConnectionShouldNegotiate(_ peerConnection: LKRTCPeerConnection) {
+        print("DEBUG: Should negotiate")
+    }
+    
+    func peerConnection(_ peerConnection: LKRTCPeerConnection, didChange newState: LKRTCIceConnectionState) {
+        print("DEBUG: ICE connection state changed to: \(newState.rawValue) (\(iceStateString(newState)))")
+        if newState == .connected {
+            print("DEBUG: *** ICE CONNECTION SUCCESSFUL ***")
+        } else if newState == .failed {
+            print("ERROR: ICE connection failed")
+        }
+    }
+    
+    private func iceStateString(_ state: LKRTCIceConnectionState) -> String {
+        switch state.rawValue {
+        case 0: return "new"
+        case 1: return "checking"
+        case 2: return "connected"
+        case 3: return "completed"
+        case 4: return "failed"
+        case 5: return "disconnected"
+        case 6: return "closed"
+        default: return "unknown"
+        }
+    }
+    
+    func peerConnection(_ peerConnection: LKRTCPeerConnection, didChange newState: LKRTCIceGatheringState) {
+        print("DEBUG: ICE gathering state changed to: \(newState)")
+    }
+    
+    func peerConnection(_ peerConnection: LKRTCPeerConnection, didGenerate candidate: LKRTCIceCandidate) {
+        print("DEBUG: ICE candidate generated - \(candidate.sdp) [\(candidate.sdpMid ?? "no-mid")] type: \(candidate.sdp.contains("host") ? "host" : candidate.sdp.contains("srflx") ? "srflx" : "relay")")
+    }
+    
+    func peerConnection(_ peerConnection: LKRTCPeerConnection, didRemove candidates: [LKRTCIceCandidate]) {
+        print("DEBUG: ICE candidates removed")
+    }
+    
+    func peerConnection(_ peerConnection: LKRTCPeerConnection, didOpen dataChannel: LKRTCDataChannel) {
+        print("DEBUG: Data channel opened")
+    }
+}
+
+// MARK: - Helper Types
+struct SDPMessage: Codable {
+    let sdp: String
+    let type: String
+}
+
+enum WebRTCError: Error {
+    case failedToCreatePeerConnection
+    case failedToCreateAnswer 
+    case invalidOffer
+    case noLocalDescription
+    case peerConnectionClosed
+    case connectionFailed
+}
+
+extension LKRTCSdpType {
+    var stringValue: String {
+        switch self {
+        case .offer: return "offer"
+        case .prAnswer: return "pranswer"
+        case .answer: return "answer"
+        case .rollback: return "rollback"
+        @unknown default: return "unknown"
+        }
+    }
+}
+
+// MARK: - Async Socket Helper
+actor AsyncSocketConnection {
+    @MainActor
+    static func connect(host: String, port: Int) async throws -> (InputStream, OutputStream) {
+        var inputStream: InputStream?
+        var outputStream: OutputStream?
+        
+        Stream.getStreamsToHost(
+            withName: host,
+            port: port,
+            inputStream: &inputStream,
+            outputStream: &outputStream
+        )
+        
+        guard let input = inputStream, let output = outputStream else {
+            throw WebRTCError.connectionFailed
+        }
+        
+        input.schedule(in: .main, forMode: .default)
+        output.schedule(in: .main, forMode: .default)
+        
+        input.open()
+        output.open()
+        
+        // Wait for connection
+        try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+        
+        return (input, output)
+    }
+}
+
+extension InputStream {
+    func readLine() async throws -> Data? {
+        var buffer = Data()
+        let chunkSize = 1024
+        var chunk = [UInt8](repeating: 0, count: chunkSize)
+        
+        while true {
+            guard self.hasBytesAvailable else {
+                try await Task.sleep(nanoseconds: 10_000_000) // 10ms
+                continue
+            }
+            
+            let bytesRead = self.read(&chunk, maxLength: 1)
+            if bytesRead <= 0 {
+                return buffer.isEmpty ? nil : buffer
+            }
+            
+            if chunk[0] == 0x0A { // newline
+                return buffer
+            }
+            
+            buffer.append(chunk[0])
+        }
+    }
+}
+
+extension OutputStream {
+    func write(_ data: Data) async throws {
+        let bytes = [UInt8](data)
+        var totalWritten = 0
+        
+        while totalWritten < bytes.count {
+            guard self.hasSpaceAvailable else {
+                try await Task.sleep(nanoseconds: 10_000_000) // 10ms
+                continue
+            }
+            
+            let written = bytes.withUnsafeBufferPointer { bufferPointer in
+                self.write(bufferPointer.baseAddress! + totalWritten, maxLength: bytes.count - totalWritten)
+            }
+            
+            if written < 0 {
+                throw WebRTCError.connectionFailed
+            }
+            totalWritten += written
+        }
+    }
+}

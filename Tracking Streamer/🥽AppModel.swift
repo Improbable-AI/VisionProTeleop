@@ -25,6 +25,9 @@ class DataManager {
     static let shared = DataManager()
     
     var latestHandTrackingData: HandTrackingData = HandTrackingData()
+    var pythonClientIP: String? = nil  // Store Python client's IP when it connects via gRPC
+    var grpcServerReady: Bool = false  // Indicates if gRPC server is ready to accept connections
+    var webrtcServerInfo: (host: String, port: Int)? = nil  // WebRTC server info from gRPC
     
     private init() {}
 }
@@ -62,6 +65,7 @@ extension 🥽AppModel {
     }
 
     func startserver() {
+        print("🚀 [DEBUG] startserver() called - initiating gRPC server...")
         Task { startServer() }
     }
     
@@ -97,10 +101,10 @@ extension 🥽AppModel {
     
     func processReconstructionUpdates() async {
         for await update in sceneReconstruction.anchorUpdates {
-            print("reconstruction update")
+            // print("reconstruction update")
             let meshAnchor = update.anchor
             let mesh_description = meshAnchor.geometry.description
-            print(mesh_description)
+            // print(mesh_description)
         }
     }
 
@@ -111,7 +115,7 @@ extension 🥽AppModel {
         guard worldTracking.state == .running else { return }
         
         let deviceAnchor = worldTracking.queryDeviceAnchor(atTimestamp: CACurrentMediaTime())
-        print(" *** device tracking running ")
+        // print(" *** device tracking running ")
 //        print(deviceAnchor?.originFromAnchorTransform)
         guard let deviceAnchor, deviceAnchor.isTracked else { return }
         DataManager.shared.latestHandTrackingData.Head = deviceAnchor.originFromAnchorTransform
@@ -120,12 +124,12 @@ extension 🥽AppModel {
     private func processHandUpdates() async {
         for await update in self.handTracking.anchorUpdates {
             let handAnchor = update.anchor
-            print("processHandUpates is running.")
+            // print("processHandUpates is running.")
             switch handAnchor.chirality {
             case .left:
                 DispatchQueue.main.async {
                     DataManager.shared.latestHandTrackingData.leftWrist = handAnchor.originFromAnchorTransform
-                    print(handAnchor.originFromAnchorTransform)
+                    // print(handAnchor.originFromAnchorTransform)
                     
 
                     let jointTypes: [HandSkeleton.JointName] = [
@@ -144,14 +148,14 @@ extension 🥽AppModel {
                         DataManager.shared.latestHandTrackingData.leftSkeleton.joints[index] = joint.anchorFromJointTransform
                     }
                     
-                    print("Updated left hand skeleton")
+                    // print("Updated left hand skeleton")
                     // Repeat for right hand and other fingers as needed
                 }
 
             case .right:
                 DispatchQueue.main.async {
                     DataManager.shared.latestHandTrackingData.rightWrist = handAnchor.originFromAnchorTransform
-                    print(handAnchor.originFromAnchorTransform)
+                    // print(handAnchor.originFromAnchorTransform)
                     
                     let jointTypes: [HandSkeleton.JointName] = [
                         .wrist,
@@ -166,11 +170,11 @@ extension 🥽AppModel {
                         guard let joint = handAnchor.handSkeleton?.joint(jointType), joint.isTracked else {
                             continue
                         }
-                        print(index)
+                        // print(index)
                         DataManager.shared.latestHandTrackingData.rightSkeleton.joints[index] = joint.anchorFromJointTransform
                     }
                     
-                    print("Updated right hand skeleton")
+                    // print("Updated right hand skeleton")
                 }
             }
             
@@ -191,21 +195,81 @@ class HandTrackingServiceProvider: Handtracking_HandTrackingServiceProvider {
         context: StreamingResponseCallContext<Handtracking_HandUpdate>
     ) -> EventLoopFuture<GRPCStatus> {
         let eventLoop = context.eventLoop
+        print("📥 [DEBUG] streamHandUpdates called - client connected!")
+        
+        // Check for WebRTC info in metadata (gRPC headers)
+        let headers = context.headers
+        if let webrtcInfo = headers.first(name: "webrtc-info") {
+            print("🎞️ [DEBUG] Found WebRTC info in metadata: \(webrtcInfo)")
+            let parts = webrtcInfo.split(separator: "|")
+            if parts.count == 5 {
+                let ip1 = Int(parts[0]) ?? 0
+                let ip2 = Int(parts[1]) ?? 0
+                let ip3 = Int(parts[2]) ?? 0
+                let ip4 = Int(parts[3]) ?? 0
+                let port = Int(parts[4]) ?? 9999
+                let host = "\(ip1).\(ip2).\(ip3).\(ip4)"
+                print("🎞️ WebRTC server from metadata: \(host):\(port)")
+                DataManager.shared.webrtcServerInfo = (host: host, port: port)
+            }
+        }
+        
+        print("🔍 [DEBUG] Checking for discovery message (m00=\(request.head.m00))...")
+        
+        // Check if this is a special "discovery" message from Python
+        // Python will send a message with Head.m00 = 888.0 to announce its presence
+        // and encode its IP in subsequent matrix elements
+        if request.head.m00 == 888.0 {
+            print("✨ [DEBUG] Discovery message detected!")
+            let ip1 = Int(request.head.m01)
+            let ip2 = Int(request.head.m02)
+            let ip3 = Int(request.head.m03)
+            let ip4 = Int(request.head.m10)
+            let pythonIP = "\(ip1).\(ip2).\(ip3).\(ip4)"
+            print("🔍 Python client discovered at: \(pythonIP)")
+            print("💾 [DEBUG] Storing Python IP in DataManager...")
+            DataManager.shared.pythonClientIP = pythonIP
+        } else if request.head.m00 == 999.0 {
+            // WebRTC server info message
+            print("🎞️ [DEBUG] WebRTC server info message detected!")
+            let ip1 = Int(request.head.m01)
+            let ip2 = Int(request.head.m02)
+            let ip3 = Int(request.head.m03)
+            let ip4 = Int(request.head.m10)
+            let port = Int(request.head.m11)
+            let host = "\(ip1).\(ip2).\(ip3).\(ip4)"
+            print("🎞️ WebRTC server available at: \(host):\(port)")
+            print("💾 [DEBUG] Storing WebRTC info in DataManager...")
+            DataManager.shared.webrtcServerInfo = (host: host, port: port)
+        } else {
+            print("⚠️ [DEBUG] Not a special message (expected m00=888.0 or 999.0, got \(request.head.m00))")
+        }
+        
+        print("🔄 [DEBUG] Starting hand tracking data stream...")
         print("hey...")
         // Example task to simulate sending hand tracking data.
         // In a real application, you would replace this with actual data collection and streaming.
+        print("⏱️ [DEBUG] Scheduling repeated task for hand tracking updates (10ms interval)...")
+        var updateCount = 0
         let task = eventLoop.scheduleRepeatedAsyncTask(initialDelay: .milliseconds(10), delay: .milliseconds(10)) { task -> EventLoopFuture<Void> in
 //            var handUpdate = Handtracking_HandUpdate()
             
             let recent_hand = fill_handUpdate()
-            print("sending...")
+            updateCount += 1
+            if updateCount == 1 || updateCount % 100 == 0 {
+                print("📤 [DEBUG] Sending hand update #\(updateCount)...")
+            }
             
             // Send the update to the client.
             return context.sendResponse(recent_hand).map { _ in }
         }
 
         // Ensure the task is cancelled when the client disconnects or the stream is otherwise closed.
-        context.statusPromise.futureResult.whenComplete { _ in task.cancel() }
+        print("🔗 [DEBUG] Setting up disconnect handler...")
+        context.statusPromise.futureResult.whenComplete { result in
+            print("🔌 [DEBUG] Client disconnected or stream closed. Sent \(updateCount) updates. Result: \(result)")
+            task.cancel()
+        }
 
         // Return a future that will complete when the streaming operation is done.
         // Here, we're indicating that the stream will remain open indefinitely until the client disconnects.
@@ -214,26 +278,40 @@ class HandTrackingServiceProvider: Handtracking_HandTrackingServiceProvider {
 }
 
 func startServer() {
+    print("📡 [DEBUG] startServer() - Starting gRPC server setup...")
     DispatchQueue.global().async {
+        print("🔧 [DEBUG] Dispatched to background thread")
         
         let port = 12345
         let host = "0.0.0.0"
+        print("🔧 [DEBUG] Server configuration: host=\(host), port=\(port)")
         
+        print("🔧 [DEBUG] Creating MultiThreadedEventLoopGroup...")
         let group = MultiThreadedEventLoopGroup(numberOfThreads: 2)
         defer {
+            print("🔧 [DEBUG] Shutting down EventLoopGroup...")
             try! group.syncShutdownGracefully()
         }
         
+        print("🔧 [DEBUG] Creating HandTrackingServiceProvider...")
         let provider = HandTrackingServiceProvider()
         
+        print("🔧 [DEBUG] Building gRPC server with provider...")
         let server = GRPC.Server.insecure(group: group)
             .withServiceProviders([provider])
             .bind(host: host, port: port)
         
+        print("🔧 [DEBUG] Server binding initiated, waiting for result...")
         server.map {
             $0.channel.localAddress
         }.whenSuccess { address in
-            print("server started on \(address!) \(address!.port!) ")
+            print("🟢 gRPC server started on \(address!) port \(address!.port!)")
+            print("✅ [DEBUG] Server is now accepting connections")
+            DataManager.shared.grpcServerReady = true
+        }
+        
+        server.whenFailure { error in
+            print("❌ [DEBUG] Server failed to start: \(error)")
         }
         
         //         Wait on the server's `onClose` future to stop the program from exiting.
