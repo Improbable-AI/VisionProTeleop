@@ -116,20 +116,57 @@ struct ImmersiveView: View {
                 statusContainer.move(to: transform, relativeTo: statusContainer.parent, duration: 0.5, timingFunction: .easeInOut)
             }
 
+            // Check if stereo mode is enabled
+            let isStereo = DataManager.shared.stereoEnabled
+            print("DEBUG: Stereo mode: \(isStereo)")
             
-            // For simple unlit material (mono display):
-            var skyBoxMaterial = UnlitMaterial()
-            do {
-                // Use right image for mono display (or combine left/right as needed)
-                let texture = try TextureResource.generate(
-                    from: imageRight.cgImage!,
-                    options: TextureResource.CreateOptions.init(semantic: nil)
-                )
-                skyBoxMaterial.color = .init(texture: .init(texture))
-                skyBox.components[ModelComponent.self]?.materials = [skyBoxMaterial]
-                print("DEBUG: Updated video texture successfully")
-            } catch {
-                print("ERROR: Failed to load texture: \(error)")
+            if isStereo {
+                // Stereo mode: Split side-by-side image and render to separate eyes
+                do {
+                    // For stereo, we need to split the side-by-side image
+                    // Left half goes to left eye, right half to right eye
+                    let leftTexture = try TextureResource.generate(
+                        from: imageLeft.cgImage!,
+                        options: TextureResource.CreateOptions.init(semantic: nil)
+                    )
+                    let rightTexture = try TextureResource.generate(
+                        from: imageRight.cgImage!,
+                        options: TextureResource.CreateOptions.init(semantic: nil)
+                    )
+                    
+                    // Create a shader graph material for stereo rendering
+                    // Note: This requires a custom shader material created in Reality Composer Pro
+                    // For now, we'll attempt to use it if available, otherwise fall back to mono
+                    if var stereoMaterial = skyBox.components[ModelComponent.self]?.materials.first as? ShaderGraphMaterial {
+                        try stereoMaterial.setParameter(name: "left", value: .textureResource(leftTexture))
+                        try stereoMaterial.setParameter(name: "right", value: .textureResource(rightTexture))
+                        skyBox.components[ModelComponent.self]?.materials = [stereoMaterial]
+                        print("DEBUG: Updated stereo textures successfully")
+                    } else {
+                        // Fallback: Create stereo material programmatically or use UnlitMaterial
+                        print("WARNING: ShaderGraphMaterial not found, falling back to mono display")
+                        var skyBoxMaterial = UnlitMaterial()
+                        skyBoxMaterial.color = .init(texture: .init(rightTexture))
+                        skyBox.components[ModelComponent.self]?.materials = [skyBoxMaterial]
+                    }
+                } catch {
+                    print("ERROR: Failed to load stereo textures: \(error)")
+                }
+            } else {
+                // Mono mode: Use simple unlit material
+                var skyBoxMaterial = UnlitMaterial()
+                do {
+                    // Use right image for mono display
+                    let texture = try TextureResource.generate(
+                        from: imageRight.cgImage!,
+                        options: TextureResource.CreateOptions.init(semantic: nil)
+                    )
+                    skyBoxMaterial.color = .init(texture: .init(texture))
+                    skyBox.components[ModelComponent.self]?.materials = [skyBoxMaterial]
+                    print("DEBUG: Updated mono video texture successfully")
+                } catch {
+                    print("ERROR: Failed to load mono texture: \(error)")
+                }
             }
         } attachments: {
             Attachment(id: "status") {
@@ -330,9 +367,46 @@ class VideoFrameRenderer: NSObject, LKRTCVideoRenderer {
         let uiImage = UIImage(cgImage: cgImage)
         
         DispatchQueue.main.async { [weak self] in
-            self?.imageData?.left = uiImage
-            self?.imageData?.right = uiImage
+            // Check if stereo mode is enabled
+            let isStereo = DataManager.shared.stereoEnabled
+            
+            if isStereo {
+                // Split side-by-side image into left and right
+                let (leftImage, rightImage) = self?.splitSideBySideImage(uiImage) ?? (uiImage, uiImage)
+                self?.imageData?.left = leftImage
+                self?.imageData?.right = rightImage
+            } else {
+                // Mono mode: use same image for both
+                self?.imageData?.left = uiImage
+                self?.imageData?.right = uiImage
+            }
         }
+    }
+    
+    private func splitSideBySideImage(_ image: UIImage) -> (UIImage, UIImage) {
+        guard let cgImage = image.cgImage else {
+            return (image, image)
+        }
+        
+        let width = cgImage.width
+        let height = cgImage.height
+        let halfWidth = width / 2
+        
+        // Crop left half
+        let leftRect = CGRect(x: 0, y: 0, width: halfWidth, height: height)
+        guard let leftCGImage = cgImage.cropping(to: leftRect) else {
+            return (image, image)
+        }
+        let leftImage = UIImage(cgImage: leftCGImage)
+        
+        // Crop right half
+        let rightRect = CGRect(x: halfWidth, y: 0, width: halfWidth, height: height)
+        guard let rightCGImage = cgImage.cropping(to: rightRect) else {
+            return (image, image)
+        }
+        let rightImage = UIImage(cgImage: rightCGImage)
+        
+        return (leftImage, rightImage)
     }
     
     private func extractPixelBuffer(from frame: LKRTCVideoFrame) -> CVPixelBuffer? {

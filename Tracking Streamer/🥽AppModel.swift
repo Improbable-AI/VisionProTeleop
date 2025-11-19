@@ -28,6 +28,7 @@ class DataManager {
     var pythonClientIP: String? = nil  // Store Python client's IP when it connects via gRPC
     var grpcServerReady: Bool = false  // Indicates if gRPC server is ready to accept connections
     var webrtcServerInfo: (host: String, port: Int)? = nil  // WebRTC server info from gRPC
+    var stereoEnabled: Bool = false  // Whether stereo video mode is enabled
     
     private init() {}
 }
@@ -237,10 +238,12 @@ class HandTrackingServiceProvider: Handtracking_HandTrackingServiceProvider {
             let ip3 = Int(request.head.m03)
             let ip4 = Int(request.head.m10)
             let port = Int(request.head.m11)
+            let stereo = request.head.m12 > 0.5  // Stereo flag
             let host = "\(ip1).\(ip2).\(ip3).\(ip4)"
-            print("🎞️ WebRTC server available at: \(host):\(port)")
+            print("🎞️ WebRTC server available at: \(host):\(port) (stereo=\(stereo))")
             print("💾 [DEBUG] Storing WebRTC info in DataManager...")
             DataManager.shared.webrtcServerInfo = (host: host, port: port)
+            DataManager.shared.stereoEnabled = stereo
         } else {
             print("⚠️ [DEBUG] Not a special message (expected m00=888.0 or 999.0, got \(request.head.m00))")
         }

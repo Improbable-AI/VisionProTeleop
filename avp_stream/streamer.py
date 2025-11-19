@@ -214,7 +214,7 @@ class VisionProStreamer:
     
     def start_video_streaming(self, video_device="0:none", format="avfoundation", 
                              options={"video_size": "640x480", "framerate": "30"}, 
-                             port=9999):
+                             port=9999, stereo=False):
         """
         Start WebRTC video streaming server.
         VisionOS will discover the server address by querying the info HTTP endpoint.
@@ -224,6 +224,7 @@ class VisionProStreamer:
             format: Video format (default: "avfoundation" for macOS)
             options: Video options dict (default: 640x480 @ 30fps)
             port: Port to run WebRTC server on (default: 9999)
+            stereo: If True, stream side-by-side stereo video (default: False)
         """
         from avp_stream.visual.server import run_peer
         
@@ -236,12 +237,13 @@ class VisionProStreamer:
         self.webrtc_info = {
             "host": local_ip,
             "port": port,
-            "status": "ready"
+            "status": "ready",
+            "stereo": stereo
         }
         
         # Send WebRTC server info via gRPC
-        print(f"📤 Sending WebRTC server info via gRPC...")
-        self._send_webrtc_info_via_grpc(local_ip, port)
+        print(f"📤 Sending WebRTC server info via gRPC (stereo={stereo})...")
+        self._send_webrtc_info_via_grpc(local_ip, port, stereo)
         
         # Create a new event loop for the WebRTC server in a separate thread
         def start_async_server():
@@ -341,7 +343,7 @@ class VisionProStreamer:
         print(f"✓ WebRTC server ready at {local_ip}:{port}")
         print(f"✓ VisionOS can query http://{local_ip}:8888/webrtc_info to get connection details")
     
-    def _send_webrtc_info_via_grpc(self, host, port):
+    def _send_webrtc_info_via_grpc(self, host, port, stereo=False):
         """Send WebRTC server info to VisionOS by opening a new gRPC connection."""
         try:
             ip_parts = host.split('.')
@@ -361,6 +363,7 @@ class VisionProStreamer:
                     webrtc_msg.Head.m03 = float(ip_parts[2])
                     webrtc_msg.Head.m10 = float(ip_parts[3])
                     webrtc_msg.Head.m11 = float(port)
+                    webrtc_msg.Head.m12 = 1.0 if stereo else 0.0  # Stereo flag
                     
                     stub = handtracking_pb2_grpc.HandTrackingServiceStub(channel)
                     # Send the message and immediately close
@@ -368,7 +371,7 @@ class VisionProStreamer:
                     # Just start the stream but don't consume responses
                     next(responses)  # Get first response to ensure message was sent
                     
-                    print(f"✓ WebRTC info sent via gRPC: {host}:{port}")
+                    print(f"✓ WebRTC info sent via gRPC: {host}:{port} (stereo={stereo})")
                 except Exception as e:
                     print(f"⚠️  Error sending WebRTC info via gRPC: {e}")
                     

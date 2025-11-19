@@ -1,18 +1,46 @@
-# subscriber.py
+#!/usr/bin/env python3
+"""
+Example script demonstrating video streaming from Python to VisionOS.
 
-from avp_stream import VisionProStreamer
-import argparse 
-from typing import * 
+Usage:
+1. Launch the VisionOS app on Vision Pro
+2. Press "Start" with video streaming toggled ON
+3. Run this script: python example_video_streaming.py
+4. The video feed should appear in the VisionOS app
+"""
 
-if __name__ == "__main__": 
+from avp_stream.streamer import VisionProStreamer
+import time
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--ip', type = str, required = True)
-    parser.add_argument('--record', action = 'store_true')
-    args = parser.parse_args()
+def main():
+    VISION_PRO_IP = "169.254.45.56" 
+    
+    streamer = VisionProStreamer(ip=VISION_PRO_IP, record=True)
+    
+    streamer.start_video_streaming(
+        video_device="0:none",          # macOS webcam (device 0)
+        format="avfoundation",           # macOS video format
+        options={
+            "video_size": "640x480",     # Resolution
+            "framerate": "30"            # FPS
+        }
+    )
+    
+    try:
+        # Keep the script running and show hand tracking data
+        while True:
+            latest = streamer.get_latest()
+            
+            if latest:
 
-    s = VisionProStreamer(args.ip, args.record)
+                pass 
+                left_pos = latest["left_wrist"][0, :3, 3]
+                right_pos = latest["right_wrist"][0, :3, 3]
+            
+            time.sleep(0.1)
+            
+    except KeyboardInterrupt:
+        print("\n\n✓ Stopped streaming")
 
-    while True:
-        latest = s.latest
-        print(latest['head'][:, :3, -1], latest['right_wrist'][:, :3, -1], latest['right_fingers'].shape)
+if __name__ == "__main__":
+    main()
