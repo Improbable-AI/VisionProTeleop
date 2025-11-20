@@ -1,0 +1,49 @@
+name: Deploy Documentation to GitHub Pages
+
+on:
+  push:
+    branches:
+      - visual  # Change to your default branch if different
+      - main
+    paths:
+      - 'docs/build/html/**'
+  workflow_dispatch:  # Allow manual triggering
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for all branches
+    
+    - name: Check if docs/build/html exists
+      run: |
+        if [ ! -d "docs/build/html" ]; then
+          echo "Error: docs/build/html directory not found"
+          echo "Please build the documentation locally first using ./build_docs.sh"
+          exit 1
+        fi
+        echo "Documentation found in docs/build/html"
+        ls -la docs/build/html
+    
+    - name: Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./docs/build/html
+        publish_branch: gh-pages
+        force_orphan: true  # Keep gh-pages clean
+        user_name: 'github-actions[bot]'
+        user_email: 'github-actions[bot]@users.noreply.github.com'
+        commit_message: 'Deploy documentation'
+    
+    - name: Summary
+      run: |
+        echo "✓ Documentation deployed to GitHub Pages"
+        echo "Visit: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
