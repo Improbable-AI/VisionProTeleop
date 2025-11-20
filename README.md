@@ -1,14 +1,26 @@
 VisionProTeleop
 ===========
 
-> **🎉 UPDATE: Now supporting Low-Latency Video Streaming!** You can now stream back your robot's camera feed back to Vision Pro via webRTC protocol, alongside the original hand tracking data stream. 
-No complicated network setting required. Download the app, `pip install avp_stream`, and you're done!
 
-![CleanShot 2024-03-03 at 13 55 11@2x](https://github.com/Improbable-AI/VisionProTeleop/assets/68195716/d87a906c-ccf3-4e2d-bd25-a66dc0df803b)
+> **🎉 UPDATE: Now supporting Low-Latency Video Streaming!** You can now stream back your robot's camera feed back to Vision Pro via webRTC protocol, alongside the original hand tracking data stream. No complicated network setting required. Download the app, `pip install avp_stream`, and you're done!
 
 
+<div align="center">
+  <img width="340" src="assets/new-logo.png">
+</div>
+<p align="center">
+  <a href="https://pypi.org/project/avp_stream/">
+    <img src="https://img.shields.io/pypi/v/avp_stream" alt="CI">
+  </a>
+  <a href="https://pypi.org/project/avp_stream/">
+    <img src="https://img.shields.io/pypi/dm/avp_stream" alt="CI">
+  </a>  
+  <a href="https://opensource.org/licenses/MIT">
+    <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="CI">
+  </a>
+</p>
 
-Wanna use your new Apple Vision Pro to control your robot?  Wanna record how you navigate and manipulate the world?  
+
 
 This VisionOS app and python library streams your Head + Wrist + Hand Tracking result via gRPC over a WiFi network, so any robots connected to the same wifi network can subscribe and use. **It can also stream stereo (or mono) camera feeds from your robot, back to the Vision Pro.**
 
@@ -42,7 +54,7 @@ After installation, click on the app on Vision Pro and click `Start`. That's it!
 **Tip**  Remember the IP address before you click start; you need to specify this IP address to subscribe to the data. Once you click start, the app will immediately enter into pass-through mode. Click on the digital crown to stop streaming.  
 
 
-### Step 3. Receive the stream from anywhere
+### Step 3. Receive the hand tracking data from anywhere
 
 The following python package allows you to receive the data stream from any device that's connected to the same WiFi network. First, install the package: 
 
@@ -62,7 +74,7 @@ while True:
     print(r['head'], r['right_wrist'], r['right_fingers'])
 ```
 
-### Step 4. [🎉NEW FEATURE] Stream video feeds from your robot back to Vision Pro! 
+### Step 4. [🎉NEW FEATURE] Stream video feeds back to Vision Pro! 
 
 Streaming your robot's video feed back to Vision Pro requires one additional line: `start_video_streaming`. 
 
