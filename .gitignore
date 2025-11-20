@@ -1,6 +1,3 @@
 /*.egg-info
 /dist 
 *.pyc
-
-# Sphinx documentation build files
-docs/build/

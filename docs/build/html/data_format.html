@@ -1,0 +1,707 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Data Format &mdash; VisionProTeleop 2.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=60dbed4a"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Video Streaming" href="video_streaming.html" />
+    <link rel="prev" title="Usage Guide" href="usage.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            VisionProTeleop
+              <img src="_static/new-logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#python-package">Python Package</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="installation.html#requirements">Requirements</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#vision-pro-app">Vision Pro App</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="installation.html#app-store-installation">App Store Installation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="installation.html#manual-installation-development">Manual Installation (Development)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#network-setup">Network Setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#verifying-installation">Verifying Installation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#basic-hand-tracking">Basic Hand Tracking</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="quickstart.html#finding-your-vision-pro-s-ip-address">Finding Your Vision Pro’s IP Address</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#with-video-streaming">With Video Streaming</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="quickstart.html#finding-the-right-camera-configuration">Finding the Right Camera Configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#simple-example-projects">Simple Example Projects</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#next-steps">Next Steps</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="usage.html">Usage Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="usage.html#basic-workflow">Basic Workflow</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="usage.html#step-1-start-the-vision-pro-app">Step 1: Start the Vision Pro App</a></li>
+<li class="toctree-l3"><a class="reference internal" href="usage.html#step-2-initialize-the-streamer">Step 2: Initialize the Streamer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="usage.html#step-3-access-tracking-data">Step 3: Access Tracking Data</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="usage.html#video-streaming-options">Video Streaming Options</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="usage.html#basic-video-streaming">Basic Video Streaming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="usage.html#stereo-video-streaming">Stereo Video Streaming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="usage.html#frame-processing">Frame Processing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="usage.html#synthetic-frames">Synthetic Frames</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="usage.html#app-features">App Features</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="usage.html#status-window">Status Window</a></li>
+<li class="toctree-l3"><a class="reference internal" href="usage.html#video-viewport-control">Video Viewport Control</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="usage.html#troubleshooting">Troubleshooting</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="usage.html#camera-not-found">Camera Not Found</a></li>
+<li class="toctree-l3"><a class="reference internal" href="usage.html#connection-issues">Connection Issues</a></li>
+<li class="toctree-l3"><a class="reference internal" href="usage.html#low-video-frame-rate">Low Video Frame Rate</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="usage.html#best-practices">Best Practices</a></li>
+</ul>
+</li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Data Format</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#tracking-data-dictionary">Tracking Data Dictionary</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#head-tracking">Head Tracking</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#wrist-tracking">Wrist Tracking</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#finger-tracking">Finger Tracking</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pinch-distance">Pinch Distance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#wrist-roll">Wrist Roll</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#coordinate-systems">Coordinate Systems</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#axis-convention">Axis Convention</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#transformation-matrices">Transformation Matrices</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#hand-skeleton-structure">Hand Skeleton Structure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#working-with-transformation-matrices">Working with Transformation Matrices</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#extracting-position">Extracting Position</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#extracting-rotation">Extracting Rotation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#transforming-points">Transforming Points</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#computing-relative-poses">Computing Relative Poses</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#units-and-scaling">Units and Scaling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#frame-rates">Frame Rates</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#data-quality-considerations">Data Quality Considerations</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="video_streaming.html">Video Streaming</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="video_streaming.html#overview">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="video_streaming.html#basic-setup">Basic Setup</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="video_streaming.html#enable-video-on-vision-pro">Enable Video on Vision Pro</a></li>
+<li class="toctree-l3"><a class="reference internal" href="video_streaming.html#start-streaming-from-python">Start Streaming from Python</a></li>
+<li class="toctree-l3"><a class="reference internal" href="video_streaming.html#parameters">Parameters</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="video_streaming.html#finding-camera-configuration">Finding Camera Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="video_streaming.html#use-the-test-script">Use the Test Script</a></li>
+<li class="toctree-l3"><a class="reference internal" href="video_streaming.html#example-output">Example Output</a></li>
+<li class="toctree-l3"><a class="reference internal" href="video_streaming.html#common-configurations">Common Configurations</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="video_streaming.html#advanced-usage">Advanced Usage</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="video_streaming.html#stereo-camera-streaming">Stereo Camera Streaming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="video_streaming.html#frame-processing">Frame Processing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="video_streaming.html#multiple-processing-steps">Multiple Processing Steps</a></li>
+<li class="toctree-l3"><a class="reference internal" href="video_streaming.html#synthetic-frame-generation">Synthetic Frame Generation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="video_streaming.html#integration-with-simulation">Integration with Simulation</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="video_streaming.html#performance-optimization">Performance Optimization</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="video_streaming.html#resolution-guidelines">Resolution Guidelines</a></li>
+<li class="toctree-l3"><a class="reference internal" href="video_streaming.html#frame-rate-guidelines">Frame Rate Guidelines</a></li>
+<li class="toctree-l3"><a class="reference internal" href="video_streaming.html#reducing-latency">Reducing Latency</a></li>
+<li class="toctree-l3"><a class="reference internal" href="video_streaming.html#monitoring-performance">Monitoring Performance</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="video_streaming.html#troubleshooting">Troubleshooting</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="video_streaming.html#no-video-appears">No Video Appears</a></li>
+<li class="toctree-l3"><a class="reference internal" href="video_streaming.html#poor-video-quality">Poor Video Quality</a></li>
+<li class="toctree-l3"><a class="reference internal" href="video_streaming.html#high-latency">High Latency</a></li>
+<li class="toctree-l3"><a class="reference internal" href="video_streaming.html#frame-drops">Frame Drops</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="video_streaming.html#examples">Examples</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="examples.html#complete-examples">Complete Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="examples.html#example-1-basic-camera-streaming">Example 1: Basic Camera Streaming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="examples.html#example-2-frame-processing">Example 2: Frame Processing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="examples.html#example-3-synthetic-frames">Example 3: Synthetic Frames</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="examples.html#use-case-examples">Use Case Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="examples.html#robot-teleoperation">Robot Teleoperation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="examples.html#hand-gesture-recognition">Hand Gesture Recognition</a></li>
+<li class="toctree-l3"><a class="reference internal" href="examples.html#bilateral-teleoperation">Bilateral Teleoperation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="examples.html#simulation-integration">Simulation Integration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="examples.html#data-recording">Data Recording</a></li>
+<li class="toctree-l3"><a class="reference internal" href="examples.html#multi-modal-control">Multi-Modal Control</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="examples.html#tips-and-best-practices">Tips and Best Practices</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api/modules.html">API Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="api/streamer.html">VisionProStreamer</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/streamer.html#avp_stream.streamer.VisionProStreamer"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="api/streamer.html#avp_stream.streamer.VisionProStreamer.__init__"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/streamer.html#avp_stream.streamer.VisionProStreamer.start_streaming"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.start_streaming()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/streamer.html#avp_stream.streamer.VisionProStreamer.stream"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.stream()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/streamer.html#avp_stream.streamer.VisionProStreamer.get_latest"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.get_latest()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/streamer.html#avp_stream.streamer.VisionProStreamer.get_recording"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.get_recording()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/streamer.html#avp_stream.streamer.VisionProStreamer.get_local_ip"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.get_local_ip()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/streamer.html#avp_stream.streamer.VisionProStreamer.register_frame_callback"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.register_frame_callback()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/streamer.html#avp_stream.streamer.VisionProStreamer.start_video_streaming"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.start_video_streaming()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="api/streamer.html#classes">Classes</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="api/streamer.html#id0"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/streamer.html#main-methods">Main Methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/streamer.html#example-usage">Example Usage</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api/isaac_env.html">Isaac Environment</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/isaac_env.html#classes-and-functions">Classes and Functions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/isaac_env.html#overview">Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/isaac_env.html#example-usage">Example Usage</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/isaac_env.html#see-also">See Also</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api/utils.html">Utilities</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/utils.html#module-avp_stream.utils.grpc_utils">gRPC Utils</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="api/utils.html#avp_stream.utils.grpc_utils.process_matrix"><code class="docutils literal notranslate"><span class="pre">process_matrix()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/utils.html#avp_stream.utils.grpc_utils.process_matrices"><code class="docutils literal notranslate"><span class="pre">process_matrices()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/utils.html#avp_stream.utils.grpc_utils.rotate_head"><code class="docutils literal notranslate"><span class="pre">rotate_head()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/utils.html#avp_stream.utils.grpc_utils.get_pinch_distance"><code class="docutils literal notranslate"><span class="pre">get_pinch_distance()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/utils.html#avp_stream.utils.grpc_utils.get_wrist_roll"><code class="docutils literal notranslate"><span class="pre">get_wrist_roll()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="api/utils.html#isaac-utils">Isaac Utils</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/utils.html#module-avp_stream.utils.se3_utils">SE(3) Transformations</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="api/utils.html#avp_stream.utils.se3_utils.standardize_quaternion"><code class="docutils literal notranslate"><span class="pre">standardize_quaternion()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/utils.html#avp_stream.utils.se3_utils.matrix_to_quaternion"><code class="docutils literal notranslate"><span class="pre">matrix_to_quaternion()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/utils.html#avp_stream.utils.se3_utils.quaternion_to_matrix"><code class="docutils literal notranslate"><span class="pre">quaternion_to_matrix()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/utils.html#avp_stream.utils.se3_utils.isaac_mat2quat"><code class="docutils literal notranslate"><span class="pre">isaac_mat2quat()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/utils.html#avp_stream.utils.se3_utils.mat2posquat"><code class="docutils literal notranslate"><span class="pre">mat2posquat()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/utils.html#avp_stream.utils.se3_utils.posquat2mat"><code class="docutils literal notranslate"><span class="pre">posquat2mat()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/utils.html#key-functions">Key Functions</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="api/utils.html#module-avp_stream.utils.trn_constants">Constants</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/utils.html#common-utilities">Common Utilities</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="api/utils.html#working-with-transformation-matrices">Working with Transformation Matrices</a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/utils.html#coordinate-frame-transformations">Coordinate Frame Transformations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/utils.html#relative-pose-computation">Relative Pose Computation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/utils.html#distance-calculations">Distance Calculations</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api/visual.html">Visual Streaming</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/visual.html#overview">Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/visual.html#module-avp_stream.visual.client">Client Module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="api/visual.html#avp_stream.visual.client.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="api/visual.html#module-avp_stream.visual.server">Server Module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="api/visual.html#avp_stream.visual.server.run_peer"><code class="docutils literal notranslate"><span class="pre">run_peer()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/visual.html#avp_stream.visual.server.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="api/visual.html#architecture">Architecture</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="api/visual.html#components">Components</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="api/visual.html#usage-examples">Usage Examples</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="api/visual.html#basic-client-usage">Basic Client Usage</a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/visual.html#with-frame-processing">With Frame Processing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/visual.html#synthetic-frames">Synthetic Frames</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="api/visual.html#advanced-configuration">Advanced Configuration</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="api/visual.html#video-encoding-settings">Video Encoding Settings</a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/visual.html#stereo-configuration">Stereo Configuration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/visual.html#network-configuration">Network Configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="api/visual.html#performance-tuning">Performance Tuning</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="api/visual.html#latency-optimization">Latency Optimization</a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/visual.html#bandwidth-optimization">Bandwidth Optimization</a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/visual.html#quality-optimization">Quality Optimization</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="api/visual.html#troubleshooting">Troubleshooting</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="api/visual.html#connection-issues">Connection Issues</a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/visual.html#poor-video-quality">Poor Video Quality</a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/visual.html#high-latency">High Latency</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="api/visual.html#see-also">See Also</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="api/streamer.html">VisionProStreamer</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="api/streamer.html#avp_stream.streamer.VisionProStreamer"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/streamer.html#avp_stream.streamer.VisionProStreamer.__init__"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/streamer.html#avp_stream.streamer.VisionProStreamer.start_streaming"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.start_streaming()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/streamer.html#avp_stream.streamer.VisionProStreamer.stream"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.stream()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/streamer.html#avp_stream.streamer.VisionProStreamer.get_latest"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.get_latest()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/streamer.html#avp_stream.streamer.VisionProStreamer.get_recording"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.get_recording()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/streamer.html#avp_stream.streamer.VisionProStreamer.get_local_ip"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.get_local_ip()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/streamer.html#avp_stream.streamer.VisionProStreamer.register_frame_callback"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.register_frame_callback()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/streamer.html#avp_stream.streamer.VisionProStreamer.start_video_streaming"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.start_video_streaming()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api/streamer.html#classes">Classes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/streamer.html#id0"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="api/streamer.html#id1"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/streamer.html#id2"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.start_video_streaming()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/streamer.html#id3"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.register_frame_callback()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/streamer.html#id4"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/streamer.html#id5"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.start_streaming()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/streamer.html#id6"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.stream()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/streamer.html#id7"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.get_latest()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/streamer.html#id8"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.get_recording()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/streamer.html#id9"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.get_local_ip()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/streamer.html#id10"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.register_frame_callback()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/streamer.html#id11"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.start_video_streaming()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="api/streamer.html#main-methods">Main Methods</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="api/streamer.html#avp_stream.streamer.__init__"><code class="docutils literal notranslate"><span class="pre">__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/streamer.html#avp_stream.streamer.start_video_streaming"><code class="docutils literal notranslate"><span class="pre">start_video_streaming()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/streamer.html#avp_stream.streamer.register_frame_callback"><code class="docutils literal notranslate"><span class="pre">register_frame_callback()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/streamer.html#avp_stream.streamer.stop"><code class="docutils literal notranslate"><span class="pre">stop()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/streamer.html#avp_stream.streamer.latest"><code class="docutils literal notranslate"><span class="pre">latest</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="api/streamer.html#example-usage">Example Usage</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="api/isaac_env.html">Isaac Environment</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="api/isaac_env.html#classes-and-functions">Classes and Functions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api/isaac_env.html#overview">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api/isaac_env.html#example-usage">Example Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api/isaac_env.html#see-also">See Also</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="api/utils.html">Utilities</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="api/utils.html#module-avp_stream.utils.grpc_utils">gRPC Utils</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/utils.html#avp_stream.utils.grpc_utils.process_matrix"><code class="docutils literal notranslate"><span class="pre">process_matrix()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/utils.html#avp_stream.utils.grpc_utils.process_matrices"><code class="docutils literal notranslate"><span class="pre">process_matrices()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/utils.html#avp_stream.utils.grpc_utils.rotate_head"><code class="docutils literal notranslate"><span class="pre">rotate_head()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/utils.html#avp_stream.utils.grpc_utils.get_pinch_distance"><code class="docutils literal notranslate"><span class="pre">get_pinch_distance()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/utils.html#avp_stream.utils.grpc_utils.get_wrist_roll"><code class="docutils literal notranslate"><span class="pre">get_wrist_roll()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api/utils.html#isaac-utils">Isaac Utils</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api/utils.html#module-avp_stream.utils.se3_utils">SE(3) Transformations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/utils.html#avp_stream.utils.se3_utils.standardize_quaternion"><code class="docutils literal notranslate"><span class="pre">standardize_quaternion()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/utils.html#avp_stream.utils.se3_utils.matrix_to_quaternion"><code class="docutils literal notranslate"><span class="pre">matrix_to_quaternion()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/utils.html#avp_stream.utils.se3_utils.quaternion_to_matrix"><code class="docutils literal notranslate"><span class="pre">quaternion_to_matrix()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/utils.html#avp_stream.utils.se3_utils.isaac_mat2quat"><code class="docutils literal notranslate"><span class="pre">isaac_mat2quat()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/utils.html#avp_stream.utils.se3_utils.mat2posquat"><code class="docutils literal notranslate"><span class="pre">mat2posquat()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/utils.html#avp_stream.utils.se3_utils.posquat2mat"><code class="docutils literal notranslate"><span class="pre">posquat2mat()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/utils.html#key-functions">Key Functions</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api/utils.html#module-avp_stream.utils.trn_constants">Constants</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api/utils.html#common-utilities">Common Utilities</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/utils.html#working-with-transformation-matrices">Working with Transformation Matrices</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/utils.html#coordinate-frame-transformations">Coordinate Frame Transformations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/utils.html#relative-pose-computation">Relative Pose Computation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/utils.html#distance-calculations">Distance Calculations</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="api/visual.html">Visual Streaming</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="api/visual.html#overview">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api/visual.html#module-avp_stream.visual.client">Client Module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/visual.html#avp_stream.visual.client.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api/visual.html#module-avp_stream.visual.server">Server Module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/visual.html#avp_stream.visual.server.run_peer"><code class="docutils literal notranslate"><span class="pre">run_peer()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/visual.html#avp_stream.visual.server.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api/visual.html#architecture">Architecture</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/visual.html#components">Components</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="api/visual.html#video-capture">Video Capture</a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/visual.html#frame-processing">Frame Processing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/visual.html#webrtc-streaming">WebRTC Streaming</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api/visual.html#usage-examples">Usage Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/visual.html#basic-client-usage">Basic Client Usage</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/visual.html#with-frame-processing">With Frame Processing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/visual.html#synthetic-frames">Synthetic Frames</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api/visual.html#advanced-configuration">Advanced Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/visual.html#video-encoding-settings">Video Encoding Settings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/visual.html#stereo-configuration">Stereo Configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/visual.html#network-configuration">Network Configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api/visual.html#performance-tuning">Performance Tuning</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/visual.html#latency-optimization">Latency Optimization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/visual.html#bandwidth-optimization">Bandwidth Optimization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/visual.html#quality-optimization">Quality Optimization</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api/visual.html#troubleshooting">Troubleshooting</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/visual.html#connection-issues">Connection Issues</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/visual.html#poor-video-quality">Poor Video Quality</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/visual.html#high-latency">High Latency</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api/visual.html#see-also">See Also</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Additional Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="acknowledgements.html">Acknowledgements</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="acknowledgements.html#research-team">Research Team</a></li>
+<li class="toctree-l2"><a class="reference internal" href="acknowledgements.html#contributing">Contributing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="acknowledgements.html#community">Community</a></li>
+<li class="toctree-l2"><a class="reference internal" href="acknowledgements.html#related-projects">Related Projects</a></li>
+<li class="toctree-l2"><a class="reference internal" href="acknowledgements.html#publications">Publications</a></li>
+<li class="toctree-l2"><a class="reference internal" href="acknowledgements.html#contact">Contact</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="license.html">License</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="license.html#mit-license">MIT License</a></li>
+<li class="toctree-l2"><a class="reference internal" href="license.html#what-this-means">What This Means</a></li>
+<li class="toctree-l2"><a class="reference internal" href="license.html#third-party-licenses">Third-Party Licenses</a></li>
+<li class="toctree-l2"><a class="reference internal" href="license.html#attribution">Attribution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="license.html#disclaimer">Disclaimer</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">VisionProTeleop</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Data Format</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/data_format.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="data-format">
+<h1>Data Format<a class="headerlink" href="#data-format" title="Link to this heading"></a></h1>
+<p>This page describes the structure and format of tracking data returned by VisionProTeleop.</p>
+<section id="tracking-data-dictionary">
+<h2>Tracking Data Dictionary<a class="headerlink" href="#tracking-data-dictionary" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">latest</span></code> property returns a dictionary with the following keys:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">data</span> <span class="o">=</span> <span class="n">streamer</span><span class="o">.</span><span class="n">latest</span>
+<span class="c1"># Returns a dict with these keys:</span>
+</pre></div>
+</div>
+<section id="head-tracking">
+<h3>Head Tracking<a class="headerlink" href="#head-tracking" title="Link to this heading"></a></h3>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">data['head']</span></code></dt><dd><ul class="simple">
+<li><p>Type: <code class="docutils literal notranslate"><span class="pre">numpy.ndarray</span></code></p></li>
+<li><p>Shape: <code class="docutils literal notranslate"><span class="pre">(1,</span> <span class="pre">4,</span> <span class="pre">4)</span></code></p></li>
+<li><p>Description: 4x4 homogeneous transformation matrix representing the head pose</p></li>
+<li><p>Reference frame: Ground frame</p></li>
+</ul>
+</dd>
+</dl>
+</section>
+<section id="wrist-tracking">
+<h3>Wrist Tracking<a class="headerlink" href="#wrist-tracking" title="Link to this heading"></a></h3>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">data['right_wrist']</span></code></dt><dd><ul class="simple">
+<li><p>Type: <code class="docutils literal notranslate"><span class="pre">numpy.ndarray</span></code></p></li>
+<li><p>Shape: <code class="docutils literal notranslate"><span class="pre">(1,</span> <span class="pre">4,</span> <span class="pre">4)</span></code></p></li>
+<li><p>Description: 4x4 homogeneous transformation matrix for right wrist pose</p></li>
+<li><p>Reference frame: Ground frame</p></li>
+</ul>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">data['left_wrist']</span></code></dt><dd><ul class="simple">
+<li><p>Type: <code class="docutils literal notranslate"><span class="pre">numpy.ndarray</span></code></p></li>
+<li><p>Shape: <code class="docutils literal notranslate"><span class="pre">(1,</span> <span class="pre">4,</span> <span class="pre">4)</span></code></p></li>
+<li><p>Description: 4x4 homogeneous transformation matrix for left wrist pose</p></li>
+<li><p>Reference frame: Ground frame</p></li>
+</ul>
+</dd>
+</dl>
+</section>
+<section id="finger-tracking">
+<h3>Finger Tracking<a class="headerlink" href="#finger-tracking" title="Link to this heading"></a></h3>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">data['right_fingers']</span></code></dt><dd><ul class="simple">
+<li><p>Type: <code class="docutils literal notranslate"><span class="pre">numpy.ndarray</span></code></p></li>
+<li><p>Shape: <code class="docutils literal notranslate"><span class="pre">(25,</span> <span class="pre">4,</span> <span class="pre">4)</span></code></p></li>
+<li><p>Description: Array of 25 transformation matrices, one for each joint in the right hand</p></li>
+<li><p>Reference frame: Right wrist frame</p></li>
+</ul>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">data['left_fingers']</span></code></dt><dd><ul class="simple">
+<li><p>Type: <code class="docutils literal notranslate"><span class="pre">numpy.ndarray</span></code></p></li>
+<li><p>Shape: <code class="docutils literal notranslate"><span class="pre">(25,</span> <span class="pre">4,</span> <span class="pre">4)</span></code></p></li>
+<li><p>Description: Array of 25 transformation matrices, one for each joint in the left hand</p></li>
+<li><p>Reference frame: Left wrist frame</p></li>
+</ul>
+</dd>
+</dl>
+</section>
+<section id="pinch-distance">
+<h3>Pinch Distance<a class="headerlink" href="#pinch-distance" title="Link to this heading"></a></h3>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">data['right_pinch_distance']</span></code></dt><dd><ul class="simple">
+<li><p>Type: <code class="docutils literal notranslate"><span class="pre">float</span></code></p></li>
+<li><p>Description: Euclidean distance between right index fingertip and thumb tip</p></li>
+<li><p>Units: Meters</p></li>
+</ul>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">data['left_pinch_distance']</span></code></dt><dd><ul class="simple">
+<li><p>Type: <code class="docutils literal notranslate"><span class="pre">float</span></code></p></li>
+<li><p>Description: Euclidean distance between left index fingertip and thumb tip</p></li>
+<li><p>Units: Meters</p></li>
+</ul>
+</dd>
+</dl>
+</section>
+<section id="wrist-roll">
+<h3>Wrist Roll<a class="headerlink" href="#wrist-roll" title="Link to this heading"></a></h3>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">data['right_wrist_roll']</span></code></dt><dd><ul class="simple">
+<li><p>Type: <code class="docutils literal notranslate"><span class="pre">float</span></code></p></li>
+<li><p>Description: Rotation angle of the right wrist around the arm axis</p></li>
+<li><p>Units: Radians</p></li>
+</ul>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">data['left_wrist_roll']</span></code></dt><dd><ul class="simple">
+<li><p>Type: <code class="docutils literal notranslate"><span class="pre">float</span></code></p></li>
+<li><p>Description: Rotation angle of the left wrist around the arm axis</p></li>
+<li><p>Units: Radians</p></li>
+</ul>
+</dd>
+</dl>
+</section>
+</section>
+<section id="coordinate-systems">
+<h2>Coordinate Systems<a class="headerlink" href="#coordinate-systems" title="Link to this heading"></a></h2>
+<section id="axis-convention">
+<h3>Axis Convention<a class="headerlink" href="#axis-convention" title="Link to this heading"></a></h3>
+<p>VisionProTeleop uses the following axis conventions:</p>
+<ul class="simple">
+<li><p><strong>X-axis</strong>: Points to the right</p></li>
+<li><p><strong>Y-axis</strong>: Points upward</p></li>
+<li><p><strong>Z-axis</strong>: Points backward (following right-hand rule)</p></li>
+</ul>
+<p>For detailed axis orientations for head, wrist, and fingers, refer to the axis convention diagram in the repository.</p>
+</section>
+<section id="transformation-matrices">
+<h3>Transformation Matrices<a class="headerlink" href="#transformation-matrices" title="Link to this heading"></a></h3>
+<p>All poses are represented as 4x4 homogeneous transformation matrices:</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}T = \begin{bmatrix}
+R_{11} &amp; R_{12} &amp; R_{13} &amp; t_x \\
+R_{21} &amp; R_{22} &amp; R_{23} &amp; t_y \\
+R_{31} &amp; R_{32} &amp; R_{33} &amp; t_z \\
+0 &amp; 0 &amp; 0 &amp; 1
+\end{bmatrix}\end{split}\]</div>
+<p>Where:
+- The upper-left 3x3 block is the rotation matrix R
+- The rightmost column (top 3 elements) is the translation vector t
+- All translations are in meters</p>
+</section>
+</section>
+<section id="hand-skeleton-structure">
+<h2>Hand Skeleton Structure<a class="headerlink" href="#hand-skeleton-structure" title="Link to this heading"></a></h2>
+<p>Each hand has 25 joints tracked in the following order:</p>
+<ol class="arabic simple">
+<li><p><strong>Wrist</strong> (joint 0)</p></li>
+<li><p><strong>Thumb</strong> (joints 1-4): Metacarpal → Proximal → Intermediate → Distal</p></li>
+<li><p><strong>Index Finger</strong> (joints 5-8): Metacarpal → Proximal → Intermediate → Distal</p></li>
+<li><p><strong>Middle Finger</strong> (joints 9-12): Metacarpal → Proximal → Intermediate → Distal</p></li>
+<li><p><strong>Ring Finger</strong> (joints 13-16): Metacarpal → Proximal → Intermediate → Distal</p></li>
+<li><p><strong>Pinky</strong> (joints 17-20): Metacarpal → Proximal → Intermediate → Distal</p></li>
+<li><p><strong>Palm</strong> (joints 21-24): Additional palm tracking points</p></li>
+</ol>
+<p>See the hand skeleton diagram in the repository for a visual reference.</p>
+</section>
+<section id="working-with-transformation-matrices">
+<h2>Working with Transformation Matrices<a class="headerlink" href="#working-with-transformation-matrices" title="Link to this heading"></a></h2>
+<section id="extracting-position">
+<h3>Extracting Position<a class="headerlink" href="#extracting-position" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="n">data</span> <span class="o">=</span> <span class="n">streamer</span><span class="o">.</span><span class="n">latest</span>
+<span class="n">head_matrix</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;head&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># Remove batch dimension</span>
+
+<span class="c1"># Extract position (translation)</span>
+<span class="n">position</span> <span class="o">=</span> <span class="n">head_matrix</span><span class="p">[:</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Head position: x=</span><span class="si">{</span><span class="n">position</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">, y=</span><span class="si">{</span><span class="n">position</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2">, z=</span><span class="si">{</span><span class="n">position</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="extracting-rotation">
+<h3>Extracting Rotation<a class="headerlink" href="#extracting-rotation" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Extract rotation matrix</span>
+<span class="n">rotation</span> <span class="o">=</span> <span class="n">head_matrix</span><span class="p">[:</span><span class="mi">3</span><span class="p">,</span> <span class="p">:</span><span class="mi">3</span><span class="p">]</span>
+
+<span class="c1"># Convert to Euler angles (example using scipy)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">scipy.spatial.transform</span><span class="w"> </span><span class="kn">import</span> <span class="n">Rotation</span> <span class="k">as</span> <span class="n">R</span>
+<span class="n">r</span> <span class="o">=</span> <span class="n">R</span><span class="o">.</span><span class="n">from_matrix</span><span class="p">(</span><span class="n">rotation</span><span class="p">)</span>
+<span class="n">euler_angles</span> <span class="o">=</span> <span class="n">r</span><span class="o">.</span><span class="n">as_euler</span><span class="p">(</span><span class="s1">&#39;xyz&#39;</span><span class="p">,</span> <span class="n">degrees</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Euler angles: </span><span class="si">{</span><span class="n">euler_angles</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="transforming-points">
+<h3>Transforming Points<a class="headerlink" href="#transforming-points" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Transform a point from wrist frame to ground frame</span>
+<span class="n">finger_in_wrist</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;right_fingers&#39;</span><span class="p">][</span><span class="mi">5</span><span class="p">]</span>  <span class="c1"># Index finger metacarpal</span>
+<span class="n">wrist_in_ground</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;right_wrist&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+
+<span class="c1"># Combine transformations</span>
+<span class="n">finger_in_ground</span> <span class="o">=</span> <span class="n">wrist_in_ground</span> <span class="o">@</span> <span class="n">finger_in_wrist</span>
+</pre></div>
+</div>
+</section>
+<section id="computing-relative-poses">
+<h3>Computing Relative Poses<a class="headerlink" href="#computing-relative-poses" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Compute right wrist pose relative to head</span>
+<span class="n">head_inv</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">inv</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;head&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span>
+<span class="n">wrist_relative_to_head</span> <span class="o">=</span> <span class="n">head_inv</span> <span class="o">@</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;right_wrist&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="units-and-scaling">
+<h2>Units and Scaling<a class="headerlink" href="#units-and-scaling" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Distance/Position</strong>: Meters</p></li>
+<li><p><strong>Rotation</strong>: Radians (for wrist roll) or rotation matrices</p></li>
+<li><p><strong>Time</strong>: Data is streamed in real-time, timestamps depend on network latency</p></li>
+</ul>
+</section>
+<section id="frame-rates">
+<h2>Frame Rates<a class="headerlink" href="#frame-rates" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Tracking data</strong>: Typically 30-90 Hz depending on Vision Pro’s update rate</p></li>
+<li><p><strong>Video streaming</strong>: Configurable, typically 30-60 fps</p></li>
+<li><p><strong>Network latency</strong>: Usually 20-50ms on good WiFi networks</p></li>
+</ul>
+</section>
+<section id="data-quality-considerations">
+<h2>Data Quality Considerations<a class="headerlink" href="#data-quality-considerations" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p><strong>Occlusion</strong>: Hand tracking may be less accurate when hands are not in the Vision Pro’s field of view</p></li>
+<li><p><strong>Lighting</strong>: Very dark environments may affect tracking quality</p></li>
+<li><p><strong>Network</strong>: WiFi quality affects both tracking data rate and video stream quality</p></li>
+<li><p><strong>Distance</strong>: Tracking is most accurate within 0.5-2 meters from the Vision Pro</p></li>
+</ol>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="usage.html" class="btn btn-neutral float-left" title="Usage Guide" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="video_streaming.html" class="btn btn-neutral float-right" title="Video Streaming" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Younghyo Park.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

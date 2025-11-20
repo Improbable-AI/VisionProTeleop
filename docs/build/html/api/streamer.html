@@ -1,0 +1,861 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VisionProStreamer &mdash; VisionProTeleop 2.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=60dbed4a"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Isaac Environment" href="isaac_env.html" />
+    <link rel="prev" title="API Reference" href="modules.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            VisionProTeleop
+              <img src="../_static/new-logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../installation.html#python-package">Python Package</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../installation.html#requirements">Requirements</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../installation.html#vision-pro-app">Vision Pro App</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../installation.html#app-store-installation">App Store Installation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../installation.html#manual-installation-development">Manual Installation (Development)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../installation.html#network-setup">Network Setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation.html#verifying-installation">Verifying Installation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quick Start</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../quickstart.html#basic-hand-tracking">Basic Hand Tracking</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../quickstart.html#finding-your-vision-pro-s-ip-address">Finding Your Vision Pro’s IP Address</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../quickstart.html#with-video-streaming">With Video Streaming</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../quickstart.html#finding-the-right-camera-configuration">Finding the Right Camera Configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../quickstart.html#simple-example-projects">Simple Example Projects</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../quickstart.html#next-steps">Next Steps</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../usage.html">Usage Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../usage.html#basic-workflow">Basic Workflow</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../usage.html#step-1-start-the-vision-pro-app">Step 1: Start the Vision Pro App</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../usage.html#step-2-initialize-the-streamer">Step 2: Initialize the Streamer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../usage.html#step-3-access-tracking-data">Step 3: Access Tracking Data</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../usage.html#video-streaming-options">Video Streaming Options</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../usage.html#basic-video-streaming">Basic Video Streaming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../usage.html#stereo-video-streaming">Stereo Video Streaming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../usage.html#frame-processing">Frame Processing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../usage.html#synthetic-frames">Synthetic Frames</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../usage.html#app-features">App Features</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../usage.html#status-window">Status Window</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../usage.html#video-viewport-control">Video Viewport Control</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../usage.html#troubleshooting">Troubleshooting</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../usage.html#camera-not-found">Camera Not Found</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../usage.html#connection-issues">Connection Issues</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../usage.html#low-video-frame-rate">Low Video Frame Rate</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../usage.html#best-practices">Best Practices</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../data_format.html">Data Format</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../data_format.html#tracking-data-dictionary">Tracking Data Dictionary</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../data_format.html#head-tracking">Head Tracking</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../data_format.html#wrist-tracking">Wrist Tracking</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../data_format.html#finger-tracking">Finger Tracking</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../data_format.html#pinch-distance">Pinch Distance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../data_format.html#wrist-roll">Wrist Roll</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../data_format.html#coordinate-systems">Coordinate Systems</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../data_format.html#axis-convention">Axis Convention</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../data_format.html#transformation-matrices">Transformation Matrices</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../data_format.html#hand-skeleton-structure">Hand Skeleton Structure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../data_format.html#working-with-transformation-matrices">Working with Transformation Matrices</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../data_format.html#extracting-position">Extracting Position</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../data_format.html#extracting-rotation">Extracting Rotation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../data_format.html#transforming-points">Transforming Points</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../data_format.html#computing-relative-poses">Computing Relative Poses</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../data_format.html#units-and-scaling">Units and Scaling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../data_format.html#frame-rates">Frame Rates</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../data_format.html#data-quality-considerations">Data Quality Considerations</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../video_streaming.html">Video Streaming</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../video_streaming.html#overview">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../video_streaming.html#basic-setup">Basic Setup</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../video_streaming.html#enable-video-on-vision-pro">Enable Video on Vision Pro</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../video_streaming.html#start-streaming-from-python">Start Streaming from Python</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../video_streaming.html#parameters">Parameters</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../video_streaming.html#finding-camera-configuration">Finding Camera Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../video_streaming.html#use-the-test-script">Use the Test Script</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../video_streaming.html#example-output">Example Output</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../video_streaming.html#common-configurations">Common Configurations</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../video_streaming.html#advanced-usage">Advanced Usage</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../video_streaming.html#stereo-camera-streaming">Stereo Camera Streaming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../video_streaming.html#frame-processing">Frame Processing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../video_streaming.html#multiple-processing-steps">Multiple Processing Steps</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../video_streaming.html#synthetic-frame-generation">Synthetic Frame Generation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../video_streaming.html#integration-with-simulation">Integration with Simulation</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../video_streaming.html#performance-optimization">Performance Optimization</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../video_streaming.html#resolution-guidelines">Resolution Guidelines</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../video_streaming.html#frame-rate-guidelines">Frame Rate Guidelines</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../video_streaming.html#reducing-latency">Reducing Latency</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../video_streaming.html#monitoring-performance">Monitoring Performance</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../video_streaming.html#troubleshooting">Troubleshooting</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../video_streaming.html#no-video-appears">No Video Appears</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../video_streaming.html#poor-video-quality">Poor Video Quality</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../video_streaming.html#high-latency">High Latency</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../video_streaming.html#frame-drops">Frame Drops</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../video_streaming.html#examples">Examples</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../examples.html#complete-examples">Complete Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples.html#example-1-basic-camera-streaming">Example 1: Basic Camera Streaming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples.html#example-2-frame-processing">Example 2: Frame Processing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples.html#example-3-synthetic-frames">Example 3: Synthetic Frames</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples.html#use-case-examples">Use Case Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples.html#robot-teleoperation">Robot Teleoperation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples.html#hand-gesture-recognition">Hand Gesture Recognition</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples.html#bilateral-teleoperation">Bilateral Teleoperation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples.html#simulation-integration">Simulation Integration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples.html#data-recording">Data Recording</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples.html#multi-modal-control">Multi-Modal Control</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples.html#tips-and-best-practices">Tips and Best Practices</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">API Reference</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">VisionProStreamer</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#avp_stream.streamer.VisionProStreamer"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#avp_stream.streamer.VisionProStreamer.__init__"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#avp_stream.streamer.VisionProStreamer.start_streaming"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.start_streaming()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#avp_stream.streamer.VisionProStreamer.stream"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.stream()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#avp_stream.streamer.VisionProStreamer.get_latest"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.get_latest()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#avp_stream.streamer.VisionProStreamer.get_recording"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.get_recording()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#avp_stream.streamer.VisionProStreamer.get_local_ip"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.get_local_ip()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#avp_stream.streamer.VisionProStreamer.register_frame_callback"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.register_frame_callback()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#avp_stream.streamer.VisionProStreamer.start_video_streaming"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.start_video_streaming()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#classes">Classes</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#id0"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main-methods">Main Methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#example-usage">Example Usage</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="isaac_env.html">Isaac Environment</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="isaac_env.html#classes-and-functions">Classes and Functions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="isaac_env.html#overview">Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="isaac_env.html#example-usage">Example Usage</a></li>
+<li class="toctree-l3"><a class="reference internal" href="isaac_env.html#see-also">See Also</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="utils.html">Utilities</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="utils.html#module-avp_stream.utils.grpc_utils">gRPC Utils</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="utils.html#avp_stream.utils.grpc_utils.process_matrix"><code class="docutils literal notranslate"><span class="pre">process_matrix()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="utils.html#avp_stream.utils.grpc_utils.process_matrices"><code class="docutils literal notranslate"><span class="pre">process_matrices()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="utils.html#avp_stream.utils.grpc_utils.rotate_head"><code class="docutils literal notranslate"><span class="pre">rotate_head()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="utils.html#avp_stream.utils.grpc_utils.get_pinch_distance"><code class="docutils literal notranslate"><span class="pre">get_pinch_distance()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="utils.html#avp_stream.utils.grpc_utils.get_wrist_roll"><code class="docutils literal notranslate"><span class="pre">get_wrist_roll()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="utils.html#isaac-utils">Isaac Utils</a></li>
+<li class="toctree-l3"><a class="reference internal" href="utils.html#module-avp_stream.utils.se3_utils">SE(3) Transformations</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="utils.html#avp_stream.utils.se3_utils.standardize_quaternion"><code class="docutils literal notranslate"><span class="pre">standardize_quaternion()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="utils.html#avp_stream.utils.se3_utils.matrix_to_quaternion"><code class="docutils literal notranslate"><span class="pre">matrix_to_quaternion()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="utils.html#avp_stream.utils.se3_utils.quaternion_to_matrix"><code class="docutils literal notranslate"><span class="pre">quaternion_to_matrix()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="utils.html#avp_stream.utils.se3_utils.isaac_mat2quat"><code class="docutils literal notranslate"><span class="pre">isaac_mat2quat()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="utils.html#avp_stream.utils.se3_utils.mat2posquat"><code class="docutils literal notranslate"><span class="pre">mat2posquat()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="utils.html#avp_stream.utils.se3_utils.posquat2mat"><code class="docutils literal notranslate"><span class="pre">posquat2mat()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="utils.html#key-functions">Key Functions</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="utils.html#module-avp_stream.utils.trn_constants">Constants</a></li>
+<li class="toctree-l3"><a class="reference internal" href="utils.html#common-utilities">Common Utilities</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="utils.html#working-with-transformation-matrices">Working with Transformation Matrices</a></li>
+<li class="toctree-l4"><a class="reference internal" href="utils.html#coordinate-frame-transformations">Coordinate Frame Transformations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="utils.html#relative-pose-computation">Relative Pose Computation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="utils.html#distance-calculations">Distance Calculations</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="visual.html">Visual Streaming</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="visual.html#overview">Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="visual.html#module-avp_stream.visual.client">Client Module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="visual.html#avp_stream.visual.client.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="visual.html#module-avp_stream.visual.server">Server Module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="visual.html#avp_stream.visual.server.run_peer"><code class="docutils literal notranslate"><span class="pre">run_peer()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="visual.html#avp_stream.visual.server.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="visual.html#architecture">Architecture</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="visual.html#components">Components</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="visual.html#usage-examples">Usage Examples</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="visual.html#basic-client-usage">Basic Client Usage</a></li>
+<li class="toctree-l4"><a class="reference internal" href="visual.html#with-frame-processing">With Frame Processing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="visual.html#synthetic-frames">Synthetic Frames</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="visual.html#advanced-configuration">Advanced Configuration</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="visual.html#video-encoding-settings">Video Encoding Settings</a></li>
+<li class="toctree-l4"><a class="reference internal" href="visual.html#stereo-configuration">Stereo Configuration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="visual.html#network-configuration">Network Configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="visual.html#performance-tuning">Performance Tuning</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="visual.html#latency-optimization">Latency Optimization</a></li>
+<li class="toctree-l4"><a class="reference internal" href="visual.html#bandwidth-optimization">Bandwidth Optimization</a></li>
+<li class="toctree-l4"><a class="reference internal" href="visual.html#quality-optimization">Quality Optimization</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="visual.html#troubleshooting">Troubleshooting</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="visual.html#connection-issues">Connection Issues</a></li>
+<li class="toctree-l4"><a class="reference internal" href="visual.html#poor-video-quality">Poor Video Quality</a></li>
+<li class="toctree-l4"><a class="reference internal" href="visual.html#high-latency">High Latency</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="visual.html#see-also">See Also</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">VisionProStreamer</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#avp_stream.streamer.VisionProStreamer"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#avp_stream.streamer.VisionProStreamer.__init__"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#avp_stream.streamer.VisionProStreamer.start_streaming"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.start_streaming()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#avp_stream.streamer.VisionProStreamer.stream"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.stream()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#avp_stream.streamer.VisionProStreamer.get_latest"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.get_latest()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#avp_stream.streamer.VisionProStreamer.get_recording"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.get_recording()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#avp_stream.streamer.VisionProStreamer.get_local_ip"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.get_local_ip()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#avp_stream.streamer.VisionProStreamer.register_frame_callback"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.register_frame_callback()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#avp_stream.streamer.VisionProStreamer.start_video_streaming"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.start_video_streaming()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#classes">Classes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id0"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#id1"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id2"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.start_video_streaming()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id3"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.register_frame_callback()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id4"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id5"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.start_streaming()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id6"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.stream()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id7"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.get_latest()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id8"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.get_recording()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id9"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.get_local_ip()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id10"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.register_frame_callback()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id11"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.start_video_streaming()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#main-methods">Main Methods</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#avp_stream.streamer.__init__"><code class="docutils literal notranslate"><span class="pre">__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#avp_stream.streamer.start_video_streaming"><code class="docutils literal notranslate"><span class="pre">start_video_streaming()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#avp_stream.streamer.register_frame_callback"><code class="docutils literal notranslate"><span class="pre">register_frame_callback()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#avp_stream.streamer.stop"><code class="docutils literal notranslate"><span class="pre">stop()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#avp_stream.streamer.latest"><code class="docutils literal notranslate"><span class="pre">latest</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#example-usage">Example Usage</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="isaac_env.html">Isaac Environment</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="isaac_env.html#classes-and-functions">Classes and Functions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="isaac_env.html#overview">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="isaac_env.html#example-usage">Example Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="isaac_env.html#see-also">See Also</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="utils.html">Utilities</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="utils.html#module-avp_stream.utils.grpc_utils">gRPC Utils</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="utils.html#avp_stream.utils.grpc_utils.process_matrix"><code class="docutils literal notranslate"><span class="pre">process_matrix()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="utils.html#avp_stream.utils.grpc_utils.process_matrices"><code class="docutils literal notranslate"><span class="pre">process_matrices()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="utils.html#avp_stream.utils.grpc_utils.rotate_head"><code class="docutils literal notranslate"><span class="pre">rotate_head()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="utils.html#avp_stream.utils.grpc_utils.get_pinch_distance"><code class="docutils literal notranslate"><span class="pre">get_pinch_distance()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="utils.html#avp_stream.utils.grpc_utils.get_wrist_roll"><code class="docutils literal notranslate"><span class="pre">get_wrist_roll()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="utils.html#isaac-utils">Isaac Utils</a></li>
+<li class="toctree-l2"><a class="reference internal" href="utils.html#module-avp_stream.utils.se3_utils">SE(3) Transformations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="utils.html#avp_stream.utils.se3_utils.standardize_quaternion"><code class="docutils literal notranslate"><span class="pre">standardize_quaternion()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="utils.html#avp_stream.utils.se3_utils.matrix_to_quaternion"><code class="docutils literal notranslate"><span class="pre">matrix_to_quaternion()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="utils.html#avp_stream.utils.se3_utils.quaternion_to_matrix"><code class="docutils literal notranslate"><span class="pre">quaternion_to_matrix()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="utils.html#avp_stream.utils.se3_utils.isaac_mat2quat"><code class="docutils literal notranslate"><span class="pre">isaac_mat2quat()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="utils.html#avp_stream.utils.se3_utils.mat2posquat"><code class="docutils literal notranslate"><span class="pre">mat2posquat()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="utils.html#avp_stream.utils.se3_utils.posquat2mat"><code class="docutils literal notranslate"><span class="pre">posquat2mat()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="utils.html#key-functions">Key Functions</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="utils.html#module-avp_stream.utils.trn_constants">Constants</a></li>
+<li class="toctree-l2"><a class="reference internal" href="utils.html#common-utilities">Common Utilities</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="utils.html#working-with-transformation-matrices">Working with Transformation Matrices</a></li>
+<li class="toctree-l3"><a class="reference internal" href="utils.html#coordinate-frame-transformations">Coordinate Frame Transformations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="utils.html#relative-pose-computation">Relative Pose Computation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="utils.html#distance-calculations">Distance Calculations</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="visual.html">Visual Streaming</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="visual.html#overview">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="visual.html#module-avp_stream.visual.client">Client Module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="visual.html#avp_stream.visual.client.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="visual.html#module-avp_stream.visual.server">Server Module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="visual.html#avp_stream.visual.server.run_peer"><code class="docutils literal notranslate"><span class="pre">run_peer()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="visual.html#avp_stream.visual.server.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="visual.html#architecture">Architecture</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="visual.html#components">Components</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="visual.html#video-capture">Video Capture</a></li>
+<li class="toctree-l4"><a class="reference internal" href="visual.html#frame-processing">Frame Processing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="visual.html#webrtc-streaming">WebRTC Streaming</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="visual.html#usage-examples">Usage Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="visual.html#basic-client-usage">Basic Client Usage</a></li>
+<li class="toctree-l3"><a class="reference internal" href="visual.html#with-frame-processing">With Frame Processing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="visual.html#synthetic-frames">Synthetic Frames</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="visual.html#advanced-configuration">Advanced Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="visual.html#video-encoding-settings">Video Encoding Settings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="visual.html#stereo-configuration">Stereo Configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="visual.html#network-configuration">Network Configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="visual.html#performance-tuning">Performance Tuning</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="visual.html#latency-optimization">Latency Optimization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="visual.html#bandwidth-optimization">Bandwidth Optimization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="visual.html#quality-optimization">Quality Optimization</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="visual.html#troubleshooting">Troubleshooting</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="visual.html#connection-issues">Connection Issues</a></li>
+<li class="toctree-l3"><a class="reference internal" href="visual.html#poor-video-quality">Poor Video Quality</a></li>
+<li class="toctree-l3"><a class="reference internal" href="visual.html#high-latency">High Latency</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="visual.html#see-also">See Also</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Additional Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../acknowledgements.html">Acknowledgements</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../acknowledgements.html#research-team">Research Team</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../acknowledgements.html#contributing">Contributing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../acknowledgements.html#community">Community</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../acknowledgements.html#related-projects">Related Projects</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../acknowledgements.html#publications">Publications</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../acknowledgements.html#contact">Contact</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../license.html#mit-license">MIT License</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../license.html#what-this-means">What This Means</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../license.html#third-party-licenses">Third-Party Licenses</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../license.html#attribution">Attribution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../license.html#disclaimer">Disclaimer</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">VisionProTeleop</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="modules.html">API Reference</a></li>
+      <li class="breadcrumb-item active">VisionProStreamer</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/api/streamer.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="visionprostreamer">
+<h1>VisionProStreamer<a class="headerlink" href="#visionprostreamer" title="Link to this heading"></a></h1>
+<p>The main interface for receiving tracking data and streaming video.</p>
+<dl class="py class" id="module-avp_stream.streamer">
+<dt class="sig sig-object py" id="avp_stream.streamer.VisionProStreamer">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">avp_stream.streamer.</span></span><span class="sig-name descname"><span class="pre">VisionProStreamer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ip</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">record</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/avp_stream/streamer.html#VisionProStreamer"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#avp_stream.streamer.VisionProStreamer" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="avp_stream.streamer.VisionProStreamer.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ip</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">record</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/avp_stream/streamer.html#VisionProStreamer.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#avp_stream.streamer.VisionProStreamer.__init__" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="avp_stream.streamer.VisionProStreamer.start_streaming">
+<span class="sig-name descname"><span class="pre">start_streaming</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/avp_stream/streamer.html#VisionProStreamer.start_streaming"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#avp_stream.streamer.VisionProStreamer.start_streaming" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="avp_stream.streamer.VisionProStreamer.stream">
+<span class="sig-name descname"><span class="pre">stream</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/avp_stream/streamer.html#VisionProStreamer.stream"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#avp_stream.streamer.VisionProStreamer.stream" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="avp_stream.streamer.VisionProStreamer.get_latest">
+<span class="sig-name descname"><span class="pre">get_latest</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/avp_stream/streamer.html#VisionProStreamer.get_latest"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#avp_stream.streamer.VisionProStreamer.get_latest" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="avp_stream.streamer.VisionProStreamer.get_recording">
+<span class="sig-name descname"><span class="pre">get_recording</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/avp_stream/streamer.html#VisionProStreamer.get_recording"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#avp_stream.streamer.VisionProStreamer.get_recording" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="avp_stream.streamer.VisionProStreamer.get_local_ip">
+<span class="sig-name descname"><span class="pre">get_local_ip</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/avp_stream/streamer.html#VisionProStreamer.get_local_ip"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#avp_stream.streamer.VisionProStreamer.get_local_ip" title="Link to this definition"></a></dt>
+<dd><p>Get the local IP address of this machine</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="avp_stream.streamer.VisionProStreamer.register_frame_callback">
+<span class="sig-name descname"><span class="pre">register_frame_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">callback</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/avp_stream/streamer.html#VisionProStreamer.register_frame_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#avp_stream.streamer.VisionProStreamer.register_frame_callback" title="Link to this definition"></a></dt>
+<dd><p>Register a callback function to process video frames before streaming.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>callback</strong> – A function that takes a numpy array (frame in BGR24 format)
+and returns a processed numpy array of the same shape.
+Example: lambda frame: cv2.putText(frame, “Hello”, (10,30), …)</p>
+</dd>
+</dl>
+<p class="rubric">Example</p>
+<dl>
+<dt>def my_processor(frame):</dt><dd><p>import cv2
+return cv2.putText(frame, “Hello VisionPro!”, (50, 50),</p>
+<blockquote>
+<div><p>cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)</p>
+</div></blockquote>
+</dd>
+</dl>
+<p>streamer.register_frame_callback(my_processor)
+streamer.start_video_streaming()</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="avp_stream.streamer.VisionProStreamer.start_video_streaming">
+<span class="sig-name descname"><span class="pre">start_video_streaming</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'0:none'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">format</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'avfoundation'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fps</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">30</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'640x480'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">port</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">9999</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stereo</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/avp_stream/streamer.html#VisionProStreamer.start_video_streaming"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#avp_stream.streamer.VisionProStreamer.start_video_streaming" title="Link to this definition"></a></dt>
+<dd><p>Start WebRTC video streaming server.
+VisionOS will discover the server address by querying the info HTTP endpoint.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>device</strong> – Video device identifier (default: “0:none” for macOS).
+Set to None to generate frames programmatically without a camera.</p></li>
+<li><p><strong>format</strong> – Video format (default: “avfoundation” for macOS).
+Ignored if device=None.</p></li>
+<li><p><strong>fps</strong> – Frame rate (default: 30)</p></li>
+<li><p><strong>size</strong> – Frame size as “WIDTHxHEIGHT” string (default: “640x480”)</p></li>
+<li><p><strong>port</strong> – Port to run WebRTC server on (default: 9999)</p></li>
+<li><p><strong>stereo</strong> – If True, stream side-by-side stereo video (default: False)</p></li>
+</ul>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul class="simple">
+<li><p>Use register_frame_callback() to add custom frame processing</p></li>
+<li><p>If device=None, the callback MUST generate frames (not just modify them)</p></li>
+<li><p>Without device, callback receives a blank frame to populate</p></li>
+</ul>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+<section id="classes">
+<h2>Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="id0">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">avp_stream.streamer.</span></span><span class="sig-name descname"><span class="pre">VisionProStreamer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ip</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">record</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/avp_stream/streamer.html#VisionProStreamer"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id0" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="id1">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ip</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">record</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/avp_stream/streamer.html#VisionProStreamer.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id1" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id2">
+<span class="sig-name descname"><span class="pre">start_video_streaming</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'0:none'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">format</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'avfoundation'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fps</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">30</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'640x480'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">port</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">9999</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stereo</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/avp_stream/streamer.html#VisionProStreamer.start_video_streaming"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id2" title="Link to this definition"></a></dt>
+<dd><p>Start WebRTC video streaming server.
+VisionOS will discover the server address by querying the info HTTP endpoint.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>device</strong> – Video device identifier (default: “0:none” for macOS).
+Set to None to generate frames programmatically without a camera.</p></li>
+<li><p><strong>format</strong> – Video format (default: “avfoundation” for macOS).
+Ignored if device=None.</p></li>
+<li><p><strong>fps</strong> – Frame rate (default: 30)</p></li>
+<li><p><strong>size</strong> – Frame size as “WIDTHxHEIGHT” string (default: “640x480”)</p></li>
+<li><p><strong>port</strong> – Port to run WebRTC server on (default: 9999)</p></li>
+<li><p><strong>stereo</strong> – If True, stream side-by-side stereo video (default: False)</p></li>
+</ul>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul class="simple">
+<li><p>Use register_frame_callback() to add custom frame processing</p></li>
+<li><p>If device=None, the callback MUST generate frames (not just modify them)</p></li>
+<li><p>Without device, callback receives a blank frame to populate</p></li>
+</ul>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id3">
+<span class="sig-name descname"><span class="pre">register_frame_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">callback</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/avp_stream/streamer.html#VisionProStreamer.register_frame_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id3" title="Link to this definition"></a></dt>
+<dd><p>Register a callback function to process video frames before streaming.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>callback</strong> – A function that takes a numpy array (frame in BGR24 format)
+and returns a processed numpy array of the same shape.
+Example: lambda frame: cv2.putText(frame, “Hello”, (10,30), …)</p>
+</dd>
+</dl>
+<p class="rubric">Example</p>
+<dl>
+<dt>def my_processor(frame):</dt><dd><p>import cv2
+return cv2.putText(frame, “Hello VisionPro!”, (50, 50),</p>
+<blockquote>
+<div><p>cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)</p>
+</div></blockquote>
+</dd>
+</dl>
+<p>streamer.register_frame_callback(my_processor)
+streamer.start_video_streaming()</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id4">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ip</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">record</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/avp_stream/streamer.html#VisionProStreamer.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id4" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id5">
+<span class="sig-name descname"><span class="pre">start_streaming</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/avp_stream/streamer.html#VisionProStreamer.start_streaming"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id5" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id6">
+<span class="sig-name descname"><span class="pre">stream</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/avp_stream/streamer.html#VisionProStreamer.stream"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id6" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id7">
+<span class="sig-name descname"><span class="pre">get_latest</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/avp_stream/streamer.html#VisionProStreamer.get_latest"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id7" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id8">
+<span class="sig-name descname"><span class="pre">get_recording</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/avp_stream/streamer.html#VisionProStreamer.get_recording"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id8" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id9">
+<span class="sig-name descname"><span class="pre">get_local_ip</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/avp_stream/streamer.html#VisionProStreamer.get_local_ip"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id9" title="Link to this definition"></a></dt>
+<dd><p>Get the local IP address of this machine</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id10">
+<span class="sig-name descname"><span class="pre">register_frame_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">callback</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/avp_stream/streamer.html#VisionProStreamer.register_frame_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id10" title="Link to this definition"></a></dt>
+<dd><p>Register a callback function to process video frames before streaming.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>callback</strong> – A function that takes a numpy array (frame in BGR24 format)
+and returns a processed numpy array of the same shape.
+Example: lambda frame: cv2.putText(frame, “Hello”, (10,30), …)</p>
+</dd>
+</dl>
+<p class="rubric">Example</p>
+<dl>
+<dt>def my_processor(frame):</dt><dd><p>import cv2
+return cv2.putText(frame, “Hello VisionPro!”, (50, 50),</p>
+<blockquote>
+<div><p>cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)</p>
+</div></blockquote>
+</dd>
+</dl>
+<p>streamer.register_frame_callback(my_processor)
+streamer.start_video_streaming()</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id11">
+<span class="sig-name descname"><span class="pre">start_video_streaming</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'0:none'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">format</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'avfoundation'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fps</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">30</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'640x480'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">port</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">9999</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stereo</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/avp_stream/streamer.html#VisionProStreamer.start_video_streaming"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id11" title="Link to this definition"></a></dt>
+<dd><p>Start WebRTC video streaming server.
+VisionOS will discover the server address by querying the info HTTP endpoint.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>device</strong> – Video device identifier (default: “0:none” for macOS).
+Set to None to generate frames programmatically without a camera.</p></li>
+<li><p><strong>format</strong> – Video format (default: “avfoundation” for macOS).
+Ignored if device=None.</p></li>
+<li><p><strong>fps</strong> – Frame rate (default: 30)</p></li>
+<li><p><strong>size</strong> – Frame size as “WIDTHxHEIGHT” string (default: “640x480”)</p></li>
+<li><p><strong>port</strong> – Port to run WebRTC server on (default: 9999)</p></li>
+<li><p><strong>stereo</strong> – If True, stream side-by-side stereo video (default: False)</p></li>
+</ul>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul class="simple">
+<li><p>Use register_frame_callback() to add custom frame processing</p></li>
+<li><p>If device=None, the callback MUST generate frames (not just modify them)</p></li>
+<li><p>Without device, callback receives a blank frame to populate</p></li>
+</ul>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+<section id="main-methods">
+<h3>Main Methods<a class="headerlink" href="#main-methods" title="Link to this heading"></a></h3>
+<dl class="py method">
+<dt class="sig sig-object py" id="avp_stream.streamer.__init__">
+<span class="sig-prename descclassname"><span class="pre">avp_stream.streamer.</span></span><span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ip</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">port</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">50051</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#avp_stream.streamer.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize the Vision Pro streamer.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ip</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – IP address of the Vision Pro device</p></li>
+<li><p><strong>port</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – gRPC port number (default: 50051)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="avp_stream.streamer.start_video_streaming">
+<span class="sig-prename descclassname"><span class="pre">avp_stream.streamer.</span></span><span class="sig-name descname"><span class="pre">start_video_streaming</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">format</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">size</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fps</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stereo</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#avp_stream.streamer.start_video_streaming" title="Link to this definition"></a></dt>
+<dd><p>Start streaming video back to Vision Pro.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>device</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><em>None</em>) – Path to video device (e.g., “/dev/video0”) or None for synthetic</p></li>
+<li><p><strong>format</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><em>None</em>) – Video format (e.g., “v4l2”, “dshow”, “avfoundation”) or None</p></li>
+<li><p><strong>size</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Frame size as string (e.g., “640x480”)</p></li>
+<li><p><strong>fps</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Frames per second</p></li>
+<li><p><strong>stereo</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>) – Whether to stream stereo video (side-by-side format)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="avp_stream.streamer.register_frame_callback">
+<span class="sig-prename descclassname"><span class="pre">avp_stream.streamer.</span></span><span class="sig-name descname"><span class="pre">register_frame_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">callback</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#avp_stream.streamer.register_frame_callback" title="Link to this definition"></a></dt>
+<dd><p>Register a function to process frames before streaming.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>callback</strong> (<em>callable</em>) – Function that takes a frame (numpy array) and returns processed frame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="avp_stream.streamer.stop">
+<span class="sig-prename descclassname"><span class="pre">avp_stream.streamer.</span></span><span class="sig-name descname"><span class="pre">stop</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#avp_stream.streamer.stop" title="Link to this definition"></a></dt>
+<dd><p>Stop the streamer and release resources.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="avp_stream.streamer.latest">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">avp_stream.streamer.</span></span><span class="sig-name descname"><span class="pre">latest</span></span><a class="headerlink" href="#avp_stream.streamer.latest" title="Link to this definition"></a></dt>
+<dd><p>Get the latest tracking data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Dictionary containing tracking data</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)">dict</a></p>
+</dd>
+</dl>
+<p>Dictionary keys:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">head</span></code>: (1, 4, 4) numpy array - head pose in ground frame</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">right_wrist</span></code>: (1, 4, 4) numpy array - right wrist pose in ground frame</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">left_wrist</span></code>: (1, 4, 4) numpy array - left wrist pose in ground frame</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">right_fingers</span></code>: (25, 4, 4) numpy array - right finger joints in wrist frame</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">left_fingers</span></code>: (25, 4, 4) numpy array - left finger joints in wrist frame</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">right_pinch_distance</span></code>: float - distance between right thumb and index finger</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">left_pinch_distance</span></code>: float - distance between left thumb and index finger</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">right_wrist_roll</span></code>: float - rotation angle of right wrist around arm axis</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">left_wrist_roll</span></code>: float - rotation angle of left wrist around arm axis</p></li>
+</ul>
+</dd></dl>
+
+</section>
+<section id="example-usage">
+<h3>Example Usage<a class="headerlink" href="#example-usage" title="Link to this heading"></a></h3>
+<p>Basic usage:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">avp_stream</span><span class="w"> </span><span class="kn">import</span> <span class="n">VisionProStreamer</span>
+
+<span class="n">avp_ip</span> <span class="o">=</span> <span class="s2">&quot;10.31.181.201&quot;</span>
+<span class="n">streamer</span> <span class="o">=</span> <span class="n">VisionProStreamer</span><span class="p">(</span><span class="n">ip</span><span class="o">=</span><span class="n">avp_ip</span><span class="p">)</span>
+
+<span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">streamer</span><span class="o">.</span><span class="n">latest</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;head&#39;</span><span class="p">],</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;right_wrist&#39;</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>With video streaming:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">streamer</span> <span class="o">=</span> <span class="n">VisionProStreamer</span><span class="p">(</span><span class="n">ip</span><span class="o">=</span><span class="n">avp_ip</span><span class="p">)</span>
+<span class="n">streamer</span><span class="o">.</span><span class="n">start_video_streaming</span><span class="p">(</span>
+    <span class="n">device</span><span class="o">=</span><span class="s2">&quot;/dev/video0&quot;</span><span class="p">,</span>
+    <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;v4l2&quot;</span><span class="p">,</span>
+    <span class="n">size</span><span class="o">=</span><span class="s2">&quot;640x480&quot;</span><span class="p">,</span>
+    <span class="n">fps</span><span class="o">=</span><span class="mi">30</span>
+<span class="p">)</span>
+
+<span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">streamer</span><span class="o">.</span><span class="n">latest</span>
+    <span class="c1"># Process tracking data</span>
+</pre></div>
+</div>
+<p>With frame processing:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">process_frame</span><span class="p">(</span><span class="n">frame</span><span class="p">):</span>
+    <span class="c1"># Add overlay or processing</span>
+    <span class="k">return</span> <span class="n">frame</span>
+
+<span class="n">streamer</span> <span class="o">=</span> <span class="n">VisionProStreamer</span><span class="p">(</span><span class="n">ip</span><span class="o">=</span><span class="n">avp_ip</span><span class="p">)</span>
+<span class="n">streamer</span><span class="o">.</span><span class="n">register_frame_callback</span><span class="p">(</span><span class="n">process_frame</span><span class="p">)</span>
+<span class="n">streamer</span><span class="o">.</span><span class="n">start_video_streaming</span><span class="p">(</span>
+    <span class="n">device</span><span class="o">=</span><span class="s2">&quot;/dev/video0&quot;</span><span class="p">,</span>
+    <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;v4l2&quot;</span><span class="p">,</span>
+    <span class="n">size</span><span class="o">=</span><span class="s2">&quot;640x480&quot;</span><span class="p">,</span>
+    <span class="n">fps</span><span class="o">=</span><span class="mi">30</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="modules.html" class="btn btn-neutral float-left" title="API Reference" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="isaac_env.html" class="btn btn-neutral float-right" title="Isaac Environment" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Younghyo Park.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
