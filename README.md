@@ -188,21 +188,12 @@ Refer to the image above to see what order the joints are represented in each ha
 
 ## App Features
 
-### Status / Control Window 
 
 Status window is a good way to monitor the networking status, and control the life cycle of the app. It is shown in full view when you first start the app, but automatically gets minimized when video frame comes in. You can also minimize / maximize as you need. 
 
 ![](assets/status-window.png)
 
-
-### Modifying the Video Viewport
-
-You can also modify the video viewport -- how far they are from your eyes. 
-
-
-
-https://github.com/user-attachments/assets/db6250ee-f09f-4834-8b81-227d6c30fac4
-
+You can also modify the video viewport -- where and how the streamed video is presented in your AR environment. 
 
 
 
