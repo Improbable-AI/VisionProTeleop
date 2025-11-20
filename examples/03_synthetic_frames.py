@@ -12,7 +12,7 @@ import numpy as np
 import time
 
 # Replace with your Vision Pro's IP address
-VISION_PRO_IP = '10.29.249.251'
+VISION_PRO_IP = '192.168.86.21'
 
 
 # Example 1: Animated gradient

@@ -13,7 +13,7 @@ from avp_stream.streamer import VisionProStreamer
 import time
 
 def main():
-    VISION_PRO_IP = "10.29.249.251" 
+    VISION_PRO_IP = "192.168.86.21" 
     
     streamer = VisionProStreamer(ip=VISION_PRO_IP, record=True)
     
