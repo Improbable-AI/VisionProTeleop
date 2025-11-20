@@ -30,6 +30,7 @@
 		C1893C762B93C1AC00F2269D /* handtracking.grpc.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1893C742B93C1AC00F2269D /* handtracking.grpc.swift */; };
 		C1893C772B93C1AC00F2269D /* handtracking.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1893C752B93C1AC00F2269D /* handtracking.pb.swift */; };
 		C1DA80C42ECE377600B55CC2 /* StatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1DA80C32ECE377600B55CC2 /* StatusView.swift */; };
+		C1DA80C72ECE8C6F00B55CC2 /* ViewControlSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1DA80C62ECE8C6F00B55CC2 /* ViewControlSettings.swift */; };
 		C1E05F782ECD84DF0018C506 /* LiveKitWebRTC in Frameworks */ = {isa = PBXBuildFile; productRef = C1E05F772ECD84DF0018C506 /* LiveKitWebRTC */; };
 		C1E05F7C2ECD850B0018C506 /* ImmersiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E05F7A2ECD850B0018C506 /* ImmersiveView.swift */; };
 		C1E05F7D2ECD850B0018C506 /* ImageData.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E05F792ECD850B0018C506 /* ImageData.swift */; };
@@ -65,8 +66,9 @@
 		16EE5E9A2B576DB000D354ED /* 🧩Model.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "🧩Model.swift"; sourceTree = "<group>"; };
 		C1893C742B93C1AC00F2269D /* handtracking.grpc.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = handtracking.grpc.swift; path = avp_stream/grpc_msg/handtracking.grpc.swift; sourceTree = SOURCE_ROOT; };
 		C1893C752B93C1AC00F2269D /* handtracking.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = handtracking.pb.swift; path = avp_stream/grpc_msg/handtracking.pb.swift; sourceTree = SOURCE_ROOT; };
-		C19896F42B7D5099003BAF99 /* VisionProTeleop.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VisionProTeleop.entitlements; sourceTree = "<group>"; };
 		C1DA80C32ECE377600B55CC2 /* StatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusView.swift; sourceTree = "<group>"; };
+		C1DA80C52ECE821800B55CC2 /* VisionProTeleop.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VisionProTeleop.entitlements; sourceTree = "<group>"; };
+		C1DA80C62ECE8C6F00B55CC2 /* ViewControlSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewControlSettings.swift; sourceTree = "<group>"; };
 		C1E05F792ECD850B0018C506 /* ImageData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageData.swift; sourceTree = "<group>"; };
 		C1E05F7A2ECD850B0018C506 /* ImmersiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImmersiveView.swift; sourceTree = "<group>"; };
 		C1E05F7B2ECD850B0018C506 /* WebRTCClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebRTCClient.swift; sourceTree = "<group>"; };
@@ -142,9 +144,9 @@
 		165ADB492B4B71B0008A756F /* Tracking Streamer */ = {
 			isa = PBXGroup;
 			children = (
+				C1DA80C52ECE821800B55CC2 /* VisionProTeleop.entitlements */,
 				C1893C742B93C1AC00F2269D /* handtracking.grpc.swift */,
 				C1893C752B93C1AC00F2269D /* handtracking.pb.swift */,
-				C19896F42B7D5099003BAF99 /* VisionProTeleop.entitlements */,
 				165ADB4E2B4B71B0008A756F /* App.swift */,
 				165ADB502B4B71B0008A756F /* ContentView.swift */,
 				C1E05F792ECD850B0018C506 /* ImageData.swift */,
@@ -153,6 +155,7 @@
 				16688DE52B59F35F004CE12B /* 🥽AppModel.swift */,
 				1642FAB82B4D6CAA0084F9ED /* 🌐RealityView.swift */,
 				C1DA80C32ECE377600B55CC2 /* StatusView.swift */,
+				C1DA80C62ECE8C6F00B55CC2 /* ViewControlSettings.swift */,
 				16EE5E982B576DA800D354ED /* 🧩Name.swift */,
 				16EE5E9A2B576DB000D354ED /* 🧩Model.swift */,
 				160ED7972B4B74C5002AD987 /* 🧑HeadTrackingComponent&System.swift */,
@@ -261,6 +264,7 @@
 				16EE5E992B576DA800D354ED /* 🧩Name.swift in Sources */,
 				160ED7982B4B74C5002AD987 /* 🧑HeadTrackingComponent&System.swift in Sources */,
 				1642FAB92B4D6CAA0084F9ED /* 🌐RealityView.swift in Sources */,
+				C1DA80C72ECE8C6F00B55CC2 /* ViewControlSettings.swift in Sources */,
 				1642FAB52B4D54A60084F9ED /* 🛠️SettingPanel.swift in Sources */,
 				16253CFB2B4E2FCB0028F0E2 /* 📏Unit.swift in Sources */,
 				165ADB512B4B71B0008A756F /* ContentView.swift in Sources */,
@@ -411,19 +415,23 @@
 				CODE_SIGN_ENTITLEMENTS = "Tracking Streamer/VisionProTeleop.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = ATTMC2WVK2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "$(TARGET_NAME)/Supporting files/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Tracking Streamer";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSCameraUsageDescription = "This app might use your cameras to sense the surrounding environments. ";
+				INFOPLIST_KEY_NSHandsTrackingUsageDescription = "This app tracks your hand to teleoperate a robot. ";
+				INFOPLIST_KEY_NSWorldSensingUsageDescription = "This app senses your surronuding world to reconstruct a simulation.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = improbable.younghyo.DexTeleop2;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -443,19 +451,23 @@
 				CODE_SIGN_ENTITLEMENTS = "Tracking Streamer/VisionProTeleop.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = ATTMC2WVK2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "$(TARGET_NAME)/Supporting files/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Tracking Streamer";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSCameraUsageDescription = "This app might use your cameras to sense the surrounding environments. ";
+				INFOPLIST_KEY_NSHandsTrackingUsageDescription = "This app tracks your hand to teleoperate a robot. ";
+				INFOPLIST_KEY_NSWorldSensingUsageDescription = "This app senses your surronuding world to reconstruct a simulation.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = improbable.younghyo.DexTeleop2;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";

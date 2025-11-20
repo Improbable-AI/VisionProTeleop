@@ -19,7 +19,7 @@ import numpy as np
 import av
 
 
-async def test_video_device(device, format_name="avfoundation", options=None, mode="test"):
+async def test_video_device(device, format="avfoundation", size="1280x720", fps="30", mode="test"):
     """
     Test if a video device can be opened with the given parameters.
     
@@ -37,8 +37,9 @@ async def test_video_device(device, format_name="avfoundation", options=None, mo
     
     print(f"\n{'='*60}")
     print(f"Testing: {device}")
-    print(f"Format: {format_name}")
-    print(f"Options: {options}")
+    print(f"Format: {format}")
+    print(f"Size: {size}")
+    print(f"FPS: {fps}")
     print(f"Mode: {mode}")
     print(f"{'='*60}")
     
@@ -54,7 +55,7 @@ async def test_video_device(device, format_name="avfoundation", options=None, mo
     signal.signal(signal.SIGINT, signal_handler)
     
     try:
-        player = MediaPlayer(device, format=format_name, options=options)
+        player = MediaPlayer(device, format=format, options={"video_size": size, "framerate": str(fps)})
         
         if player.video:
             print("✓ SUCCESS! Video device opened successfully.")
@@ -202,8 +203,9 @@ async def main():
     
     await test_video_device(
         device="0:none", 
-        format_name="avfoundation", 
-        options={"video_size": "640x480", "framerate": "30"},
+        format="avfoundation", 
+        size="1280x720",
+        fps=30,
         mode=mode
     )
     

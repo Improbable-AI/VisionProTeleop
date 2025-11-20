@@ -21,7 +21,7 @@ struct HandTrackingData {
     var Head: simd_float4x4 = simd_float4x4(1)
 }
 
-class DataManager {
+class DataManager: ObservableObject {
     static let shared = DataManager()
     
     var latestHandTrackingData: HandTrackingData = HandTrackingData()
@@ -30,7 +30,37 @@ class DataManager {
     var webrtcServerInfo: (host: String, port: Int)? = nil  // WebRTC server info from gRPC
     var stereoEnabled: Bool = false  // Whether stereo video mode is enabled
     
-    private init() {}
+    @Published var connectionStatus: String = "Initializing..."
+    
+    // Video plane z-distance setting (persistent via UserDefaults)
+    @Published var videoPlaneZDistance: Float {
+        didSet {
+            UserDefaults.standard.set(videoPlaneZDistance, forKey: "videoPlaneZDistance")
+        }
+    }
+    
+    // Video plane y-position setting (persistent via UserDefaults)
+    @Published var videoPlaneYPosition: Float {
+        didSet {
+            UserDefaults.standard.set(videoPlaneYPosition, forKey: "videoPlaneYPosition")
+        }
+    }
+    
+    // Auto-tilt video plane to be perpendicular to view (persistent via UserDefaults)
+    @Published var videoPlaneAutoPerpendicular: Bool {
+        didSet {
+            UserDefaults.standard.set(videoPlaneAutoPerpendicular, forKey: "videoPlaneAutoPerpendicular")
+        }
+    }
+    
+    private init() {
+        // Load saved z-distance or use default of -10.0
+        self.videoPlaneZDistance = UserDefaults.standard.object(forKey: "videoPlaneZDistance") as? Float ?? -10.0
+        // Load saved y-position or use default of 0.0
+        self.videoPlaneYPosition = UserDefaults.standard.object(forKey: "videoPlaneYPosition") as? Float ?? 0.0
+        // Load saved auto-perpendicular or use default of false
+        self.videoPlaneAutoPerpendicular = UserDefaults.standard.object(forKey: "videoPlaneAutoPerpendicular") as? Bool ?? false
+    }
 }
 
 

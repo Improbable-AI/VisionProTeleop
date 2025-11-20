@@ -13,17 +13,16 @@ from avp_stream.streamer import VisionProStreamer
 import time
 
 def main():
-    VISION_PRO_IP = "169.254.45.56" 
+    VISION_PRO_IP = "10.29.249.251" 
     
     streamer = VisionProStreamer(ip=VISION_PRO_IP, record=True)
     
     streamer.start_video_streaming(
-        video_device="0:none",          # macOS webcam (device 0)
-        format="avfoundation",           # macOS video format
-        options={
-            "video_size": "640x480",     # Resolution
-            "framerate": "30"            # FPS
-        }
+        device="0:none",
+        format="avfoundation",
+        size = "640x480",
+        fps = 30, 
+        port=9999
     )
     
     try:

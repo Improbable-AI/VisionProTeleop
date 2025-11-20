@@ -1,12 +1,16 @@
 VisionProTeleop
 ===========
 
+> **🎉 UPDATE: Now supporting Low-Latency Video Streaming!** You can now stream back your robot's camera feed back to Vision Pro via webRTC protocol, alongside the original hand tracking data stream. 
+No complicated network setting required. Download the app, `pip install avp_stream`, and you're done!
+
 ![CleanShot 2024-03-03 at 13 55 11@2x](https://github.com/Improbable-AI/VisionProTeleop/assets/68195716/d87a906c-ccf3-4e2d-bd25-a66dc0df803b)
 
 
 
-Wanna use your new Apple Vision Pro to control your robot?  Wanna record how you navigate and manipulate the world to train your robot? 
-This VisionOS app and python library streams your Head + Wrist + Hand Tracking result via gRPC over a WiFi network, so any robots connected to the same wifi network can subscribe and use. 
+Wanna use your new Apple Vision Pro to control your robot?  Wanna record how you navigate and manipulate the world?  
+
+This VisionOS app and python library streams your Head + Wrist + Hand Tracking result via gRPC over a WiFi network, so any robots connected to the same wifi network can subscribe and use. **It can also stream stereo (or mono) camera feeds from your robot, back to the Vision Pro.**
 
 > **For a more detailed explanation, check out this short [paper](./assets/short_paper_new.pdf).**
 
@@ -51,12 +55,56 @@ Then, add this code snippet to any of your projects you were developing:
 ```python
 from avp_stream import VisionProStreamer
 avp_ip = "10.31.181.201"   # example IP 
-s = VisionProStreamer(ip = avp_ip, record = True)
+s = VisionProStreamer(ip = avp_ip)
 
 while True:
     r = s.latest
     print(r['head'], r['right_wrist'], r['right_fingers'])
 ```
+
+### Step 4. [🎉NEW FEATURE] Stream video feeds from your robot back to Vision Pro! 
+
+Streaming your robot's video feed back to Vision Pro requires one additional line: `start_video_streaming`. 
+
+```python
+from avp_stream import VisionProStreamer
+avp_ip = "10.31.181.201"   # example IP 
+s = VisionProStreamer(ip = avp_ip)
+
+# you can simply start a video stream 
+# by defining which video device you want to use
+s.start_video_streaming(device="/dev/video0", format="v4l2", \
+                        size="640x480", fps=30)
+
+while True:
+    r = s.latest
+    print(r['head'], r['right_wrist'], r['right_fingers'])
+```
+
+You can also: 
+
+- image-process the camera frames before you send it to Vision Pro 
+  ```python
+  s = VisionProStreamer(ip = avp_ip)
+  # define your own image processing function, and register
+  s.register_frame_callback(my_own_processor)
+  s.start_video_streaming(device="/dev/video0", format="v4l2", \
+                        size="640x480", fps=30)
+  ```
+- work without a physical camera and send over synthetically generated frames (i.e., rendered from simulation)
+  ```python
+  s = VisionProStreamer(ip = avp_ip)
+  # define your own image generating function, and register
+  s.register_frame_callback(synthetic_frame_generator)
+  s.start_video_streaming(device = None, format = None, \
+                          size="1280x720", fps=60)
+  ```
+
+which is explained in detail in [examples](examples) folder. 
+
+> **NOTE**:  Finding the right combination of `device`, `format`, `size`, and `fps` can sometime be tricky, since camera models only support certain combination. Also, depending on your operation system and how you plugged the camera, the `device` might have been mounted on a different directory. 
+
+
 
 
 
@@ -90,6 +138,8 @@ r['left_wrist_roll']: float
 ```
 
 
+
+
 ### Axis Convention
 
 Refer to the image below to see how the axis are defined for your head, wrist, and fingers. 
@@ -102,6 +152,19 @@ Refer to the image below to see how the axis are defined for your head, wrist, a
 ![](assets/hand_skeleton_convention.png)
 
 Refer to the image above to see what order the joints are represented in each hand's skeleton. 
+
+
+## App Features
+
+### Status Window 
+
+
+
+### Modifying the Video Viewport
+
+
+
+### Temporarily Hiding Video Stream  
 
 
 ## Acknowledgements 

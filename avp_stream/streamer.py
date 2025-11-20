@@ -7,7 +7,8 @@ import numpy as np
 import asyncio
 import socket
 from http.server import HTTPServer, BaseHTTPRequestHandler
-import json 
+import json
+import fractions 
 
 
 YUP2ZUP = np.array([[[1, 0, 0, 0], 
@@ -28,6 +29,7 @@ class VisionProStreamer:
         self.axis_transform = YUP2ZUP
         self.webrtc_info = None  # Store WebRTC server info for HTTP endpoint
         self.info_server = None  # HTTP server for sharing WebRTC address
+        self.frame_callback = None  # User-registered frame processing function
         self.start_streaming()
         self._start_info_server()  # Start HTTP endpoint immediately
 
@@ -166,6 +168,27 @@ class VisionProStreamer:
         except Exception:
             return "127.0.0.1"
     
+    def register_frame_callback(self, callback):
+        """
+        Register a callback function to process video frames before streaming.
+        
+        Args:
+            callback: A function that takes a numpy array (frame in BGR24 format) 
+                     and returns a processed numpy array of the same shape.
+                     Example: lambda frame: cv2.putText(frame, "Hello", (10,30), ...)
+        
+        Example:
+            def my_processor(frame):
+                import cv2
+                return cv2.putText(frame, "Hello VisionPro!", (50, 50), 
+                                  cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            
+            streamer.register_frame_callback(my_processor)
+            streamer.start_video_streaming()
+        """
+        self.frame_callback = callback
+        print(f"✓ Frame callback registered: {callback.__name__ if hasattr(callback, '__name__') else 'anonymous function'}")
+    
     def _start_info_server(self, port=8888):
         """
         Start a simple HTTP server that provides WebRTC connection info.
@@ -212,21 +235,31 @@ class VisionProStreamer:
         info_thread = Thread(target=run_http_server, daemon=True)
         info_thread.start()
     
-    def start_video_streaming(self, video_device="0:none", format="avfoundation", 
-                             options={"video_size": "640x480", "framerate": "30"}, 
+    def start_video_streaming(self, device="0:none", format="avfoundation", 
+                             fps=30, size="640x480", 
                              port=9999, stereo=False):
         """
         Start WebRTC video streaming server.
         VisionOS will discover the server address by querying the info HTTP endpoint.
         
         Args:
-            video_device: Video device identifier (default: "0:none" for macOS)
-            format: Video format (default: "avfoundation" for macOS)
-            options: Video options dict (default: 640x480 @ 30fps)
+            device: Video device identifier (default: "0:none" for macOS).
+                   Set to None to generate frames programmatically without a camera.
+            format: Video format (default: "avfoundation" for macOS). 
+                   Ignored if device=None.
+            fps: Frame rate (default: 30)
+            size: Frame size as "WIDTHxHEIGHT" string (default: "640x480")
             port: Port to run WebRTC server on (default: 9999)
             stereo: If True, stream side-by-side stereo video (default: False)
+        
+        Note:
+            - Use register_frame_callback() to add custom frame processing
+            - If device=None, the callback MUST generate frames (not just modify them)
+            - Without device, callback receives a blank frame to populate
         """
-        from avp_stream.visual.server import run_peer
+        from aiortc import VideoStreamTrack
+        from aiortc.contrib.media import MediaPlayer
+        from av import VideoFrame
         
         # Get local IP
         local_ip = self.get_local_ip()
@@ -245,6 +278,87 @@ class VisionProStreamer:
         print(f"📤 Sending WebRTC server info via gRPC (stereo={stereo})...")
         self._send_webrtc_info_via_grpc(local_ip, port, stereo)
         
+        # Parse size
+        width, height = map(int, size.split('x'))
+        
+        # Define custom video track for frame processing
+        class ProcessedVideoTrack(VideoStreamTrack):
+            def __init__(self, device, fmt, framerate, resolution, callback):
+                super().__init__()
+                self.callback = callback
+                self.width, self.height = resolution
+                self.use_camera = device is not None
+                
+                if self.use_camera:
+                    # Use physical camera
+                    opts = {"video_size": f"{self.width}x{self.height}", "framerate": str(framerate)}
+                    self.player = MediaPlayer(device, format=fmt, options=opts)
+                    self.video_track = self.player.video
+                else:
+                    # Generate frames programmatically
+                    self.player = None
+                    self.video_track = None
+                    self.fps = framerate
+                    self.frame_count = 0
+                    self.start_time = time.time()
+                
+            async def recv(self):
+                if self.use_camera:
+                    # Get frame from camera
+                    frame = await self.video_track.recv()
+                    
+                    # Apply user callback if registered
+                    if self.callback is not None:
+                        try:
+                            # Convert to numpy array
+                            img = frame.to_ndarray(format="bgr24")
+                            
+                            # Apply user's processing function
+                            processed_img = self.callback(img)
+                            
+                            # Convert back to VideoFrame
+                            new_frame = VideoFrame.from_ndarray(processed_img, format="bgr24")
+                            new_frame.pts = frame.pts
+                            new_frame.time_base = frame.time_base
+                            return new_frame
+                        except Exception as e:
+                            print(f"Error in frame callback: {e}")
+                            # Return original frame if processing fails
+                            return frame
+                    else:
+                        # No callback, return original frame (identity)
+                        return frame
+                else:
+                    # Generate frame programmatically
+                    # Wait to maintain target FPS
+                    target_time = self.start_time + (self.frame_count / self.fps)
+                    current_time = time.time()
+                    wait_time = target_time - current_time
+                    if wait_time > 0:
+                        await asyncio.sleep(wait_time)
+                    
+                    # Create blank frame
+                    blank_frame = np.zeros((self.height, self.width, 3), dtype=np.uint8)
+                    
+                    # Apply callback to populate the frame
+                    if self.callback is not None:
+                        try:
+                            processed_img = self.callback(blank_frame)
+                        except Exception as e:
+                            print(f"Error in frame callback: {e}")
+                            processed_img = blank_frame
+                    else:
+                        # No callback - just send blank frame
+                        processed_img = blank_frame
+                    
+                    # Convert to VideoFrame
+                    new_frame = VideoFrame.from_ndarray(processed_img, format="bgr24")
+                    new_frame.pts = self.frame_count
+                    new_frame.time_base = fractions.Fraction(1, self.fps)
+                    
+                    self.frame_count += 1
+                    return new_frame
+        
         # Create a new event loop for the WebRTC server in a separate thread
         def start_async_server():
             loop = asyncio.new_event_loop()
@@ -253,7 +367,6 @@ class VisionProStreamer:
             # Modify run_peer to use custom parameters
             async def run_peer_custom(reader, writer):
                 from aiortc import RTCPeerConnection, RTCSessionDescription
-                from aiortc.contrib.media import MediaPlayer
                 import logging
                 
                 pc = RTCPeerConnection()
@@ -266,21 +379,38 @@ class VisionProStreamer:
                         writer.close()
                         await writer.wait_closed()
                 
-                # Open video device with provided parameters
+                # Create video track with or without camera
                 try:
-                    print("Opening video device...")
-                    player = MediaPlayer(
-                        video_device,
-                        format=format,
-                        options=options,
+                    if device is None:
+                        print("Creating synthetic video stream (no camera)...")
+                        if self.frame_callback is None:
+                            print("⚠️  WARNING: No frame callback registered. Stream will be blank.")
+                            print("   Use register_frame_callback() to generate frames.")
+                    else:
+                        print(f"Opening video device: {device}...")
+                    
+                    processed_track = ProcessedVideoTrack(
+                        device, 
+                        format, 
+                        fps,
+                        (width, height),
+                        self.frame_callback  # Pass the registered callback
                     )
-                    print(f"MediaPlayer created for device: {video_device}")
+                    
+                    if device is None:
+                        print(f"✓ Synthetic video track created ({size} @ {fps}fps)")
+                    else:
+                        print(f"✓ Camera track created for device: {device}")
+                    
+                    if self.frame_callback:
+                        print("✓ Frame processing enabled")
+                    else:
+                        print("✓ Frame processing disabled (identity)")
                 except Exception as e:
-                    print(f"Error creating MediaPlayer: {e}")
+                    print(f"Error creating ProcessedVideoTrack: {e}")
                     raise
                 
-                if player.video:
-                    pc.addTrack(player.video)
+                pc.addTrack(processed_track)
                 
                 # Create offer
                 offer = await pc.createOffer()

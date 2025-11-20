@@ -27,19 +27,31 @@ class NetworkInfoManager: ObservableObject {
 
 /// A floating status display that shows network connection info and follows the user's head
 struct StatusOverlay: View {
-    let hasFrames: Bool
+    @Binding var hasFrames: Bool
     let showVideoStatus: Bool  // Whether to show WebRTC and frame status
     @Binding var isMinimized: Bool
+    @Binding var showViewControls: Bool
+    @Binding var previewZDistance: Float?
+    @Binding var previewActive: Bool
+    @Binding var userInteracted: Bool
+    @Binding var videoMinimized: Bool
+    @ObservedObject var dataManager = DataManager.shared
     @State private var ipAddress: String = ""
     @State private var pythonConnected: Bool = false
     @State private var pythonIP: String = "Not connected"
     @State private var webrtcConnected: Bool = false
+    @State private var hidePreviewTask: Task<Void, Never>?
     
-    init(hasFrames: Bool = false, showVideoStatus: Bool = true, isMinimized: Binding<Bool> = .constant(false)) {
-        self.hasFrames = hasFrames
+    init(hasFrames: Binding<Bool> = .constant(false), showVideoStatus: Bool = true, isMinimized: Binding<Bool> = .constant(false), showViewControls: Binding<Bool> = .constant(false), previewZDistance: Binding<Float?> = .constant(nil), previewActive: Binding<Bool> = .constant(false), userInteracted: Binding<Bool> = .constant(false), videoMinimized: Binding<Bool> = .constant(false)) {
+        self._hasFrames = hasFrames
         self.showVideoStatus = showVideoStatus
         self._isMinimized = isMinimized
-        print("🟢 [StatusView] StatusOverlay init called, hasFrames: \(hasFrames), showVideoStatus: \(showVideoStatus)")
+        self._showViewControls = showViewControls
+        self._previewZDistance = previewZDistance
+        self._previewActive = previewActive
+        self._userInteracted = userInteracted
+        self._videoMinimized = videoMinimized
+        print("🟢 [StatusView] StatusOverlay init called, hasFrames: \(hasFrames.wrappedValue), showVideoStatus: \(showVideoStatus)")
     }
     
     var body: some View {
@@ -72,52 +84,61 @@ struct StatusOverlay: View {
     }
     
     private var minimizedView: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 16) {
             // Expand button
             Button {
                 withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
                     isMinimized = false
+                    userInteracted = true  // Mark that user has interacted
                 }
             } label: {
                 ZStack {
                     Circle()
                         .fill(Color.white.opacity(0.3))
-                        .frame(width: 24, height: 24)
+                        .frame(width: 40, height: 40)
                     Image(systemName: "arrow.up.left.and.arrow.down.right")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.system(size: 16, weight: .bold))
                         .foregroundColor(.white)
                 }
             }
             .buttonStyle(.plain)
             
-            Circle()
-                .fill(Color.green)
-                .frame(width: 12, height: 12)
-            Circle()
-                .fill(pythonConnected ? Color.green : Color.red)
-                .frame(width: 12, height: 12)
+            // Video minimize/maximize button (only show if video streaming mode is enabled)
             if showVideoStatus {
-                Circle()
-                    .fill(webrtcConnected ? Color.green : Color.orange)
-                    .frame(width: 12, height: 12)
+                Button {
+                    withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                        videoMinimized.toggle()
+                    }
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(Color.blue.opacity(0.8))
+                            .frame(width: 40, height: 40)
+                        Image(systemName: videoMinimized ? "video.fill" : "video.slash.fill")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.white)
+                    }
+                }
+                .buttonStyle(.plain)
             }
+            
             Button {
                 exit(0)
             } label: {
                 ZStack {
                     Circle()
                         .fill(Color.red)
-                        .frame(width: 24, height: 24)
+                        .frame(width: 40, height: 40)
                     Text("✕")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 18, weight: .bold))
                         .foregroundColor(.white)
                 }
             }
             .buttonStyle(.plain)
         }
-        .padding(12)
+        .padding(20)
         .background(Color.black.opacity(0.6))
-        .cornerRadius(20)
+        .cornerRadius(24)
     }
     
     private var expandedView: some View {
@@ -127,6 +148,7 @@ struct StatusOverlay: View {
                 Button {
                     withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
                         isMinimized = true
+                        userInteracted = true  // Mark that user has interacted
                     }
                 } label: {
                     ZStack {
@@ -144,6 +166,7 @@ struct StatusOverlay: View {
                     .font(.headline)
                     .foregroundColor(.white)
                 Spacer()
+                
                 Button {
                     exit(0)
                 } label: {
@@ -210,16 +233,261 @@ struct StatusOverlay: View {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                         .scaleEffect(0.8)
-                    Text("Waiting for frames to arrive...")
+                    Text(dataManager.connectionStatus)
                         .foregroundColor(.white.opacity(0.9))
                         .font(.subheadline)
                         .fontWeight(.medium)
+                        .lineLimit(2)
                 }
+            }
+            
+            // View controls section (expandable)
+            if showViewControls {
+                Divider()
+                    .background(Color.white.opacity(0.3))
+                
+                viewControlsSection
+            } else {
+                // Show expand button when collapsed
+                Divider()
+                    .background(Color.white.opacity(0.3))
+                
+                Button {
+                    withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                        showViewControls = true
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 14, weight: .medium))
+                        Text("Modify Video View")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                        Spacer()
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 12, weight: .bold))
+                    }
+                    .foregroundColor(.white.opacity(0.9))
+                    .padding(.vertical, 8)
+                }
+                .buttonStyle(.plain)
             }
         }
         .padding(20)
         .background(Color.black.opacity(0.7))
         .cornerRadius(16)
+    }
+    
+    private var viewControlsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button {
+                withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                    showViewControls = false
+                }
+                previewZDistance = nil
+                previewActive = false
+                hidePreviewTask?.cancel()
+            } label: {
+                HStack {
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.system(size: 14, weight: .medium))
+                    Text("Modify Video View")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    Spacer()
+                    Image(systemName: "chevron.up")
+                        .font(.system(size: 12, weight: .bold))
+                }
+                .foregroundColor(.white.opacity(0.9))
+            }
+            .buttonStyle(.plain)
+            
+            // Distance control
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Distance (Z-axis)")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.7))
+                
+                HStack {
+                    Text("\(String(format: "%.1f", -dataManager.videoPlaneZDistance))m")
+                        .font(.system(size: 13, weight: .medium, design: .monospaced))
+                        .foregroundColor(.white)
+                        .frame(width: 45, alignment: .leading)
+                    
+                    Slider(value: Binding(
+                        get: { -dataManager.videoPlaneZDistance },
+                        set: { positiveValue in
+                            let negativeValue = -positiveValue
+                            dataManager.videoPlaneZDistance = negativeValue
+                            previewZDistance = negativeValue
+                            
+                            // Cancel any existing hide task
+                            hidePreviewTask?.cancel()
+                            
+                            // Schedule hiding the preview after 3 seconds of inactivity
+                            hidePreviewTask = Task { @MainActor in
+                                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                                if !Task.isCancelled {
+                                    previewZDistance = nil
+                                }
+                            }
+                        }
+                    ), in: 2.0...20.0, step: 0.5)
+                    .tint(.blue)
+                }
+                
+                HStack {
+                    Text("Near (2m)")
+                        .font(.caption2)
+                        .foregroundColor(.white.opacity(0.5))
+                    Spacer()
+                    Text("Far (20m)")
+                        .font(.caption2)
+                        .foregroundColor(.white.opacity(0.5))
+                }
+            }
+            
+            Divider()
+                .background(Color.white.opacity(0.2))
+            
+            // Height control
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Height (Y-axis)")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.7))
+                
+                HStack {
+                    Text("\(String(format: "%.2f", dataManager.videoPlaneYPosition))m")
+                        .font(.system(size: 13, weight: .medium, design: .monospaced))
+                        .foregroundColor(.white)
+                        .frame(width: 45, alignment: .leading)
+                    
+                    Slider(value: Binding(
+                        get: { dataManager.videoPlaneYPosition },
+                        set: { newValue in
+                            dataManager.videoPlaneYPosition = newValue
+                            // Show preview when adjusting
+                            previewActive = true
+                            
+                            // Cancel any existing hide task
+                            hidePreviewTask?.cancel()
+                            
+                            // Schedule hiding the preview after 3 seconds of inactivity
+                            hidePreviewTask = Task { @MainActor in
+                                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                                if !Task.isCancelled {
+                                    previewActive = false
+                                }
+                            }
+                        }
+                    ), in: -2.0...2.0, step: 0.1)
+                    .tint(.green)
+                }
+                
+                HStack {
+                    Text("Down (2m)")
+                        .font(.caption2)
+                        .foregroundColor(.white.opacity(0.5))
+                    Spacer()
+                    Text("Up (2m)")
+                        .font(.caption2)
+                        .foregroundColor(.white.opacity(0.5))
+                }
+            }
+            
+            Divider()
+                .background(Color.white.opacity(0.2))
+            
+            // Auto-perpendicular toggle
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Auto-Perpendicular")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.7))
+                    Text("Tilt plane to face head")
+                        .font(.caption2)
+                        .foregroundColor(.white.opacity(0.5))
+                }
+                Spacer()
+                Toggle("", isOn: Binding(
+                    get: { dataManager.videoPlaneAutoPerpendicular },
+                    set: { newValue in
+                        dataManager.videoPlaneAutoPerpendicular = newValue
+                        // Show preview when toggling
+                        previewActive = true
+                        
+                        // Cancel any existing hide task
+                        hidePreviewTask?.cancel()
+                        
+                        // Schedule hiding the preview after 3 seconds
+                        hidePreviewTask = Task { @MainActor in
+                            try? await Task.sleep(nanoseconds: 3_000_000_000)
+                            if !Task.isCancelled {
+                                previewActive = false
+                            }
+                        }
+                    }
+                ))
+                .labelsHidden()
+                .tint(.blue)
+            }
+            
+            HStack(spacing: 12) {
+                Spacer()
+                
+                // Video minimize/maximize button
+                Button {
+                    withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                        videoMinimized.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: videoMinimized ? "eye.fill" : "eye.slash.fill")
+                            .font(.system(size: 11, weight: .bold))
+                        Text(videoMinimized ? "Show Video" : "Hide Video")
+                            .font(.caption)
+                    }
+                    .foregroundColor(.blue)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Color.white.opacity(0.15))
+                    .cornerRadius(6)
+                }
+                .buttonStyle(.plain)
+                
+                Button {
+                    dataManager.videoPlaneZDistance = -10.0
+                    dataManager.videoPlaneYPosition = 0.0
+                    dataManager.videoPlaneAutoPerpendicular = false
+                    previewZDistance = -10.0
+                    previewActive = true
+                    
+                    hidePreviewTask?.cancel()
+                    hidePreviewTask = Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 3_000_000_000)
+                        if !Task.isCancelled {
+                            previewZDistance = nil
+                            previewActive = false
+                        }
+                    }
+                } label: {
+                    Text("Reset All")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Color.white.opacity(0.15))
+                        .cornerRadius(6)
+                }
+                .buttonStyle(.plain)
+                Spacer()
+            }
+            
+            Text("💡 Adjust position and orientation of the video plane")
+                .font(.caption2)
+                .foregroundColor(.white.opacity(0.5))
+                .multilineTextAlignment(.leading)
+        }
     }
 }
 

@@ -2,12 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>ITSAppUsesNonExemptEncryption</key>
-	<false/>
-	<key>NSHandsTrackingUsageDescription</key>
-	<string>This app tracks your hand to teleoperate a robot. </string>
-	<key>NSWorldSensingUsageDescription</key>
-	<string>This app senses your surronuding world to reconstruct a simulation.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

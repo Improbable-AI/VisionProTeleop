@@ -8,9 +8,17 @@ struct ImmersiveView: View {
     @EnvironmentObject var imageData: ImageData
     @StateObject private var videoStreamManager = VideoStreamManager()
     @StateObject private var appModel = 🥽AppModel()
+    @ObservedObject private var dataManager = DataManager.shared
     @State private var updateTrigger = false
     @State private var hasFrames = false
     @State private var isMinimized = false
+    @State private var showViewControls = false
+    @State private var previewZDistance: Float? = nil
+    @State private var previewActive = false  // Track if preview should be shown
+    @State private var hasAutoMinimized = false  // Track if we've already auto-minimized
+    @State private var userInteracted = false  // Track if user has manually changed minimized state
+    @State private var currentAspectRatio: Float? = nil  // Track current video aspect ratio
+    @State private var videoMinimized = false  // Track if video view is minimized
     
     var body: some View {
         RealityView { content, attachments in
@@ -24,11 +32,19 @@ struct ImmersiveView: View {
             // Create the video display plane (initially hidden)
             let skyBox = createSkyBox()
             skyBox.isEnabled = false  // Hide until we have frames
+            skyBox.name = "videoPlane"
             skyBox.setParent(videoAnchor)
             
-            // Position the video plane
-            skyBox.transform.translation.z = -6.0
-            skyBox.transform.translation.y = 0.0
+            // Position the video plane using saved distance and height
+            skyBox.transform.translation.z = dataManager.videoPlaneZDistance
+            skyBox.transform.translation.y = dataManager.videoPlaneYPosition
+            
+            // Create preview plane (gray, initially hidden)
+            let previewPlane = createPreviewPlane()
+            previewPlane.name = "previewPlane"
+            previewPlane.isEnabled = false
+            previewPlane.setParent(videoAnchor)
+            previewPlane.transform.translation.y = 0.0
             
             // Create status display anchor
             let statusAnchor = AnchorEntity(.head)
@@ -54,6 +70,11 @@ struct ImmersiveView: View {
         } update: { updateContent, attachments in
             // This will be triggered when updateTrigger changes (i.e., when new frames arrive)
             let _ = updateTrigger  // Explicitly depend on updateTrigger
+            let _ = dataManager.videoPlaneZDistance  // React to z-distance changes
+            let _ = dataManager.videoPlaneYPosition  // React to y-position changes
+            let _ = dataManager.videoPlaneAutoPerpendicular  // React to tilt setting changes
+            let _ = previewZDistance  // React to preview changes
+            let _ = currentAspectRatio  // React to aspect ratio changes
             
             // Find the video anchor
             guard let anchor = updateContent.entities.first(where: { 
@@ -62,9 +83,67 @@ struct ImmersiveView: View {
                 return
             }
             
-            let skyBoxEntity = anchor.children.first(where: { $0.components[ModelComponent.self] != nil })
+            let skyBoxEntity = anchor.children.first(where: { $0.name == "videoPlane" })
+            let previewEntity = anchor.children.first(where: { $0.name == "previewPlane" })
             
             print("DEBUG: Update block called, left=\(imageData.left != nil), right=\(imageData.right != nil)")
+            print("🎬 [ImmersiveView] Preview z-distance: \(String(describing: previewZDistance))")
+            
+            // Update preview/video plane position when adjusting
+            // Show preview if previewZDistance is set OR if previewActive is true
+            let shouldShowPreview = previewZDistance != nil || previewActive
+            
+            if shouldShowPreview {
+                let zDist = previewZDistance ?? dataManager.videoPlaneZDistance
+                print("🎬 [ImmersiveView] Adjusting position to z=\(zDist)")
+                
+                // If we have video frames, move the actual video plane
+                if hasFrames, let skyBox = skyBoxEntity {
+                    print("🎬 [ImmersiveView] Moving actual video plane")
+                    var videoTransform = skyBox.transform
+                    videoTransform.translation.z = zDist
+                    videoTransform.translation.y = dataManager.videoPlaneYPosition
+                    
+                    // Apply auto-perpendicular rotation if enabled
+                    if dataManager.videoPlaneAutoPerpendicular {
+                        let distance = abs(zDist)
+                        let height = dataManager.videoPlaneYPosition
+                        let angle = atan2(height, distance)
+                        videoTransform.rotation = simd_quatf(angle: angle, axis: SIMD3<Float>(1, 0, 0))
+                    } else {
+                        videoTransform.rotation = simd_quatf(angle: 0, axis: SIMD3<Float>(1, 0, 0))
+                    }
+                    
+                    skyBox.move(to: videoTransform, relativeTo: skyBox.parent, duration: 0.1, timingFunction: .linear)
+                    // Hide gray preview since we're showing the actual video
+                    previewEntity?.isEnabled = false
+                } else {
+                    // No frames yet, show gray preview
+                    if let preview = previewEntity {
+                        print("🎬 [ImmersiveView] Showing gray preview")
+                        preview.isEnabled = true
+                        var previewTransform = preview.transform
+                        previewTransform.translation.z = zDist
+                        previewTransform.translation.y = dataManager.videoPlaneYPosition
+                        
+                        // Apply auto-perpendicular rotation if enabled
+                        if dataManager.videoPlaneAutoPerpendicular {
+                            let distance = abs(zDist)
+                            let height = dataManager.videoPlaneYPosition
+                            let angle = atan2(height, distance)
+                            previewTransform.rotation = simd_quatf(angle: angle, axis: SIMD3<Float>(1, 0, 0))
+                        } else {
+                            previewTransform.rotation = simd_quatf(angle: 0, axis: SIMD3<Float>(1, 0, 0))
+                        }
+                        
+                        preview.move(to: previewTransform, relativeTo: preview.parent, duration: 0.1, timingFunction: .linear)
+                    }
+                }
+            } else {
+                // Not adjusting, hide gray preview
+                print("🎬 [ImmersiveView] Hiding preview")
+                previewEntity?.isEnabled = false
+            }
             
             // Update the video texture when new frames arrive
             guard let imageLeft = imageData.left,
@@ -82,38 +161,87 @@ struct ImmersiveView: View {
                 return
             }
             
-            // Show video
-            skyBox.isEnabled = true
+            // Calculate aspect ratio from incoming image
+            let imageWidth = imageRight.size.width
+            let imageHeight = imageRight.size.height
+            let aspectRatio = Float(imageWidth / imageHeight)
             
-            // Auto-minimize when frames first arrive (only once, don't override user preference)
+            // Update plane geometry if aspect ratio changed
+            if currentAspectRatio == nil || abs(currentAspectRatio! - aspectRatio) > 0.01 {
+                print("DEBUG: Updating plane geometry for aspect ratio: \(aspectRatio) (was: \(currentAspectRatio ?? 0))")
+                currentAspectRatio = aspectRatio
+                
+                // Use a fixed height and calculate width based on aspect ratio
+                // This preserves the original aspect ratio of the video
+                let planeHeight: Float = 9.6
+                let planeWidth = planeHeight * aspectRatio
+                
+                let newMesh = MeshResource.generatePlane(width: planeWidth, height: planeHeight)
+                skyBox.components[ModelComponent.self]?.mesh = newMesh
+                
+                // Also update preview plane if it exists
+                if let preview = previewEntity {
+                    preview.components[ModelComponent.self]?.mesh = newMesh
+                }
+            }
+            
+            // Show video only if not minimized
+            skyBox.isEnabled = !videoMinimized
+            
+            // Auto-minimize when frames first arrive (only once, and never if user has interacted)
             if !hasFrames {
                 hasFrames = true
                 // Only auto-minimize if user hasn't manually changed the state
-                if !isMinimized {
+                if !hasAutoMinimized && !userInteracted {
                     // Delay minimization slightly for smooth transition
                     Task { @MainActor in
                         try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
                         // Only minimize if user hasn't already interacted with it
-                        if !isMinimized {
+                        if !hasAutoMinimized && !userInteracted {
                             withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
                                 isMinimized = true
+                                hasAutoMinimized = true
                             }
                         }
                     }
                 }
             }
             
-            // Update status container position based on minimized state
-            if let statusAnchor = updateContent.entities.first(where: { $0.name == "statusHeadAnchor" }) as? AnchorEntity,
-               let statusContainer = statusAnchor.children.first(where: { $0.name == "statusContainer" }) {
-                // Move higher when minimized
-                let yPosition: Float = isMinimized ? 0.5 : 0.0
-                let targetTranslation = SIMD3<Float>(0.0, yPosition, -1.0)
+            // Update video plane position and rotation based on settings
+            if let skyBox = skyBoxEntity {
+                var videoTransform = skyBox.transform
+                videoTransform.translation.z = dataManager.videoPlaneZDistance
+                videoTransform.translation.y = dataManager.videoPlaneYPosition
                 
-                // Animate the position change
-                var transform = statusContainer.transform
-                transform.translation = targetTranslation
-                statusContainer.move(to: transform, relativeTo: statusContainer.parent, duration: 0.5, timingFunction: .easeInOut)
+                // Apply auto-perpendicular rotation if enabled
+                if dataManager.videoPlaneAutoPerpendicular {
+                    // Calculate the angle to tilt the plane to face the head
+                    let distance = abs(dataManager.videoPlaneZDistance)
+                    let height = dataManager.videoPlaneYPosition
+                    let angle = atan2(height, distance)
+                    
+                    // Rotate around X-axis to tilt the plane
+                    videoTransform.rotation = simd_quatf(angle: -angle, axis: SIMD3<Float>(1, 0, 0))
+                } else {
+                    // Reset rotation to default (facing forward)
+                    videoTransform.rotation = simd_quatf(angle: 0, axis: SIMD3<Float>(1, 0, 0))
+                }
+                
+                skyBox.move(to: videoTransform, relativeTo: skyBox.parent, duration: 0.3, timingFunction: .easeInOut)
+            }
+            
+            // Update status container position based on minimized state
+            if let statusAnchor = updateContent.entities.first(where: { $0.name == "statusHeadAnchor" }) as? AnchorEntity {
+                if let statusContainer = statusAnchor.children.first(where: { $0.name == "statusContainer" }) {
+                    // Move higher when minimized
+                    let yPosition: Float = isMinimized ? 0.3 : 0.0
+                    let targetTranslation = SIMD3<Float>(0.0, yPosition, -1.0)
+                    
+                    // Animate the position change
+                    var transform = statusContainer.transform
+                    transform.translation = targetTranslation
+                    statusContainer.move(to: transform, relativeTo: statusContainer.parent, duration: 0.5, timingFunction: .easeInOut)
+                }
             }
 
             // Check if stereo mode is enabled
@@ -171,8 +299,16 @@ struct ImmersiveView: View {
         } attachments: {
             Attachment(id: "status") {
                 print("🟡 [ImmersiveView] Status attachment builder called")
-                return StatusOverlay(hasFrames: hasFrames, isMinimized: $isMinimized)
-                    .frame(maxWidth: 300)
+                return StatusOverlay(
+                    hasFrames: $hasFrames, 
+                    isMinimized: $isMinimized,
+                    showViewControls: $showViewControls,
+                    previewZDistance: $previewZDistance,
+                    previewActive: $previewActive,
+                    userInteracted: $userInteracted,
+                    videoMinimized: $videoMinimized
+                )
+                .frame(maxWidth: 300)
             }
         }
         .onReceive(imageData.$left) { newImage in
@@ -195,13 +331,33 @@ struct ImmersiveView: View {
 
 private func createSkyBox() -> Entity {
     let skyBoxEntity = Entity()
-    let largePlane = MeshResource.generatePlane(width: 12.8, height: 9.6)
+    // Start with a default 16:9 aspect ratio plane
+    // This will be updated dynamically based on the incoming video's actual aspect ratio
+    let defaultHeight: Float = 9.6
+    let defaultWidth: Float = defaultHeight * (16.0 / 9.0)  // 16:9 aspect ratio
+    let largePlane = MeshResource.generatePlane(width: defaultWidth, height: defaultHeight)
     var skyBoxMaterial = UnlitMaterial()
     skyBoxMaterial.color = .init(tint: .clear)
     skyBoxEntity.components.set(
         ModelComponent(mesh: largePlane, materials: [skyBoxMaterial])
     )
     return skyBoxEntity
+}
+
+private func createPreviewPlane() -> Entity {
+    let previewEntity = Entity()
+    // Start with a default 16:9 aspect ratio plane
+    // This will be updated dynamically based on the incoming video's actual aspect ratio
+    let defaultHeight: Float = 9.6
+    let defaultWidth: Float = defaultHeight * (16.0 / 9.0)  // 16:9 aspect ratio
+    let largePlane = MeshResource.generatePlane(width: defaultWidth, height: defaultHeight)
+    var previewMaterial = UnlitMaterial()
+    // Gray semi-transparent material for preview
+    previewMaterial.color = .init(tint: .init(white: 0.5, alpha: 0.6))
+    previewEntity.components.set(
+        ModelComponent(mesh: largePlane, materials: [previewMaterial])
+    )
+    return previewEntity
 }
 
 /// Manages the WebRTC video stream connection and frame processing

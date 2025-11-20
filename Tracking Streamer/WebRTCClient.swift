@@ -65,11 +65,17 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
     
     private func connectToServer(host: String, port: Int) async throws {
         print("DEBUG: Attempting to connect to \(host):\(port)")
+        await MainActor.run {
+            DataManager.shared.connectionStatus = "Connecting to \(host):\(port)..."
+        }
         let (inputStream, outputStream) = try await AsyncSocketConnection.connect(
             host: host,
             port: port
         )
         print("DEBUG: Socket connection established to \(host):\(port)")
+        await MainActor.run {
+            DataManager.shared.connectionStatus = "Socket connected to \(host):\(port)"
+        }
         
         // Read offer from server
         guard let offerData = try await inputStream.readLine(),
@@ -78,6 +84,9 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
         }
         
         print("DEBUG: Received offer from server")
+        await MainActor.run {
+            DataManager.shared.connectionStatus = "Received offer from server"
+        }
         
         // Set remote description (offer)
         let remoteDesc = LKRTCSessionDescription(type: .offer, sdp: offerJson.sdp)
@@ -96,6 +105,9 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
         
         // Wait for ICE gathering to complete
         print("DEBUG: Waiting for ICE gathering to complete")
+        await MainActor.run {
+            DataManager.shared.connectionStatus = "Waiting for ICE gathering..."
+        }
         try await waitForICEGatheringComplete()
         
         // Send answer to server
@@ -113,6 +125,9 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
         try await outputStream.write(answerString.data(using: .utf8)!)
         
         print("DEBUG: Answer sent to server")
+        await MainActor.run {
+            DataManager.shared.connectionStatus = "Answer sent, waiting for video..."
+        }
     }
     
     @MainActor
@@ -135,12 +150,18 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
                 checkCount += 1
                 let state = pc.iceGatheringState
                 print("DEBUG: ICE gathering check #\(checkCount), state: \(state.rawValue)")
+                Task { @MainActor in
+                    DataManager.shared.connectionStatus = "ICE gathering (\(checkCount)/50)..."
+                }
                 
                 // Complete if state is .complete (2) OR timeout after getting at least one candidate
                 if state == .complete || (checkCount >= maxChecks && checkCount > 5) {
                     if !resumed {
                         resumed = true
                         print("DEBUG: ICE gathering finished - state: \(state.rawValue), checks: \(checkCount)")
+                        Task { @MainActor in
+                            DataManager.shared.connectionStatus = "ICE gathering complete (\(checkCount) checks)"
+                        }
                         continuation.resume()
                     }
                     timer.invalidate()
@@ -169,14 +190,30 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
 extension WebRTCClient {
     func peerConnection(_ peerConnection: LKRTCPeerConnection, didChange stateChanged: LKRTCSignalingState) {
         print("DEBUG: Signaling state changed to: \(stateChanged)")
+        Task { @MainActor in
+            switch stateChanged.rawValue {
+            case 0: DataManager.shared.connectionStatus = "Signaling: Stable"
+            case 1: DataManager.shared.connectionStatus = "Signaling: Have local offer"
+            case 2: DataManager.shared.connectionStatus = "Signaling: Have remote offer"
+            case 3: DataManager.shared.connectionStatus = "Signaling: Have local answer"
+            case 4: DataManager.shared.connectionStatus = "Signaling: Have remote answer"
+            default: break
+            }
+        }
     }
     
     func peerConnection(_ peerConnection: LKRTCPeerConnection, didAdd stream: LKRTCMediaStream) {
         print("DEBUG: Stream added - id: \(stream.streamId)")
         print("DEBUG: Stream has \(stream.videoTracks.count) video tracks, \(stream.audioTracks.count) audio tracks")
+        Task { @MainActor in
+            DataManager.shared.connectionStatus = "Video stream received (\(stream.videoTracks.count) tracks)"
+        }
         if let videoTrack = stream.videoTracks.first {
             self.videoTrack = videoTrack
             print("DEBUG: Video track received - id: \(videoTrack.trackId), enabled: \(videoTrack.isEnabled)")
+            Task { @MainActor in
+                DataManager.shared.connectionStatus = "Video track enabled, waiting for frames..."
+            }
         }
     }
     
@@ -190,10 +227,16 @@ extension WebRTCClient {
     
     func peerConnection(_ peerConnection: LKRTCPeerConnection, didChange newState: LKRTCIceConnectionState) {
         print("DEBUG: ICE connection state changed to: \(newState.rawValue) (\(iceStateString(newState)))")
-        if newState == .connected {
-            print("DEBUG: *** ICE CONNECTION SUCCESSFUL ***")
-        } else if newState == .failed {
-            print("ERROR: ICE connection failed")
+        Task { @MainActor in
+            if newState == .connected {
+                print("DEBUG: *** ICE CONNECTION SUCCESSFUL ***")
+                DataManager.shared.connectionStatus = "ICE connected successfully!"
+            } else if newState == .failed {
+                print("ERROR: ICE connection failed")
+                DataManager.shared.connectionStatus = "ICE connection failed"
+            } else if newState == .checking {
+                DataManager.shared.connectionStatus = "Checking ICE connection..."
+            }
         }
     }
     
