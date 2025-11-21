@@ -12,6 +12,10 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
     
     private let stunServer = "stun:stun.l.google.com:19302"
     
+    // ICE gathering completion tracking
+    private var iceGatheringContinuation: CheckedContinuation<Void, Error>?
+    private var iceGatheringResumed = false
+    
     override init() {
         // Initialize WebRTC factory
         LKRTCInitializeSSL()
@@ -133,39 +137,32 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
     @MainActor
     private func waitForICEGatheringComplete() async throws {
         return try await withCheckedThrowingContinuation { continuation in
-            var resumed = false
-            var checkCount = 0
-            let maxChecks = 50 // 5 seconds timeout
+            self.iceGatheringContinuation = continuation
+            self.iceGatheringResumed = false
             
-            Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { timer in
-                guard let pc = self.peerConnection else {
-                    if !resumed {
-                        resumed = true
-                        continuation.resume(throwing: WebRTCError.peerConnectionClosed)
+            // Set up timeout as fallback (500ms should be plenty)
+            Task {
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                if !self.iceGatheringResumed, let cont = self.iceGatheringContinuation {
+                    self.iceGatheringResumed = true
+                    self.iceGatheringContinuation = nil
+                    print("DEBUG: ICE gathering timed out after 500ms (proceeding anyway)")
+                    Task { @MainActor in
+                        DataManager.shared.connectionStatus = "ICE ready"
                     }
-                    timer.invalidate()
-                    return
+                    cont.resume()
                 }
-                
-                checkCount += 1
-                let state = pc.iceGatheringState
-                print("DEBUG: ICE gathering check #\(checkCount), state: \(state.rawValue)")
+            }
+            
+            // Check if already complete
+            if let pc = self.peerConnection, pc.iceGatheringState == .complete {
+                self.iceGatheringResumed = true
+                self.iceGatheringContinuation = nil
+                print("DEBUG: ICE gathering already complete")
                 Task { @MainActor in
-                    DataManager.shared.connectionStatus = "ICE gathering (\(checkCount)/50)..."
+                    DataManager.shared.connectionStatus = "ICE gathering complete"
                 }
-                
-                // Complete if state is .complete (2) OR timeout after getting at least one candidate
-                if state == .complete || (checkCount >= maxChecks && checkCount > 5) {
-                    if !resumed {
-                        resumed = true
-                        print("DEBUG: ICE gathering finished - state: \(state.rawValue), checks: \(checkCount)")
-                        Task { @MainActor in
-                            DataManager.shared.connectionStatus = "ICE gathering complete (\(checkCount) checks)"
-                        }
-                        continuation.resume()
-                    }
-                    timer.invalidate()
-                }
+                continuation.resume()
             }
         }
     }
@@ -254,7 +251,20 @@ extension WebRTCClient {
     }
     
     func peerConnection(_ peerConnection: LKRTCPeerConnection, didChange newState: LKRTCIceGatheringState) {
-        print("DEBUG: ICE gathering state changed to: \(newState)")
+        print("DEBUG: ICE gathering state changed to: \(newState) (rawValue: \(newState.rawValue))")
+        
+        // Resume continuation when gathering is complete
+        if newState == .complete {
+            if !iceGatheringResumed, let continuation = iceGatheringContinuation {
+                iceGatheringResumed = true
+                iceGatheringContinuation = nil
+                print("DEBUG: ICE gathering completed via delegate callback")
+                Task { @MainActor in
+                    DataManager.shared.connectionStatus = "ICE gathering complete"
+                }
+                continuation.resume()
+            }
+        }
     }
     
     func peerConnection(_ peerConnection: LKRTCPeerConnection, didGenerate candidate: LKRTCIceCandidate) {

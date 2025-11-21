@@ -313,12 +313,14 @@ class VisionProStreamer:
                 self.callback = callback
                 self.width, self.height = resolution
                 self.use_camera = device is not None
+                self.warmup_frames = 0  # Track warmup frames for encoder optimization
                 
                 if self.use_camera:
                     # Use physical camera
                     opts = {"video_size": f"{self.width}x{self.height}", "framerate": str(framerate)}
                     self.player = MediaPlayer(device, format=fmt, options=opts)
                     self.video_track = self.player.video
+                    print("🎥 Camera initialized, warming up encoder...")
                 else:
                     # Generate frames programmatically
                     self.player = None
@@ -351,6 +353,12 @@ class VisionProStreamer:
                     
                     # Store frame for reference
                     self.frame = img.copy()
+                    
+                    # Log encoder warmup progress
+                    if self.warmup_frames < 10:
+                        self.warmup_frames += 1
+                        if self.warmup_frames == 10:
+                            print("✅ Encoder warmed up - optimal encoding should begin")
                     
                     # Apply user callback if registered
                     if self.callback is not None:
@@ -423,18 +431,31 @@ class VisionProStreamer:
             
             # Modify run_peer to use custom parameters
             async def run_peer_custom(reader, writer):
-                from aiortc import RTCPeerConnection, RTCSessionDescription
+                from aiortc import RTCPeerConnection, RTCSessionDescription, RTCConfiguration, RTCIceServer
                 import logging
                 
-                pc = RTCPeerConnection()
+                client_addr = writer.get_extra_info('peername')
+                print(f"🔗 VisionOS client connected from {client_addr}")
+                
+                # Configure RTCPeerConnection for low latency
+                config = RTCConfiguration(
+                    iceServers=[RTCIceServer(urls=["stun:stun.l.google.com:19302"])]
+                )
+                pc = RTCPeerConnection(configuration=config)
                 
                 @pc.on("iceconnectionstatechange")
                 async def on_ice_state_change():
                     print(f"ICE state: {pc.iceConnectionState}")
+                    if pc.iceConnectionState == "connected":
+                        print("🎥 WebRTC connection established - video should flow now")
                     if pc.iceConnectionState in ("failed", "closed"):
                         await pc.close()
                         writer.close()
                         await writer.wait_closed()
+                
+                @pc.on("track")
+                def on_track(track):
+                    print(f"📹 Track received: {track.kind}")
                 
                 # Create video track with or without camera
                 try:
@@ -476,18 +497,33 @@ class VisionProStreamer:
                 offer = await pc.createOffer()
                 await pc.setLocalDescription(offer)
                 
-                # Wait for ICE gathering
-                while pc.iceGatheringState != "complete":
-                    await asyncio.sleep(0.1)
+                # Wait briefly for at least one ICE candidate (improves connection speed)
+                # Modern WebRTC uses trickle ICE, so we don't need complete gathering
+                start_time = asyncio.get_event_loop().time()
+                max_wait_time = 0.5  # 500ms max
                 
-                # Send offer
+                while asyncio.get_event_loop().time() - start_time < max_wait_time:
+                    if pc.iceGatheringState == "complete":
+                        print(f"ICE gathering complete in {asyncio.get_event_loop().time() - start_time:.2f}s")
+                        break
+                    elif pc.iceGatheringState == "gathering":
+                        # At least one candidate should be available, that's good enough
+                        await asyncio.sleep(0.1)
+                        print(f"ICE gathering in progress, proceeding after {asyncio.get_event_loop().time() - start_time:.2f}s")
+                        break
+                    await asyncio.sleep(0.05)
+                
+                if pc.iceGatheringState == "new":
+                    print("Warning: ICE gathering hasn't started yet, sending offer anyway")
+                
+                # Send offer (ICE candidates will be trickled separately if needed)
                 offer_payload = {
                     "sdp": pc.localDescription.sdp,
                     "type": pc.localDescription.type,
                 }
                 writer.write((json.dumps(offer_payload) + "\n").encode("utf-8"))
                 await writer.drain()
-                print("Sent offer to VisionOS")
+                print(f"Sent offer to VisionOS (ICE state: {pc.iceGatheringState})")
                 
                 # Wait for answer
                 line = await reader.readline()
