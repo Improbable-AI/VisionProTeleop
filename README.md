@@ -26,8 +26,9 @@ This VisionOS app and python library streams your Head + Wrist + Hand Tracking r
 
 > **For a more detailed explanation, check out this short [paper](./assets/short_paper_new.pdf).**
 
-<iframe style="width:100%;height:auto;min-width:600px;min-height:400px;" src="https://www.star-history.com/embed?secret=Z2hwX215NktwajNwWHM3eHo1bVpoZzBSTjJMbUJLUG5HZjM4OFk1Uw==#improbable-ai/visionproteleop&type=date&legend=top-left" frameBorder="0"></iframe>
+## Star History
 
+[![Star History Chart](https://api.star-history.com/svg?repos=improbable-ai/visionproteleop&type=date&legend=top-left)](https://www.star-history.com/#improbable-ai/visionproteleop&type=date&legend=top-left)
 
 ## How to Use
 
