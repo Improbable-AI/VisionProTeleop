@@ -30,6 +30,8 @@ class VisionProStreamer:
         self.webrtc_info = None  # Store WebRTC server info for HTTP endpoint
         self.info_server = None  # HTTP server for sharing WebRTC address
         self.frame_callback = None  # User-registered frame processing function
+        self.camera = None  # Processed video track (accessible after start_video_streaming)
+        self.user_frame = None  # User-provided frame to override camera input
         self.start_streaming()
         self._start_info_server()  # Start HTTP endpoint immediately
 
@@ -189,6 +191,26 @@ class VisionProStreamer:
         self.frame_callback = callback
         print(f"✓ Frame callback registered: {callback.__name__ if hasattr(callback, '__name__') else 'anonymous function'}")
     
+    def update_frame(self, user_frame):
+        """
+        Override the camera frame with a custom frame. The frame will still go through
+        any registered callbacks before being sent to VisionPro.
+        
+        Args:
+            user_frame: A numpy array in BGR24 format (H, W, 3) to send instead of camera input.
+                       Should match the resolution specified in start_video_streaming().
+        
+        Example:
+            import numpy as np
+            
+            # Create a custom frame
+            frame = np.zeros((480, 640, 3), dtype=np.uint8)
+            frame[:, :] = [0, 255, 0]  # Green frame
+            
+            streamer.update_frame(frame)
+        """
+        self.user_frame = user_frame
+    
     def _start_info_server(self, port=8888):
         """
         Start a simple HTTP server that provides WebRTC connection info.
@@ -281,6 +303,9 @@ class VisionProStreamer:
         # Parse size
         width, height = map(int, size.split('x'))
         
+        # Store reference to streamer instance for use in ProcessedVideoTrack
+        streamer_instance = self
+        
         # Define custom video track for frame processing
         class ProcessedVideoTrack(VideoStreamTrack):
             def __init__(self, device, fmt, framerate, resolution, callback):
@@ -304,30 +329,55 @@ class VisionProStreamer:
                 
             async def recv(self):
                 if self.use_camera:
-                    # Get frame from camera
-                    frame = await self.video_track.recv()
+                    # Check if user provided a frame override
+                    if streamer_instance.user_frame is not None:
+                        # Use user-provided frame instead of camera
+                        img = streamer_instance.user_frame
+                        # Get timing from camera track if available
+                        try:
+                            camera_frame = await self.video_track.recv()
+                            pts = camera_frame.pts
+                            time_base = camera_frame.time_base
+                        except:
+                            # Fallback timing if camera fails
+                            pts = None
+                            time_base = None
+                    else:
+                        # Get frame from camera
+                        frame = await self.video_track.recv()
+                        img = frame.to_ndarray(format="bgr24")
+                        pts = frame.pts
+                        time_base = frame.time_base
+                    
+                    # Store frame for reference
+                    self.frame = img.copy()
                     
                     # Apply user callback if registered
                     if self.callback is not None:
                         try:
-                            # Convert to numpy array
-                            img = frame.to_ndarray(format="bgr24")
-                            
                             # Apply user's processing function
                             processed_img = self.callback(img)
                             
                             # Convert back to VideoFrame
                             new_frame = VideoFrame.from_ndarray(processed_img, format="bgr24")
-                            new_frame.pts = frame.pts
-                            new_frame.time_base = frame.time_base
+                            new_frame.pts = pts
+                            new_frame.time_base = time_base
                             return new_frame
                         except Exception as e:
+                            import traceback
+                            traceback.print_exc()
                             print(f"Error in frame callback: {e}")
                             # Return original frame if processing fails
-                            return frame
+                            new_frame = VideoFrame.from_ndarray(img, format="bgr24")
+                            new_frame.pts = pts
+                            new_frame.time_base = time_base
+                            return new_frame
                     else:
                         # No callback, return original frame (identity)
-                        return frame
+                        new_frame = VideoFrame.from_ndarray(img, format="bgr24")
+                        new_frame.pts = pts
+                        new_frame.time_base = time_base
+                        return new_frame
                 else:
                     # Generate frame programmatically
                     # Wait to maintain target FPS
@@ -337,19 +387,26 @@ class VisionProStreamer:
                     if wait_time > 0:
                         await asyncio.sleep(wait_time)
                     
-                    # Create blank frame
-                    blank_frame = np.zeros((self.height, self.width, 3), dtype=np.uint8)
+                    # Check if user provided a frame override
+                    if streamer_instance.user_frame is not None:
+                        # Use user-provided frame
+                        self.frame = streamer_instance.user_frame.copy()
+                    else:
+                        # Create blank frame
+                        self.frame = np.zeros((self.height, self.width, 3), dtype=np.uint8)
                     
                     # Apply callback to populate the frame
                     if self.callback is not None:
                         try:
-                            processed_img = self.callback(blank_frame)
+                            processed_img = self.callback(self.frame)
                         except Exception as e:
+                            import traceback
+                            traceback.print_exc()
                             print(f"Error in frame callback: {e}")
-                            processed_img = blank_frame
+                            processed_img = self.frame
                     else:
                         # No callback - just send blank frame
-                        processed_img = blank_frame
+                        processed_img = self.frame
                     
                     # Convert to VideoFrame
                     new_frame = VideoFrame.from_ndarray(processed_img, format="bgr24")
@@ -396,6 +453,9 @@ class VisionProStreamer:
                         (width, height),
                         self.frame_callback  # Pass the registered callback
                     )
+                    
+                    # Store the track as instance attribute for external access
+                    self.camera = processed_track
                     
                     if device is None:
                         print(f"✓ Synthetic video track created ({size} @ {fps}fps)")

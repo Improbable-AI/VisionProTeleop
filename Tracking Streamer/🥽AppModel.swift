@@ -53,6 +53,19 @@ class DataManager: ObservableObject {
         }
     }
     
+    // Status window minimized position (persistent via UserDefaults)
+    @Published var statusMinimizedXPosition: Float {
+        didSet {
+            UserDefaults.standard.set(statusMinimizedXPosition, forKey: "statusMinimizedXPosition")
+        }
+    }
+    
+    @Published var statusMinimizedYPosition: Float {
+        didSet {
+            UserDefaults.standard.set(statusMinimizedYPosition, forKey: "statusMinimizedYPosition")
+        }
+    }
+    
     private init() {
         // Load saved z-distance or use default of -10.0
         self.videoPlaneZDistance = UserDefaults.standard.object(forKey: "videoPlaneZDistance") as? Float ?? -10.0
@@ -60,6 +73,9 @@ class DataManager: ObservableObject {
         self.videoPlaneYPosition = UserDefaults.standard.object(forKey: "videoPlaneYPosition") as? Float ?? 0.0
         // Load saved auto-perpendicular or use default of false
         self.videoPlaneAutoPerpendicular = UserDefaults.standard.object(forKey: "videoPlaneAutoPerpendicular") as? Bool ?? false
+        // Load saved minimized status position or use defaults
+        self.statusMinimizedXPosition = UserDefaults.standard.object(forKey: "statusMinimizedXPosition") as? Float ?? 0.0
+        self.statusMinimizedYPosition = UserDefaults.standard.object(forKey: "statusMinimizedYPosition") as? Float ?? -0.3
     }
 }
 
@@ -173,7 +189,7 @@ extension 🥽AppModel {
                     ]
                     
                     for (index, jointType) in jointTypes.enumerated() {
-                        guard let joint = handAnchor.handSkeleton?.joint(jointType), joint.isTracked else {
+                        guard let joint = handAnchor.handSkeleton?.joint(jointType) else {
                             continue
                         }
                         DataManager.shared.latestHandTrackingData.leftSkeleton.joints[index] = joint.anchorFromJointTransform
@@ -198,7 +214,7 @@ extension 🥽AppModel {
                     ]
  
                     for (index, jointType) in jointTypes.enumerated() {
-                        guard let joint = handAnchor.handSkeleton?.joint(jointType), joint.isTracked else {
+                        guard let joint = handAnchor.handSkeleton?.joint(jointType) else {
                             continue
                         }
                         // print(index)

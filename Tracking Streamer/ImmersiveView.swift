@@ -19,6 +19,8 @@ struct ImmersiveView: View {
     @State private var userInteracted = false  // Track if user has manually changed minimized state
     @State private var currentAspectRatio: Float? = nil  // Track current video aspect ratio
     @State private var videoMinimized = false  // Track if video view is minimized
+    @State private var previewStatusPosition: (x: Float, y: Float)? = nil  // Track preview status position
+    @State private var previewStatusActive = false  // Track if status preview should be shown
     
     var body: some View {
         RealityView { content, attachments in
@@ -67,6 +69,27 @@ struct ImmersiveView: View {
             } else {
                 print("🔴 [ImmersiveView] Status attachment NOT found!")
             }
+            
+            // Create preview status container entity (initially hidden)
+            let statusPreviewContainer = Entity()
+            statusPreviewContainer.name = "statusPreviewContainer"
+            statusPreviewContainer.setParent(statusAnchor)
+            
+            // Initialize at the correct Z position to avoid flying in from far away
+            statusPreviewContainer.transform.translation = SIMD3<Float>(
+                dataManager.statusMinimizedXPosition,
+                dataManager.statusMinimizedYPosition,
+                -1.0
+            )
+            
+            // Attach the status preview UI to the preview container
+            if let statusPreviewAttachment = attachments.entity(for: "statusPreview") {
+                print("🟢 [ImmersiveView] Status preview attachment found and attached")
+                statusPreviewAttachment.setParent(statusPreviewContainer)
+                statusPreviewContainer.isEnabled = false
+            } else {
+                print("🔴 [ImmersiveView] Status preview attachment NOT found!")
+            }
         } update: { updateContent, attachments in
             // This will be triggered when updateTrigger changes (i.e., when new frames arrive)
             let _ = updateTrigger  // Explicitly depend on updateTrigger
@@ -75,6 +98,11 @@ struct ImmersiveView: View {
             let _ = dataManager.videoPlaneAutoPerpendicular  // React to tilt setting changes
             let _ = previewZDistance  // React to preview changes
             let _ = currentAspectRatio  // React to aspect ratio changes
+            let _ = dataManager.statusMinimizedXPosition  // React to status position changes
+            let _ = dataManager.statusMinimizedYPosition  // React to status position changes
+            let _ = previewStatusPosition  // React to status preview changes
+            let _ = previewStatusActive  // React to status preview active state
+            let _ = isMinimized  // React to minimized state changes
             
             // Find the video anchor
             guard let anchor = updateContent.entities.first(where: { 
@@ -86,7 +114,9 @@ struct ImmersiveView: View {
             let skyBoxEntity = anchor.children.first(where: { $0.name == "videoPlane" })
             let previewEntity = anchor.children.first(where: { $0.name == "previewPlane" })
             
-            print("DEBUG: Update block called, left=\(imageData.left != nil), right=\(imageData.right != nil)")
+            // Check if we have actual frames available RIGHT NOW
+            let framesAvailable = imageData.left != nil && imageData.right != nil
+            print("DEBUG: Update block called, left=\(imageData.left != nil), right=\(imageData.right != nil), framesAvailable=\(framesAvailable)")
             print("🎬 [ImmersiveView] Preview z-distance: \(String(describing: previewZDistance))")
             
             // Update preview/video plane position when adjusting
@@ -97,9 +127,9 @@ struct ImmersiveView: View {
                 let zDist = previewZDistance ?? dataManager.videoPlaneZDistance
                 print("🎬 [ImmersiveView] Adjusting position to z=\(zDist)")
                 
-                // If we have video frames, move the actual video plane
-                if hasFrames, let skyBox = skyBoxEntity {
-                    print("🎬 [ImmersiveView] Moving actual video plane")
+                // If we have video frames, move the actual video plane and NEVER show gray preview
+                if framesAvailable, let skyBox = skyBoxEntity {
+                    print("🎬 [ImmersiveView] Moving actual video plane (frames available)")
                     var videoTransform = skyBox.transform
                     videoTransform.translation.z = zDist
                     videoTransform.translation.y = dataManager.videoPlaneYPosition
@@ -115,12 +145,12 @@ struct ImmersiveView: View {
                     }
                     
                     skyBox.move(to: videoTransform, relativeTo: skyBox.parent, duration: 0.1, timingFunction: .linear)
-                    // Hide gray preview since we're showing the actual video
+                    // ALWAYS hide gray preview when frames are available
                     previewEntity?.isEnabled = false
-                } else {
-                    // No frames yet, show gray preview
+                } else if !framesAvailable {
+                    // No frames yet, show gray preview ONLY if no frames
                     if let preview = previewEntity {
-                        print("🎬 [ImmersiveView] Showing gray preview")
+                        print("🎬 [ImmersiveView] Showing gray preview (no frames yet)")
                         preview.isEnabled = true
                         var previewTransform = preview.transform
                         previewTransform.translation.z = zDist
@@ -140,9 +170,50 @@ struct ImmersiveView: View {
                     }
                 }
             } else {
-                // Not adjusting, hide gray preview
-                print("🎬 [ImmersiveView] Hiding preview")
+                // Not adjusting, ALWAYS hide gray preview
+                print("🎬 [ImmersiveView] Hiding preview (not adjusting)")
                 previewEntity?.isEnabled = false
+            }
+            
+            // Update status container position based on minimized state (do this BEFORE early return)
+            if let statusAnchor = updateContent.entities.first(where: { $0.name == "statusHeadAnchor" }) as? AnchorEntity {
+                if let statusContainer = statusAnchor.children.first(where: { $0.name == "statusContainer" }) {
+                    // When minimized, use custom position; when maximized, use (0, 0, -1.0)
+                    let targetTranslation: SIMD3<Float>
+                    if isMinimized {
+                        targetTranslation = SIMD3<Float>(
+                            dataManager.statusMinimizedXPosition,
+                            dataManager.statusMinimizedYPosition,
+                            -1.0
+                        )
+                    } else {
+                        // Maximized stays at (0, 0, -1.0)
+                        targetTranslation = SIMD3<Float>(0.0, 0.0, -1.0)
+                    }
+                    
+                    // Animate the position change
+                    var transform = statusContainer.transform
+                    transform.translation = targetTranslation
+                    statusContainer.move(to: transform, relativeTo: statusContainer.parent, duration: 0.5, timingFunction: .easeInOut)
+                }
+                
+                // Handle status preview
+                if let statusPreviewContainer = statusAnchor.children.first(where: { $0.name == "statusPreviewContainer" }) {
+                    let shouldShowPreview = previewStatusPosition != nil || previewStatusActive
+                    
+                    if shouldShowPreview {
+                        let xPos = previewStatusPosition?.x ?? dataManager.statusMinimizedXPosition
+                        let yPos = previewStatusPosition?.y ?? dataManager.statusMinimizedYPosition
+                        
+                        print("🎭 [ImmersiveView] Showing status preview at x=\(xPos), y=\(yPos)")
+                        statusPreviewContainer.isEnabled = true
+                        var previewTransform = statusPreviewContainer.transform
+                        previewTransform.translation = SIMD3<Float>(xPos, yPos, -1.0)
+                        statusPreviewContainer.move(to: previewTransform, relativeTo: statusPreviewContainer.parent, duration: 0.1, timingFunction: .linear)
+                    } else {
+                        statusPreviewContainer.isEnabled = false
+                    }
+                }
             }
             
             // Update the video texture when new frames arrive
@@ -229,20 +300,6 @@ struct ImmersiveView: View {
                 
                 skyBox.move(to: videoTransform, relativeTo: skyBox.parent, duration: 0.3, timingFunction: .easeInOut)
             }
-            
-            // Update status container position based on minimized state
-            if let statusAnchor = updateContent.entities.first(where: { $0.name == "statusHeadAnchor" }) as? AnchorEntity {
-                if let statusContainer = statusAnchor.children.first(where: { $0.name == "statusContainer" }) {
-                    // Move higher when minimized
-                    let yPosition: Float = isMinimized ? 0.3 : 0.0
-                    let targetTranslation = SIMD3<Float>(0.0, yPosition, -1.0)
-                    
-                    // Animate the position change
-                    var transform = statusContainer.transform
-                    transform.translation = targetTranslation
-                    statusContainer.move(to: transform, relativeTo: statusContainer.parent, duration: 0.5, timingFunction: .easeInOut)
-                }
-            }
 
             // Check if stereo mode is enabled
             let isStereo = DataManager.shared.stereoEnabled
@@ -306,9 +363,16 @@ struct ImmersiveView: View {
                     previewZDistance: $previewZDistance,
                     previewActive: $previewActive,
                     userInteracted: $userInteracted,
-                    videoMinimized: $videoMinimized
+                    videoMinimized: $videoMinimized,
+                    previewStatusPosition: $previewStatusPosition,
+                    previewStatusActive: $previewStatusActive
                 )
                 .frame(maxWidth: 300)
+            }
+            
+            Attachment(id: "statusPreview") {
+                print("🟡 [ImmersiveView] Status preview attachment builder called")
+                return StatusPreviewView(showVideoStatus: true)
             }
         }
         .onReceive(imageData.$left) { newImage in

@@ -35,14 +35,17 @@ struct StatusOverlay: View {
     @Binding var previewActive: Bool
     @Binding var userInteracted: Bool
     @Binding var videoMinimized: Bool
+    @Binding var previewStatusPosition: (x: Float, y: Float)?
+    @Binding var previewStatusActive: Bool
     @ObservedObject var dataManager = DataManager.shared
     @State private var ipAddress: String = ""
     @State private var pythonConnected: Bool = false
     @State private var pythonIP: String = "Not connected"
     @State private var webrtcConnected: Bool = false
     @State private var hidePreviewTask: Task<Void, Never>?
+    @State private var showStatusPositionControls: Bool = false
     
-    init(hasFrames: Binding<Bool> = .constant(false), showVideoStatus: Bool = true, isMinimized: Binding<Bool> = .constant(false), showViewControls: Binding<Bool> = .constant(false), previewZDistance: Binding<Float?> = .constant(nil), previewActive: Binding<Bool> = .constant(false), userInteracted: Binding<Bool> = .constant(false), videoMinimized: Binding<Bool> = .constant(false)) {
+    init(hasFrames: Binding<Bool> = .constant(false), showVideoStatus: Bool = true, isMinimized: Binding<Bool> = .constant(false), showViewControls: Binding<Bool> = .constant(false), previewZDistance: Binding<Float?> = .constant(nil), previewActive: Binding<Bool> = .constant(false), userInteracted: Binding<Bool> = .constant(false), videoMinimized: Binding<Bool> = .constant(false), previewStatusPosition: Binding<(x: Float, y: Float)?> = .constant(nil), previewStatusActive: Binding<Bool> = .constant(false)) {
         self._hasFrames = hasFrames
         self.showVideoStatus = showVideoStatus
         self._isMinimized = isMinimized
@@ -51,6 +54,8 @@ struct StatusOverlay: View {
         self._previewActive = previewActive
         self._userInteracted = userInteracted
         self._videoMinimized = videoMinimized
+        self._previewStatusPosition = previewStatusPosition
+        self._previewStatusActive = previewStatusActive
         print("🟢 [StatusView] StatusOverlay init called, hasFrames: \(hasFrames.wrappedValue), showVideoStatus: \(showVideoStatus)")
     }
     
@@ -84,7 +89,7 @@ struct StatusOverlay: View {
     }
     
     private var minimizedView: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 24) {
             // Expand button
             Button {
                 withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
@@ -95,9 +100,9 @@ struct StatusOverlay: View {
                 ZStack {
                     Circle()
                         .fill(Color.white.opacity(0.3))
-                        .frame(width: 40, height: 40)
+                        .frame(width: 60, height: 60)
                     Image(systemName: "arrow.up.left.and.arrow.down.right")
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.system(size: 24, weight: .bold))
                         .foregroundColor(.white)
                 }
             }
@@ -113,9 +118,9 @@ struct StatusOverlay: View {
                     ZStack {
                         Circle()
                             .fill(Color.blue.opacity(0.8))
-                            .frame(width: 40, height: 40)
+                            .frame(width: 60, height: 60)
                         Image(systemName: videoMinimized ? "video.fill" : "video.slash.fill")
-                            .font(.system(size: 16, weight: .bold))
+                            .font(.system(size: 24, weight: .bold))
                             .foregroundColor(.white)
                     }
                 }
@@ -128,17 +133,17 @@ struct StatusOverlay: View {
                 ZStack {
                     Circle()
                         .fill(Color.red)
-                        .frame(width: 40, height: 40)
+                        .frame(width: 60, height: 60)
                     Text("✕")
-                        .font(.system(size: 18, weight: .bold))
+                        .font(.system(size: 27, weight: .bold))
                         .foregroundColor(.white)
                 }
             }
             .buttonStyle(.plain)
         }
-        .padding(20)
+        .padding(30)
         .background(Color.black.opacity(0.6))
-        .cornerRadius(24)
+        .cornerRadius(36)
     }
     
     private var expandedView: some View {
@@ -261,6 +266,35 @@ struct StatusOverlay: View {
                         Image(systemName: "slider.horizontal.3")
                             .font(.system(size: 14, weight: .medium))
                         Text("Modify Video View")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                        Spacer()
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 12, weight: .bold))
+                    }
+                    .foregroundColor(.white.opacity(0.9))
+                    .padding(.vertical, 8)
+                }
+                .buttonStyle(.plain)
+            }
+            
+            // Status position controls section (collapsible, separate from video controls)
+            Divider()
+                .background(Color.white.opacity(0.3))
+            
+            if showStatusPositionControls {
+                statusPositionControlsSection
+            } else {
+                // Show expand button when collapsed
+                Button {
+                    withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                        showStatusPositionControls = true
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: "move.3d")
+                            .font(.system(size: 14, weight: .medium))
+                        Text("Modify Controller Position")
                             .font(.subheadline)
                             .fontWeight(.medium)
                         Spacer()
@@ -488,6 +522,210 @@ struct StatusOverlay: View {
                 .foregroundColor(.white.opacity(0.5))
                 .multilineTextAlignment(.leading)
         }
+    }
+    
+    private var statusPositionControlsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button {
+                withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                    showStatusPositionControls = false
+                }
+                previewStatusPosition = nil
+                previewStatusActive = false
+                hidePreviewTask?.cancel()
+            } label: {
+                HStack {
+                    Image(systemName: "move.3d")
+                        .font(.system(size: 14, weight: .medium))
+                    Text("Modify Controller Position")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    Spacer()
+                    Image(systemName: "chevron.up")
+                        .font(.system(size: 12, weight: .bold))
+                }
+                .foregroundColor(.white.opacity(0.9))
+            }
+            .buttonStyle(.plain)
+            
+            // X position control
+            VStack(alignment: .leading, spacing: 8) {
+                Text("X Position (Left-Right)")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.7))
+                
+                HStack {
+                    Text("\(String(format: "%.2f", dataManager.statusMinimizedXPosition))m")
+                        .font(.system(size: 13, weight: .medium, design: .monospaced))
+                        .foregroundColor(.white)
+                        .frame(width: 45, alignment: .leading)
+                    
+                    Slider(value: Binding(
+                        get: { dataManager.statusMinimizedXPosition },
+                        set: { newValue in
+                            print("🎚️ [StatusView] X slider changed to: \(newValue)")
+                            dataManager.statusMinimizedXPosition = newValue
+                            previewStatusPosition = (x: newValue, y: dataManager.statusMinimizedYPosition)
+                            previewStatusActive = true
+                            print("🎚️ [StatusView] Set previewStatusPosition to: \(String(describing: previewStatusPosition)), previewStatusActive: \(previewStatusActive)")
+                            
+                            // Cancel any existing hide task
+                            hidePreviewTask?.cancel()
+                            
+                            // Schedule hiding the preview after 3 seconds of inactivity
+                            hidePreviewTask = Task { @MainActor in
+                                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                                if !Task.isCancelled {
+                                    previewStatusPosition = nil
+                                    previewStatusActive = false
+                                }
+                            }
+                        }
+                    ), in: -0.5...0.5, step: 0.05)
+                    .tint(.purple)
+                }
+                
+                HStack {
+                    Text("Left (0.5m)")
+                        .font(.caption2)
+                        .foregroundColor(.white.opacity(0.5))
+                    Spacer()
+                    Text("Right (0.5m)")
+                        .font(.caption2)
+                        .foregroundColor(.white.opacity(0.5))
+                }
+            }
+            
+            Divider()
+                .background(Color.white.opacity(0.2))
+            
+            // Y position control
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Y Position (Up-Down)")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.7))
+                
+                HStack {
+                    Text("\(String(format: "%.2f", dataManager.statusMinimizedYPosition))m")
+                        .font(.system(size: 13, weight: .medium, design: .monospaced))
+                        .foregroundColor(.white)
+                        .frame(width: 45, alignment: .leading)
+                    
+                    Slider(value: Binding(
+                        get: { dataManager.statusMinimizedYPosition },
+                        set: { newValue in
+                            print("🎚️ [StatusView] Y slider changed to: \(newValue)")
+                            dataManager.statusMinimizedYPosition = newValue
+                            previewStatusPosition = (x: dataManager.statusMinimizedXPosition, y: newValue)
+                            previewStatusActive = true
+                            print("🎚️ [StatusView] Set previewStatusPosition to: \(String(describing: previewStatusPosition)), previewStatusActive: \(previewStatusActive)")
+                            
+                            // Cancel any existing hide task
+                            hidePreviewTask?.cancel()
+                            
+                            // Schedule hiding the preview after 3 seconds of inactivity
+                            hidePreviewTask = Task { @MainActor in
+                                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                                if !Task.isCancelled {
+                                    previewStatusPosition = nil
+                                    previewStatusActive = false
+                                }
+                            }
+                        }
+                    ), in: -0.5...0.5, step: 0.05)
+                    .tint(.purple)
+                }
+                
+                HStack {
+                    Text("Down (0.5m)")
+                        .font(.caption2)
+                        .foregroundColor(.white.opacity(0.5))
+                    Spacer()
+                    Text("Up (0.5m)")
+                        .font(.caption2)
+                        .foregroundColor(.white.opacity(0.5))
+                }
+            }
+            
+            HStack {
+                Spacer()
+                Button {
+                    dataManager.statusMinimizedXPosition = 0.0
+                    dataManager.statusMinimizedYPosition = -0.3
+                    previewStatusPosition = (x: 0.0, y: -0.3)
+                    previewStatusActive = true
+                    
+                    hidePreviewTask?.cancel()
+                    hidePreviewTask = Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 3_000_000_000)
+                        if !Task.isCancelled {
+                            previewStatusPosition = nil
+                            previewStatusActive = false
+                        }
+                    }
+                } label: {
+                    Text("Reset Position")
+                        .font(.caption)
+                        .foregroundColor(.purple)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Color.white.opacity(0.15))
+                        .cornerRadius(6)
+                }
+                .buttonStyle(.plain)
+                Spacer()
+            }
+            
+            Text("💡 Preview will show where the minimized status will appear")
+                .font(.caption2)
+                .foregroundColor(.white.opacity(0.5))
+                .multilineTextAlignment(.leading)
+        }
+    }
+}
+
+/// Preview view that looks exactly like the minimized status but with 50% opacity
+struct StatusPreviewView: View {
+    let showVideoStatus: Bool
+    
+    var body: some View {
+        HStack(spacing: 24) {
+            // Expand button (non-functional in preview)
+            ZStack {
+                Circle()
+                    .fill(Color.white.opacity(0.3))
+                    .frame(width: 60, height: 60)
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundColor(.white)
+            }
+            
+            // Video minimize/maximize button (only show if video streaming mode is enabled)
+            if showVideoStatus {
+                ZStack {
+                    Circle()
+                        .fill(Color.blue.opacity(0.8))
+                        .frame(width: 60, height: 60)
+                    Image(systemName: "video.fill")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundColor(.white)
+                }
+            }
+            
+            // Close button (non-functional in preview)
+            ZStack {
+                Circle()
+                    .fill(Color.red)
+                    .frame(width: 60, height: 60)
+                Text("✕")
+                    .font(.system(size: 27, weight: .bold))
+                    .foregroundColor(.white)
+            }
+        }
+        .padding(30)
+        .background(Color.black.opacity(0.6))
+        .cornerRadius(36)
+        .opacity(0.5)  // 50% transparent
     }
 }
 
