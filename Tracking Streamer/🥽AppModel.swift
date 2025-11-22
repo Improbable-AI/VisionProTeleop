@@ -29,6 +29,8 @@ class DataManager: ObservableObject {
     var grpcServerReady: Bool = false  // Indicates if gRPC server is ready to accept connections
     var webrtcServerInfo: (host: String, port: Int)? = nil  // WebRTC server info from gRPC
     var stereoEnabled: Bool = false  // Whether stereo video mode is enabled
+    var stereoAudioEnabled: Bool = false  // Whether stereo audio mode is enabled
+    var audioEnabled: Bool = false  // Whether audio track is present at all
     
     @Published var connectionStatus: String = "Initializing..."
     
@@ -284,12 +286,16 @@ class HandTrackingServiceProvider: Handtracking_HandTrackingServiceProvider {
             let ip3 = Int(request.head.m03)
             let ip4 = Int(request.head.m10)
             let port = Int(request.head.m11)
-            let stereo = request.head.m12 > 0.5  // Stereo flag
+            let stereoVideo = request.head.m12 > 0.5  // Stereo video flag
+            let stereoAudio = request.head.m13 > 0.5  // Stereo audio flag
+            let audioEnabled = request.head.m20 > 0.5  // Audio enabled flag
             let host = "\(ip1).\(ip2).\(ip3).\(ip4)"
-            print("🎞️ WebRTC server available at: \(host):\(port) (stereo=\(stereo))")
+            print("🎞️ WebRTC server available at: \(host):\(port) (stereo_video=\(stereoVideo), stereo_audio=\(stereoAudio), audio_enabled=\(audioEnabled))")
             print("💾 [DEBUG] Storing WebRTC info in DataManager...")
             DataManager.shared.webrtcServerInfo = (host: host, port: port)
-            DataManager.shared.stereoEnabled = stereo
+            DataManager.shared.stereoEnabled = stereoVideo
+            DataManager.shared.stereoAudioEnabled = stereoAudio
+            DataManager.shared.audioEnabled = audioEnabled
         } else {
             print("⚠️ [DEBUG] Not a special message (expected m00=888.0 or 999.0, got \(request.head.m00))")
         }

@@ -92,7 +92,7 @@ s = VisionProStreamer(ip = avp_ip)
 # you can simply start a video stream 
 # by defining which video device you want to use
 s.start_video_streaming(device="/dev/video0", format="v4l2", \
-                        size="640x480", fps=30, stereo_video=False)
+                        size="640x480", fps=30, stereo=False)
 
 while True:
     r = s.latest
@@ -115,7 +115,7 @@ You can also:
   ```python
   s = VisionProStreamer(ip = avp_ip)
   s.start_video_streaming(device="/dev/video0", format="v4l2", \
-                        size="640x480", fps=30, stereo_video=True)
+                        size="640x480", fps=30, stereo=True)
   ```
 
 - work without a physical camera and send over synthetically generated frames (i.e., simulation renderings, or purely synthetic images)

@@ -264,7 +264,6 @@ if __name__ == "__main__":
         size=args.resolution,     # Side-by-side stereo resolution
         port=9999,
         stereo_video=True,        # Enable stereo video mode
-        stereo_audio=False        # No audio needed for this demo
     )
     
     print("✓ Stereo video streaming started!")

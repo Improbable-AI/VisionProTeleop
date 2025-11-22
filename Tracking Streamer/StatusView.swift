@@ -227,6 +227,69 @@ struct StatusOverlay: View {
                         .fontWeight(.medium)
                 }
                 .font(.subheadline)
+                
+                // Show detailed track information when connected
+                if webrtcConnected {
+                    Divider()
+                        .background(Color.white.opacity(0.2))
+                    
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Stream Details")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.6))
+                            .fontWeight(.semibold)
+                        
+                        // Video track info
+                        HStack(spacing: 6) {
+                            Image(systemName: "video.fill")
+                                .font(.system(size: 10))
+                                .foregroundColor(.blue)
+                            Text("Video:")
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.7))
+                            if dataManager.stereoEnabled {
+                                Text("Stereo")
+                                    .font(.caption)
+                                    .foregroundColor(.cyan)
+                                    .fontWeight(.medium)
+                            } else {
+                                Text("Mono")
+                                    .font(.caption)
+                                    .foregroundColor(.white)
+                                    .fontWeight(.medium)
+                            }
+                        }
+                        
+                        // Audio track info (optional - may not be present)
+                        HStack(spacing: 6) {
+                            Image(systemName: "waveform")
+                                .font(.system(size: 10))
+                                .foregroundColor(dataManager.audioEnabled ? .green : .gray)
+                            Text("Audio:")
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.7))
+                            if dataManager.audioEnabled {
+                                if dataManager.stereoAudioEnabled {
+                                    Text("Stereo")
+                                        .font(.caption)
+                                        .foregroundColor(.green)
+                                        .fontWeight(.medium)
+                                } else {
+                                    Text("Mono")
+                                        .font(.caption)
+                                        .foregroundColor(.white)
+                                        .fontWeight(.medium)
+                                }
+                            } else {
+                                Text("N/A")
+                                    .font(.caption)
+                                    .foregroundColor(.white.opacity(0.5))
+                                    .fontWeight(.medium)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
             }
             
             // Show waiting message when no frames are available (only for video mode)

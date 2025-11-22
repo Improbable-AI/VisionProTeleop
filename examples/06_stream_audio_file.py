@@ -93,12 +93,7 @@ def hand_tracking_visualizer(streamer):
 
 
 def audio_file_streamer(audio_file_path, stereo=False):
-    """Stream audio file in a loop
-    
-    Args:
-        audio_file_path: Path to audio file (MP3, WAV, etc.)
-        stereo: If True, preserve/convert to stereo audio. If False, convert to mono.
-    """
+    """Stream audio file in a loop"""
     from pydub import AudioSegment
     
     print(f"🎵 Loading audio file: {audio_file_path}")
@@ -106,28 +101,33 @@ def audio_file_streamer(audio_file_path, stereo=False):
     # Load audio file (supports MP3, WAV, etc.)
     audio = AudioSegment.from_file(audio_file_path)
     
-    # Convert to 48kHz and desired channel count
+    # Convert to 48kHz with specified channel count
     channels = 2 if stereo else 1
     audio = audio.set_frame_rate(48000).set_channels(channels)
     
-    print(f"✓ Audio loaded:")
+    channel_mode = "stereo" if stereo else "mono"
+    print(f"✓ Audio loaded ({channel_mode}):")
     print(f"  - Duration: {len(audio) / 1000:.2f} seconds")
     print(f"  - Sample rate: {audio.frame_rate} Hz")
     print(f"  - Channels: {audio.channels}")
     print(f"  - Sample width: {audio.sample_width} bytes")
     
-    # Get raw audio data as int16 samples (interleaved for stereo: L, R, L, R, ...)
+    # Get raw audio data as int16 samples
+    # For stereo, this array is interleaved: [L, R, L, R, L, R, ...]
     audio_samples = np.array(audio.get_array_of_samples(), dtype=np.int16)
     total_samples = len(audio_samples)
     
-    # Track position in audio file
+    # Track position in audio file (in terms of individual samples, not frames)
     current_position = 0
     
     def generate_audio(audio_frame):
         nonlocal current_position
         
-        # For stereo: num_samples is per-channel, but we need total interleaved samples
-        num_samples_needed = audio_frame.samples * channels
+        # Number of samples per frame PER CHANNEL
+        num_samples_per_channel = audio_frame.samples
+        
+        # Total samples needed (for stereo: num_samples * 2, for mono: num_samples * 1)
+        num_samples_needed = num_samples_per_channel * channels
         
         # Extract samples for this frame
         end_position = current_position + num_samples_needed
@@ -170,7 +170,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Stream audio file with hand tracking visualization")
     parser.add_argument("--ip", type=str, required=True, help="Vision Pro IP address")
     parser.add_argument("--audio", type=str, required=True, help="Path to audio file (MP3, WAV, etc.)")
-    parser.add_argument("--stereo", action="store_true", help="Stream in stereo (default: mono)")
+    parser.add_argument("--stereo-audio", action="store_true", help="Stream audio in stereo (2 channels) instead of mono")
     args = parser.parse_args()
     
     # Check if audio file exists
@@ -185,7 +185,7 @@ if __name__ == "__main__":
     streamer.register_frame_callback(hand_tracking_visualizer(streamer))
     
     # Register audio callback for file streaming
-    streamer.register_audio_callback(audio_file_streamer(args.audio, stereo=args.stereo))
+    streamer.register_audio_callback(audio_file_streamer(args.audio, stereo=args.stereo_audio))
     
     # Start video and audio streaming
     streamer.start_video_streaming(
@@ -194,7 +194,8 @@ if __name__ == "__main__":
         fps=30,                # 30fps video
         size="1280x720",       # HD resolution
         port=9999,
-        stereo_audio=args.stereo,  # Stereo or mono audio
+        stereo_video=False,    # Mono video
+        stereo_audio=args.stereo_audio,  # Stereo audio if flag is set
         audio_device=None,     # No microphone - use audio file
         audio_format=None
     )
@@ -204,7 +205,8 @@ if __name__ == "__main__":
     print("=" * 60)
     print()
     print(f"📹 Video: Hand tracking visualization at 30fps")
-    print(f"🎵 Audio: Looping {args.audio} ({'stereo' if args.stereo else 'mono'})")
+    audio_mode = "stereo" if args.stereo_audio else "mono"
+    print(f"🎵 Audio: Looping {args.audio} ({audio_mode})")
     print()
     print("Make sure Vision Pro app is running and connected!")
     print("Press Ctrl+C to stop")

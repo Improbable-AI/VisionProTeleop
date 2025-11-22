@@ -7,6 +7,7 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
     private var peerConnection: LKRTCPeerConnection?
     private let factory: LKRTCPeerConnectionFactory
     private var videoTrack: LKRTCVideoTrack?
+    private var audioTrack: LKRTCAudioTrack?
     
     var onFrameReceived: ((CVPixelBuffer) -> Void)?
     
@@ -176,10 +177,20 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
         }
     }
     
+    func addAudioRenderer(_ renderer: LKRTCAudioRenderer) {
+        if let track = audioTrack {
+            track.add(renderer)
+            print("DEBUG: Audio renderer attached to track - track enabled: \(track.isEnabled)")
+        } else {
+            print("INFO: No audio track available (audio may not be enabled on server)")
+        }
+    }
+    
     func disconnect() {
         peerConnection?.close()
         peerConnection = nil
         videoTrack = nil
+        audioTrack = nil
     }
 }
 
@@ -210,6 +221,13 @@ extension WebRTCClient {
             print("DEBUG: Video track received - id: \(videoTrack.trackId), enabled: \(videoTrack.isEnabled)")
             Task { @MainActor in
                 DataManager.shared.connectionStatus = "Video track enabled, waiting for frames..."
+            }
+        }
+        if let audioTrack = stream.audioTracks.first {
+            self.audioTrack = audioTrack
+            print("DEBUG: Audio track received - id: \(audioTrack.trackId), enabled: \(audioTrack.isEnabled)")
+            Task { @MainActor in
+                DataManager.shared.connectionStatus = "Audio track enabled"
             }
         }
     }
@@ -288,7 +306,7 @@ struct SDPMessage: Codable {
 
 enum WebRTCError: Error {
     case failedToCreatePeerConnection
-    case failedToCreateAnswer 
+    case failedToCreateAnswer
     case invalidOffer
     case noLocalDescription
     case peerConnectionClosed

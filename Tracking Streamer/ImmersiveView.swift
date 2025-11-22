@@ -3,6 +3,8 @@ import RealityKit
 import LiveKitWebRTC
 import CoreImage
 import Accelerate
+import AVFAudio
+import RealityKitContent
 
 struct ImmersiveView: View {
     @EnvironmentObject var imageData: ImageData
@@ -21,6 +23,7 @@ struct ImmersiveView: View {
     @State private var videoMinimized = false  // Track if video view is minimized
     @State private var previewStatusPosition: (x: Float, y: Float)? = nil  // Track preview status position
     @State private var previewStatusActive = false  // Track if status preview should be shown
+    @State private var stereoMaterialEntity: Entity? = nil  // Store reference to RealityKit stereo material entity
     
     var body: some View {
         RealityView { content, attachments in
@@ -306,7 +309,7 @@ struct ImmersiveView: View {
             print("DEBUG: Stereo mode: \(isStereo)")
             
             if isStereo {
-                // Stereo mode: Split side-by-side image and render to separate eyes
+                // Stereo mode: Use the loaded ShaderGraphMaterial from RealityKitContent
                 do {
                     // For stereo, we need to split the side-by-side image
                     // Left half goes to left eye, right half to right eye
@@ -319,26 +322,28 @@ struct ImmersiveView: View {
                         options: TextureResource.CreateOptions.init(semantic: nil)
                     )
                     
-                    // Create a shader graph material for stereo rendering
-                    // Note: This requires a custom shader material created in Reality Composer Pro
-                    // For now, we'll attempt to use it if available, otherwise fall back to mono
-                    if var stereoMaterial = skyBox.components[ModelComponent.self]?.materials.first as? ShaderGraphMaterial {
+                    // Get the stereo material from the loaded RealityKit entity
+                    if let sphereEntity = stereoMaterialEntity,
+                       var stereoMaterial = sphereEntity.components[ModelComponent.self]?.materials.first as? ShaderGraphMaterial {
+                        // Update the material parameters with new textures
                         try stereoMaterial.setParameter(name: "left", value: .textureResource(leftTexture))
                         try stereoMaterial.setParameter(name: "right", value: .textureResource(rightTexture))
+                        
+                        // Apply the stereo material to the video plane
                         skyBox.components[ModelComponent.self]?.materials = [stereoMaterial]
-                        print("DEBUG: Updated stereo textures successfully")
+                        print("✅ DEBUG: Updated stereo textures successfully (left + right)")
                     } else {
-                        // Fallback: Create stereo material programmatically or use UnlitMaterial
-                        print("WARNING: ShaderGraphMaterial not found, falling back to mono display")
+                        // Fallback if stereo material isn't loaded yet
+                        print("⚠️ WARNING: StereoMaterial not loaded yet, falling back to mono display")
                         var skyBoxMaterial = UnlitMaterial()
                         skyBoxMaterial.color = .init(texture: .init(rightTexture))
                         skyBox.components[ModelComponent.self]?.materials = [skyBoxMaterial]
                     }
                 } catch {
-                    print("ERROR: Failed to load stereo textures: \(error)")
+                    print("❌ ERROR: Failed to load stereo textures: \(error)")
                 }
             } else {
-                // Mono mode: Use simple unlit material
+                // Mono mode: Use simple unlit material with alpha support
                 var skyBoxMaterial = UnlitMaterial()
                 do {
                     // Use right image for mono display
@@ -347,10 +352,11 @@ struct ImmersiveView: View {
                         options: TextureResource.CreateOptions.init(semantic: nil)
                     )
                     skyBoxMaterial.color = .init(texture: .init(texture))
+                    
                     skyBox.components[ModelComponent.self]?.materials = [skyBoxMaterial]
                     print("DEBUG: Updated mono video texture successfully")
                 } catch {
-                    print("ERROR: Failed to load mono texture: \(error)")
+                    print("❌ ERROR: Failed to load mono texture: \(error)")
                 }
             }
         } attachments: {
@@ -385,6 +391,24 @@ struct ImmersiveView: View {
         .onAppear {
             print("DEBUG: ImmersiveView appeared, starting video stream")
             videoStreamManager.start(imageData: imageData)
+            
+            // Load the stereo material from RealityKitContent
+            Task {
+                if let scene = try? await Entity(named: "Immersive", in: realityKitContentBundle) {
+                    // Find the sphere with stereo material
+                    if let sphereEntity = scene.findEntity(named: "Sphere") {
+                        sphereEntity.isEnabled = false  // Hide the sphere, we just need its material
+                        await MainActor.run {
+                            self.stereoMaterialEntity = sphereEntity
+                        }
+                        print("✅ [ImmersiveView] Loaded stereo material from RealityKitContent")
+                    } else {
+                        print("⚠️ [ImmersiveView] Could not find Sphere entity in Immersive scene")
+                    }
+                } else {
+                    print("⚠️ [ImmersiveView] Could not load Immersive scene from RealityKitContent")
+                }
+            }
         }
         .onDisappear {
             print("DEBUG: ImmersiveView disappeared, stopping video stream")
@@ -429,6 +453,7 @@ private func createPreviewPlane() -> Entity {
 class VideoStreamManager: ObservableObject {
     private var webrtcClient: WebRTCClient?
     private var videoRenderer: VideoFrameRenderer?
+    private var audioRenderer: AudioFrameRenderer?
     private var isRunning = false
     
     func start(imageData: ImageData) {
@@ -501,12 +526,19 @@ class VideoStreamManager: ObservableObject {
                 let client = WebRTCClient()
                 self.webrtcClient = client
                 
-                let renderer = VideoFrameRenderer(imageData: imageData)
-                self.videoRenderer = renderer
+                let videoRenderer = VideoFrameRenderer(imageData: imageData)
+                self.videoRenderer = videoRenderer
+                
+                let audioRenderer = AudioFrameRenderer()
+                self.audioRenderer = audioRenderer
                 
                 try await client.connect(to: info.host, port: info.port)
                 print("✅ [DEBUG] WebRTC connection established!")
-                client.addVideoRenderer(renderer)
+                let stereoVideo = DataManager.shared.stereoEnabled
+                let stereoAudio = DataManager.shared.stereoAudioEnabled
+                print("📊 [DEBUG] Stereo modes - Video: \(stereoVideo), Audio: \(stereoAudio)")
+                client.addVideoRenderer(videoRenderer)
+                client.addAudioRenderer(audioRenderer)
             } catch {
                 print("❌ [DEBUG] Failed to connect to WebRTC server: \(error)")
             }
@@ -557,6 +589,7 @@ class VideoStreamManager: ObservableObject {
         webrtcClient?.disconnect()
         webrtcClient = nil
         videoRenderer = nil
+        audioRenderer = nil
     }
 }
 
@@ -586,22 +619,22 @@ class VideoFrameRenderer: NSObject, LKRTCVideoRenderer {
         guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else { return }
         let uiImage = UIImage(cgImage: cgImage)
         
+        // Update image data directly
         DispatchQueue.main.async { [weak self] in
-            // Check if stereo mode is enabled
+            guard let self = self else { return }
             let isStereo = DataManager.shared.stereoEnabled
             
             if isStereo {
-                // Split side-by-side image into left and right
-                let (leftImage, rightImage) = self?.splitSideBySideImage(uiImage) ?? (uiImage, uiImage)
-                self?.imageData?.left = leftImage
-                self?.imageData?.right = rightImage
+                let (leftImage, rightImage) = self.splitSideBySideImage(uiImage)
+                self.imageData?.left = leftImage
+                self.imageData?.right = rightImage
             } else {
-                // Mono mode: use same image for both
-                self?.imageData?.left = uiImage
-                self?.imageData?.right = uiImage
+                self.imageData?.left = uiImage
+                self.imageData?.right = uiImage
             }
         }
     }
+
     
     private func splitSideBySideImage(_ image: UIImage) -> (UIImage, UIImage) {
         guard let cgImage = image.cgImage else {
@@ -628,20 +661,18 @@ class VideoFrameRenderer: NSObject, LKRTCVideoRenderer {
         
         return (leftImage, rightImage)
     }
-    
+}
+
+extension VideoFrameRenderer {
     private func extractPixelBuffer(from frame: LKRTCVideoFrame) -> CVPixelBuffer? {
-        let conversionStart = CFAbsoluteTimeGetCurrent()
         let buffer = frame.buffer
         if let cv = buffer as? LKRTCCVPixelBuffer {
-            let elapsed = (CFAbsoluteTimeGetCurrent() - conversionStart) * 1000
-            print("DEBUG: CVPixelBuffer direct conversion took \(String(format: "%.2f", elapsed))ms")
             return cv.pixelBuffer
         }
         // Convert I420 to BGRA into a new CVPixelBuffer
         guard let i420 = buffer.toI420() as? LKRTCI420Buffer else { return nil }
         let width = Int(buffer.width)
         let height = Int(buffer.height)
-        print("DEBUG: Starting I420->BGRA conversion for \(width)x\(height) frame")
         
         var output: CVPixelBuffer?
         let options = [
@@ -728,13 +759,94 @@ class VideoFrameRenderer: NSObject, LKRTCVideoRenderer {
             vImage_Flags(kvImageNoFlags)
         )
         
-        if error != kvImageNoError {
-            print("DEBUG: vImage conversion error: \(error)")
+        // Silent error handling - don't spam logs
+        guard error == kvImageNoError else { return nil }
+        
+        return out
+    }
+}
+
+/// Renders audio frames from WebRTC to device speakers
+class AudioFrameRenderer: NSObject, LKRTCAudioRenderer {
+    private var audioEngine: AVAudioEngine?
+    private var playerNode: AVAudioPlayerNode?
+    private var audioFormat: AVAudioFormat?
+    private var bufferCount = 0
+    private let audioQueue = DispatchQueue(label: "com.visionpro.audio", qos: .userInteractive)
+    
+    override init() {
+        super.init()
+        print("🔊 AudioFrameRenderer initialized")
+    }
+    
+    private func setupAudioEngine(format: AVAudioFormat) {
+        guard audioEngine == nil else { return }
+        
+        let channelMode = format.channelCount == 2 ? "STEREO" : "MONO"
+        print("🔊 Setting up audio engine with format:")
+        print("   - Sample rate: \(format.sampleRate) Hz")
+        print("   - Channels: \(format.channelCount) [\(channelMode)]")
+        
+        audioEngine = AVAudioEngine()
+        playerNode = AVAudioPlayerNode()
+        
+        guard let engine = audioEngine, let player = playerNode else {
+            print("❌ Failed to create audio engine or player node")
+            return
         }
         
-        let loopElapsed = (CFAbsoluteTimeGetCurrent() - loopStart) * 1000
-        let totalElapsed = (CFAbsoluteTimeGetCurrent() - conversionStart) * 1000
-        print("DEBUG: vImage I420->BGRA conversion took \(String(format: "%.2f", loopElapsed))ms, total: \(String(format: "%.2f", totalElapsed))ms")
-        return out
+        engine.attach(player)
+        
+        // Connect player to mixer with the incoming audio format
+        engine.connect(player, to: engine.mainMixerNode, format: format)
+        
+        // Prepare engine (pre-allocates resources)
+        engine.prepare()
+        
+        do {
+            try engine.start()
+            player.play()
+            print("✅ Audio engine started successfully!")
+        } catch {
+            print("❌ Failed to start audio engine: \(error)")
+        }
+        
+        self.audioFormat = format
+    }
+    
+    func render(pcmBuffer: AVAudioPCMBuffer) {
+        // Fast early return checks (avoid logging overhead)
+        guard let player = playerNode, let engine = audioEngine else {
+            if audioEngine == nil {
+                setupAudioEngine(format: pcmBuffer.format)
+                return
+            }
+            return
+        }
+        
+        guard engine.isRunning else { return }
+        
+        // Quick format validation without expensive logging
+        guard let expectedFormat = audioFormat, 
+              pcmBuffer.format.sampleRate == expectedFormat.sampleRate,
+              pcmBuffer.format.channelCount == expectedFormat.channelCount else {
+            return
+        }
+        
+        // Schedule buffer on background queue to avoid blocking WebRTC thread
+        audioQueue.async { [weak player] in
+            guard let player = player else { return }
+            player.scheduleBuffer(pcmBuffer, completionHandler: nil)
+            
+            if !player.isPlaying {
+                player.play()
+            }
+        }
+        
+        // Log only first buffer
+        if bufferCount == 0 {
+            print("🔊 Audio streaming started")
+        }
+        bufferCount += 1
     }
 }
