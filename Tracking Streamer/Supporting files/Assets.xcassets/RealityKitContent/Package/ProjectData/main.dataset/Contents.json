@@ -1,0 +1,12 @@
+{
+  "data" : [
+    {
+      "filename" : "main.json",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

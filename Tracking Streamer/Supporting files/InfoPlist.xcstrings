@@ -55,6 +55,18 @@
         }
       }
     },
+    "NSMicrophoneUsageDescription" : {
+      "comment" : "Privacy - Microphone Usage Description",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "This app uses your microphone to communicate with the robot."
+          }
+        }
+      }
+    },
     "NSWorldSensingUsageDescription" : {
       "comment" : "Privacy - World Sensing Usage Description",
       "extractionState" : "extracted_with_value",

@@ -1,0 +1,12 @@
+{
+  "data" : [
+    {
+      "filename" : "xcschememanagement.plist",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

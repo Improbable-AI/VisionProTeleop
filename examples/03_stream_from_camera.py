@@ -12,10 +12,8 @@ Usage:
 from avp_stream.streamer import VisionProStreamer
 import time
 
-def main():
-    VISION_PRO_IP = "192.168.86.21" 
-    
-    streamer = VisionProStreamer(ip=VISION_PRO_IP, record=True)
+def main(args):
+    streamer = VisionProStreamer(ip=args.ip, record=True)
     
     streamer.start_video_streaming(
         device="0:none",
@@ -42,4 +40,11 @@ def main():
         print("\n\n✓ Stopped streaming")
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    parser = argparse.ArgumentParser(
+        description="Stream video from Python to VisionOS with hand tracking."
+    )
+    parser.add_argument("--ip", type=str, required=True)
+    args = parser.parse_args()
+
+    main(args)

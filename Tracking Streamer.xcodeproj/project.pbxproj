@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 60;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -31,6 +31,7 @@
 		C1893C772B93C1AC00F2269D /* handtracking.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1893C752B93C1AC00F2269D /* handtracking.pb.swift */; };
 		C1DA80C42ECE377600B55CC2 /* StatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1DA80C32ECE377600B55CC2 /* StatusView.swift */; };
 		C1DA80C72ECE8C6F00B55CC2 /* ViewControlSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1DA80C62ECE8C6F00B55CC2 /* ViewControlSettings.swift */; };
+		C1DA80DC2ED0F61D00B55CC2 /* RealityKitContent in Frameworks */ = {isa = PBXBuildFile; productRef = C1DA80DB2ED0F61D00B55CC2 /* RealityKitContent */; };
 		C1E05F782ECD84DF0018C506 /* LiveKitWebRTC in Frameworks */ = {isa = PBXBuildFile; productRef = C1E05F772ECD84DF0018C506 /* LiveKitWebRTC */; };
 		C1E05F7C2ECD850B0018C506 /* ImmersiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E05F7A2ECD850B0018C506 /* ImmersiveView.swift */; };
 		C1E05F7D2ECD850B0018C506 /* ImageData.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E05F792ECD850B0018C506 /* ImageData.swift */; };
@@ -69,6 +70,7 @@
 		C1DA80C32ECE377600B55CC2 /* StatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusView.swift; sourceTree = "<group>"; };
 		C1DA80C52ECE821800B55CC2 /* VisionProTeleop.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VisionProTeleop.entitlements; sourceTree = "<group>"; };
 		C1DA80C62ECE8C6F00B55CC2 /* ViewControlSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewControlSettings.swift; sourceTree = "<group>"; };
+		C1DA80D92ED0F4C500B55CC2 /* RealityKitContent */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = RealityKitContent; sourceTree = "<group>"; };
 		C1E05F792ECD850B0018C506 /* ImageData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageData.swift; sourceTree = "<group>"; };
 		C1E05F7A2ECD850B0018C506 /* ImmersiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImmersiveView.swift; sourceTree = "<group>"; };
 		C1E05F7B2ECD850B0018C506 /* WebRTCClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebRTCClient.swift; sourceTree = "<group>"; };
@@ -81,6 +83,7 @@
 			files = (
 				C14DAF552B7C375D00A7333E /* protoc-gen-grpc-swift in Frameworks */,
 				C14DAF532B7C375D00A7333E /* GRPC in Frameworks */,
+				C1DA80DC2ED0F61D00B55CC2 /* RealityKitContent in Frameworks */,
 				C1E05F782ECD84DF0018C506 /* LiveKitWebRTC in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -103,6 +106,7 @@
 		16267B4E2B57D148000CA8AD /* Supporting files */ = {
 			isa = PBXGroup;
 			children = (
+				C1DA80D92ED0F4C500B55CC2 /* RealityKitContent */,
 				165ADB522B4B71B2008A756F /* Assets.xcassets */,
 				169D84AE2B5A319400BB5606 /* sound1.m4a */,
 				169D84AD2B5A319000BB5606 /* sound2.m4a */,
@@ -196,6 +200,7 @@
 				C14DAF522B7C375D00A7333E /* GRPC */,
 				C14DAF542B7C375D00A7333E /* protoc-gen-grpc-swift */,
 				C1E05F772ECD84DF0018C506 /* LiveKitWebRTC */,
+				C1DA80DB2ED0F61D00B55CC2 /* RealityKitContent */,
 			);
 			productName = HandsWidth;
 			productReference = 165ADB472B4B71B0008A756F /* Tracking Streamer.app */;
@@ -229,6 +234,7 @@
 			packageReferences = (
 				C14DAF512B7C375D00A7333E /* XCRemoteSwiftPackageReference "grpc-swift" */,
 				C1E05F762ECD84DF0018C506 /* XCRemoteSwiftPackageReference "webrtc-xcframework" */,
+				C1DA80DA2ED0F61D00B55CC2 /* XCLocalSwiftPackageReference "Tracking Streamer/Supporting files/RealityKitContent" */,
 			);
 			productRefGroup = 165ADB482B4B71B0008A756F /* Products */;
 			projectDirPath = "";
@@ -426,6 +432,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app might use your cameras to sense the surrounding environments. ";
 				INFOPLIST_KEY_NSHandsTrackingUsageDescription = "This app tracks your hand to teleoperate a robot. ";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app uses your microphone to communicate with the robot.";
 				INFOPLIST_KEY_NSWorldSensingUsageDescription = "This app senses your surronuding world to reconstruct a simulation.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -462,6 +469,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app might use your cameras to sense the surrounding environments. ";
 				INFOPLIST_KEY_NSHandsTrackingUsageDescription = "This app tracks your hand to teleoperate a robot. ";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app uses your microphone to communicate with the robot.";
 				INFOPLIST_KEY_NSWorldSensingUsageDescription = "This app senses your surronuding world to reconstruct a simulation.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -501,6 +509,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		C1DA80DA2ED0F61D00B55CC2 /* XCLocalSwiftPackageReference "Tracking Streamer/Supporting files/RealityKitContent" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "Tracking Streamer/Supporting files/RealityKitContent";
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		C14DAF512B7C375D00A7333E /* XCRemoteSwiftPackageReference "grpc-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -530,6 +545,10 @@
 			isa = XCSwiftPackageProductDependency;
 			package = C14DAF512B7C375D00A7333E /* XCRemoteSwiftPackageReference "grpc-swift" */;
 			productName = "protoc-gen-grpc-swift";
+		};
+		C1DA80DB2ED0F61D00B55CC2 /* RealityKitContent */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = RealityKitContent;
 		};
 		C1E05F772ECD84DF0018C506 /* LiveKitWebRTC */ = {
 			isa = XCSwiftPackageProductDependency;
