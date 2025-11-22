@@ -648,6 +648,8 @@ class VideoStreamManager: ObservableObject {
 /// Renders video frames from WebRTC to UIImage
 class VideoFrameRenderer: NSObject, LKRTCVideoRenderer {
     weak var imageData: ImageData?
+    // Reuse CIContext for performance (creating it every frame is expensive)
+    private let context = CIContext()
     
     init(imageData: ImageData) {
         self.imageData = imageData
@@ -667,7 +669,7 @@ class VideoFrameRenderer: NSObject, LKRTCVideoRenderer {
         
         // Convert CVPixelBuffer to UIImage
         let ciImage = CIImage(cvPixelBuffer: cvPixelBuffer)
-        let context = CIContext()
+        // Use the reused context
         guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else { return }
         let uiImage = UIImage(cgImage: cgImage)
         

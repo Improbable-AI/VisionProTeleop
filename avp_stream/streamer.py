@@ -447,7 +447,12 @@ class VisionProStreamer:
                 
                 if self.use_camera:
                     # Use physical camera
-                    opts = {"video_size": f"{self.width}x{self.height}", "framerate": str(framerate)}
+                    opts = {
+                        "video_size": f"{self.width}x{self.height}", 
+                        "framerate": str(framerate),
+                        "fflags": "nobuffer",  # Minimize buffering
+                        "flags": "low_delay"   # Low delay mode
+                    }
                     self.player = MediaPlayer(device, format=fmt, options=opts)
                     self.video_track = self.player.video
                     print("🎥 Camera initialized, warming up encoder...")
@@ -650,6 +655,17 @@ class VisionProStreamer:
                 # Force high bitrate by modifying SDP directly
                 # This is the most reliable way to set bitrate in WebRTC
                 # We add a b=AS:15000 line (15 Mbps) to the video section
+                sdp = offer.sdp
+                # Find the video media section and add bandwidth limit
+                if "m=video" in sdp:
+                    # Add b=AS:15000 (15 Mbps) after c=IN ... line or just after m=video line
+                    # A simple way is to replace "m=video" with "m=video ...\r\nb=AS:15000"
+                    # But we need to be careful not to break the SDP structure.
+                    # Let's insert it after the first attribute of the video section.
+                    import re
+                    sdp = re.sub(r"(m=video.*\r\n)", r"\1b=AS:15000\r\n", sdp)
+                
+                offer = RTCSessionDescription(sdp=sdp, type=offer.type)
                 
                 await pc.setLocalDescription(offer)
                 
