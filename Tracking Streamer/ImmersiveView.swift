@@ -361,8 +361,7 @@ struct ImmersiveView: View {
             }
         } attachments: {
             Attachment(id: "status") {
-                print("🟡 [ImmersiveView] Status attachment builder called")
-                return StatusOverlay(
+                StatusOverlay(
                     hasFrames: $hasFrames, 
                     isMinimized: $isMinimized,
                     showViewControls: $showViewControls,
@@ -377,8 +376,7 @@ struct ImmersiveView: View {
             }
             
             Attachment(id: "statusPreview") {
-                print("🟡 [ImmersiveView] Status preview attachment builder called")
-                return StatusPreviewView(showVideoStatus: true)
+                StatusPreviewView(showVideoStatus: true)
             }
         }
         .onReceive(imageData.$left) { newImage in
@@ -407,6 +405,38 @@ struct ImmersiveView: View {
                     }
                 } else {
                     print("⚠️ [ImmersiveView] Could not load Immersive scene from RealityKitContent")
+                }
+            }
+        }
+        .onChange(of: dataManager.pythonClientIP) { oldValue, newValue in
+            if newValue == nil {
+                print("🔌 [ImmersiveView] Python client disconnected - clearing state")
+                // Clear the video frames
+                imageData.left = nil
+                imageData.right = nil
+                hasFrames = false
+                videoMinimized = false
+                hasAutoMinimized = false
+                // Stop the video stream
+                videoStreamManager.stop()
+            }
+        }
+        .onChange(of: dataManager.webrtcGeneration) { oldValue, newValue in
+            if newValue < 0 {
+                // Disconnection detected
+                print("🔌 [ImmersiveView] WebRTC disconnected (generation: \(newValue)) - clearing state")
+                imageData.left = nil
+                imageData.right = nil
+                hasFrames = false
+                videoMinimized = false
+                videoStreamManager.stop()
+            } else if newValue > 0 && oldValue != newValue {
+                // New connection or reconnection
+                print("🔄 [ImmersiveView] WebRTC generation changed to \(newValue), restarting stream...")
+                videoStreamManager.stop()
+                // Give it a moment to cleanup
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    videoStreamManager.start(imageData: imageData)
                 }
             }
         }
@@ -457,7 +487,12 @@ class VideoStreamManager: ObservableObject {
     private var isRunning = false
     
     func start(imageData: ImageData) {
-        guard !isRunning else { return }
+        // If already running, we might want to restart if called explicitly, 
+        // but for now let's respect the flag unless stop() was called.
+        if isRunning {
+            print("⚠️ [DEBUG] VideoStreamManager.start() called but already running. Ignoring.")
+            return 
+        }
         isRunning = true
         
         Task {
@@ -736,7 +771,18 @@ extension VideoFrameRenderer {
         )
         
         // YUV to ARGB conversion info (ITU-R BT.601)
-        var pixelRange = vImage_YpCbCrPixelRange(Yp_bias: 0, CbCr_bias: 128, YpRangeMax: 255, CbCrRangeMax: 255, YpMax: 255, YpMin: 0, CbCrMax: 255, CbCrMin: 0)
+        // Use video range (limited range) which is standard for WebRTC/H.264
+        // Y: 16-235, CbCr: 16-240
+        var pixelRange = vImage_YpCbCrPixelRange(
+            Yp_bias: 16,
+            CbCr_bias: 128,
+            YpRangeMax: 235,
+            CbCrRangeMax: 240,
+            YpMax: 255,
+            YpMin: 0,
+            CbCrMax: 255,
+            CbCrMin: 0
+        )
         var infoYpCbCrToARGB = vImage_YpCbCrToARGB()
         vImageConvert_YpCbCrToARGB_GenerateConversion(
             kvImage_YpCbCrToARGBMatrix_ITU_R_601_4!,

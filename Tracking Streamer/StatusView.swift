@@ -76,14 +76,28 @@ struct StatusOverlay: View {
             
             // Update status periodically
             Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+                let wasPythonConnected = pythonConnected
+                let wasWebrtcConnected = webrtcConnected
+                
                 if let pythonClientIP = DataManager.shared.pythonClientIP {
                     pythonConnected = true
                     pythonIP = pythonClientIP
-                    print("🟣 [StatusView] Python connected: \(pythonIP)")
+                } else {
+                    pythonConnected = false
+                    pythonIP = "Not connected"
                 }
                 
                 webrtcConnected = DataManager.shared.webrtcServerInfo != nil
-                print("🟣 [StatusView] WebRTC connected: \(webrtcConnected)")
+                
+                // Detect disconnection and maximize status view
+                if (wasPythonConnected && !pythonConnected) || (wasWebrtcConnected && !webrtcConnected) {
+                    print("🔌 [StatusView] Connection lost - maximizing status view")
+                    withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                        isMinimized = false
+                        userInteracted = false  // Reset so it can auto-minimize again on next connection
+                        hasFrames = false  // Clear frames flag
+                    }
+                }
             }
         }
     }

@@ -72,7 +72,8 @@ def Xform "Root"
         def Shader "PreviewSurface"
         {
             uniform token info:id = "ND_UsdPreviewSurface_surfaceshader"
-            color3f inputs:diffuseColor.connect = </Root/StereoMaterial/GeometrySwitchCameraIndex.outputs:out>
+            color3f inputs:diffuseColor = (0, 0, 0)
+            color3f inputs:emissiveColor.connect = </Root/StereoMaterial/GeometrySwitchCameraIndex.outputs:out>
             float inputs:metallic
             float inputs:opacity
             float inputs:roughness

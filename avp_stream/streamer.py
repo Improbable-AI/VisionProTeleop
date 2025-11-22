@@ -38,7 +38,7 @@ class VisionProStreamer:
 
     def start_streaming(self): 
 
-        stream_thread = Thread(target = self.stream)
+        stream_thread = Thread(target = self.stream, daemon=True)
         stream_thread.start() 
         
         print('Waiting for hand tracking data...')
@@ -239,6 +239,9 @@ class VisionProStreamer:
         """
         streamer_instance = self
         
+        class ReusableHTTPServer(HTTPServer):
+            allow_reuse_address = True
+
         class InfoHandler(BaseHTTPRequestHandler):
             def do_GET(self):
                 client_ip = self.client_address[0]
@@ -268,7 +271,7 @@ class VisionProStreamer:
         
         def run_http_server():
             try:
-                server = HTTPServer(('0.0.0.0', port), InfoHandler)
+                server = ReusableHTTPServer(('0.0.0.0', port), InfoHandler)
                 self.info_server = server
                 print(f"Info server started on port {port}")
                 server.serve_forever()
@@ -643,6 +646,27 @@ class VisionProStreamer:
                 
                 # Create offer
                 offer = await pc.createOffer()
+                
+                # Force high bitrate by modifying SDP directly
+                # This is the most reliable way to set bitrate in WebRTC
+                # We add a b=AS:15000 line (15 Mbps) to the video section
+                sdp_lines = offer.sdp.split('\r\n')
+                new_sdp_lines = []
+                video_section = False
+                for line in sdp_lines:
+                    new_sdp_lines.append(line)
+                    if line.startswith('m=video'):
+                        video_section = True
+                    elif video_section and line.startswith('m='):
+                        video_section = False
+                    
+                    # Insert bandwidth line after c= line in video section
+                    if video_section and line.startswith('c=IN'):
+                        new_sdp_lines.append('b=AS:15000')  # 15 Mbps
+                        print("✓ Added b=AS:15000 (15 Mbps) to SDP offer")
+                
+                offer.sdp = '\r\n'.join(new_sdp_lines)
+                
                 await pc.setLocalDescription(offer)
                 
                 # Wait briefly for at least one ICE candidate (improves connection speed)

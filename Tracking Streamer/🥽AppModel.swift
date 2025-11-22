@@ -25,12 +25,13 @@ class DataManager: ObservableObject {
     static let shared = DataManager()
     
     var latestHandTrackingData: HandTrackingData = HandTrackingData()
-    var pythonClientIP: String? = nil  // Store Python client's IP when it connects via gRPC
-    var grpcServerReady: Bool = false  // Indicates if gRPC server is ready to accept connections
-    var webrtcServerInfo: (host: String, port: Int)? = nil  // WebRTC server info from gRPC
-    var stereoEnabled: Bool = false  // Whether stereo video mode is enabled
-    var stereoAudioEnabled: Bool = false  // Whether stereo audio mode is enabled
-    var audioEnabled: Bool = false  // Whether audio track is present at all
+    @Published var pythonClientIP: String? = nil  // Store Python client's IP when it connects via gRPC
+    @Published var grpcServerReady: Bool = false  // Indicates if gRPC server is ready to accept connections
+    @Published var webrtcServerInfo: (host: String, port: Int)? = nil  // WebRTC server info from gRPC
+    @Published var webrtcGeneration: Int = 0  // Increments when new WebRTC info is received to trigger reconnects
+    @Published var stereoEnabled: Bool = false  // Whether stereo video mode is enabled
+    @Published var stereoAudioEnabled: Bool = false  // Whether stereo audio mode is enabled
+    @Published var audioEnabled: Bool = false  // Whether audio track is present at all
     
     @Published var connectionStatus: String = "Initializing..."
     
@@ -265,6 +266,9 @@ class HandTrackingServiceProvider: Handtracking_HandTrackingServiceProvider {
         
         print("🔍 [DEBUG] Checking for discovery message (m00=\(request.head.m00))...")
         
+        // Track if this is a WebRTC info-only connection (will close immediately)
+        let isWebRTCInfoOnly = request.head.m00 == 999.0
+        
         // Check if this is a special "discovery" message from Python
         // Python will send a message with Head.m00 = 888.0 to announce its presence
         // and encode its IP in subsequent matrix elements
@@ -278,9 +282,9 @@ class HandTrackingServiceProvider: Handtracking_HandTrackingServiceProvider {
             print("🔍 Python client discovered at: \(pythonIP)")
             print("💾 [DEBUG] Storing Python IP in DataManager...")
             DataManager.shared.pythonClientIP = pythonIP
-        } else if request.head.m00 == 999.0 {
-            // WebRTC server info message
-            print("🎞️ [DEBUG] WebRTC server info message detected!")
+        } else if isWebRTCInfoOnly {
+            // WebRTC server info message (this connection will close immediately after sending info)
+            print("🎞️ [DEBUG] WebRTC server info message detected (info-only connection)!")
             let ip1 = Int(request.head.m01)
             let ip2 = Int(request.head.m02)
             let ip3 = Int(request.head.m03)
@@ -292,10 +296,22 @@ class HandTrackingServiceProvider: Handtracking_HandTrackingServiceProvider {
             let host = "\(ip1).\(ip2).\(ip3).\(ip4)"
             print("🎞️ WebRTC server available at: \(host):\(port) (stereo_video=\(stereoVideo), stereo_audio=\(stereoAudio), audio_enabled=\(audioEnabled))")
             print("💾 [DEBUG] Storing WebRTC info in DataManager...")
-            DataManager.shared.webrtcServerInfo = (host: host, port: port)
-            DataManager.shared.stereoEnabled = stereoVideo
-            DataManager.shared.stereoAudioEnabled = stereoAudio
-            DataManager.shared.audioEnabled = audioEnabled
+            
+            DispatchQueue.main.async {
+                let hadConnection = DataManager.shared.webrtcServerInfo != nil
+                DataManager.shared.webrtcServerInfo = (host: host, port: port)
+                DataManager.shared.stereoEnabled = stereoVideo
+                DataManager.shared.stereoAudioEnabled = stereoAudio
+                DataManager.shared.audioEnabled = audioEnabled
+                // Increment generation to trigger reconnect
+                // Use positive numbers for valid connections
+                if DataManager.shared.webrtcGeneration < 0 || !hadConnection {
+                    DataManager.shared.webrtcGeneration = 1
+                } else {
+                    DataManager.shared.webrtcGeneration += 1
+                }
+                print("🔄 [DEBUG] Set WebRTC generation to \(DataManager.shared.webrtcGeneration)")
+            }
         } else {
             print("⚠️ [DEBUG] Not a special message (expected m00=888.0 or 999.0, got \(request.head.m00))")
         }
@@ -324,6 +340,20 @@ class HandTrackingServiceProvider: Handtracking_HandTrackingServiceProvider {
         context.statusPromise.futureResult.whenComplete { result in
             print("🔌 [DEBUG] Client disconnected or stream closed. Sent \(updateCount) updates. Result: \(result)")
             task.cancel()
+            
+            // Only clear connection state if this was NOT a WebRTC info-only connection
+            // WebRTC info connections close immediately after sending info, but that's normal
+            if !isWebRTCInfoOnly {
+                DispatchQueue.main.async {
+                    print("🧹 [DEBUG] Cleaning up connection state after main client disconnect")
+                    DataManager.shared.pythonClientIP = nil
+                    DataManager.shared.webrtcServerInfo = nil
+                    // Set generation to negative to signal disconnection
+                    DataManager.shared.webrtcGeneration = -1
+                }
+            } else {
+                print("ℹ️ [DEBUG] WebRTC info-only connection closed (expected behavior)")
+            }
         }
 
         // Return a future that will complete when the streaming operation is done.
@@ -352,7 +382,16 @@ func startServer() {
         let provider = HandTrackingServiceProvider()
         
         print("🔧 [DEBUG] Building gRPC server with provider...")
+        
+        // Configure keepalive to detect dead connections
+        let keepalive = ServerConnectionKeepalive(
+            interval: .seconds(5),
+            timeout: .seconds(3),
+            permitWithoutCalls: true
+        )
+        
         let server = GRPC.Server.insecure(group: group)
+            .withKeepalive(keepalive)
             .withServiceProviders([provider])
             .bind(host: host, port: port)
         

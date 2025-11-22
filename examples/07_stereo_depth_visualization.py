@@ -39,16 +39,7 @@ def create_stereo_depth_visualizer(streamer, disparity_scale=50.0):
         # This will be side-by-side stereo (left half = left eye, right half = right eye)
         half_w = w // 2
         
-        # Dark background for both eyes
-        blank_frame[:] = [0, 0, 0]  # Dark blue-ish background
-        
-        # Draw reference grid to help see depth
-        grid_color = (40, 40, 60)
-        for i in range(0, h, 80):
-            cv2.line(blank_frame, (0, i), (w, i), grid_color, 1)
-        for i in range(0, w, 80):
-            cv2.line(blank_frame, (i, 0), (i, h), grid_color, 1)
-        
+
         # Get latest hand tracking data
         latest = streamer.get_latest()
         if latest is None:
@@ -63,8 +54,6 @@ def create_stereo_depth_visualizer(streamer, disparity_scale=50.0):
         center_y = h // 2
         quarter_w = half_w // 2  # Center of each eye view
         
-        # Stereo baseline (interpupillary distance in pixels)
-        baseline = 60  # pixels, adjustable for comfort
         
         # Scale factors for projection
         xy_scale = 800  # How much to scale X/Y coordinates (doubled for bigger hands)
@@ -233,7 +222,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--ip", type=str, required=True, 
                        help="Vision Pro IP address")
-    parser.add_argument("--resolution", type=str, default="1920x1080",
+    parser.add_argument("--resolution", type=str, default="2000x1000",
                        help="Resolution for side-by-side stereo (default: 1920x1080)")
     parser.add_argument("--fps", type=int, default=30,
                        help="Frame rate (default: 30)")
