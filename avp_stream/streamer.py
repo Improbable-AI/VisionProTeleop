@@ -650,22 +650,6 @@ class VisionProStreamer:
                 # Force high bitrate by modifying SDP directly
                 # This is the most reliable way to set bitrate in WebRTC
                 # We add a b=AS:15000 line (15 Mbps) to the video section
-                sdp_lines = offer.sdp.split('\r\n')
-                new_sdp_lines = []
-                video_section = False
-                for line in sdp_lines:
-                    new_sdp_lines.append(line)
-                    if line.startswith('m=video'):
-                        video_section = True
-                    elif video_section and line.startswith('m='):
-                        video_section = False
-                    
-                    # Insert bandwidth line after c= line in video section
-                    if video_section and line.startswith('c=IN'):
-                        new_sdp_lines.append('b=AS:15000')  # 15 Mbps
-                        print("✓ Added b=AS:15000 (15 Mbps) to SDP offer")
-                
-                offer.sdp = '\r\n'.join(new_sdp_lines)
                 
                 await pc.setLocalDescription(offer)
                 

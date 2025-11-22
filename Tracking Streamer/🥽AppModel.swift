@@ -56,12 +56,8 @@ class DataManager: ObservableObject {
         }
     }
     
-    // Lock video plane to world frame (persistent via UserDefaults)
-    @Published var videoPlaneFixedToWorld: Bool {
-        didSet {
-            UserDefaults.standard.set(videoPlaneFixedToWorld, forKey: "videoPlaneFixedToWorld")
-        }
-    }
+    // Lock video plane to world frame (not persistent, always defaults to head-following)
+    @Published var videoPlaneFixedToWorld: Bool
     
     // Status window minimized position (persistent via UserDefaults)
     @Published var statusMinimizedXPosition: Float {
@@ -83,8 +79,8 @@ class DataManager: ObservableObject {
         self.videoPlaneYPosition = UserDefaults.standard.object(forKey: "videoPlaneYPosition") as? Float ?? 0.0
         // Load saved auto-perpendicular or use default of false
         self.videoPlaneAutoPerpendicular = UserDefaults.standard.object(forKey: "videoPlaneAutoPerpendicular") as? Bool ?? false
-        // Load saved fixed-to-world preference or use default of false
-        self.videoPlaneFixedToWorld = UserDefaults.standard.object(forKey: "videoPlaneFixedToWorld") as? Bool ?? false
+        // Always default to head-following (false) on startup, ignoring any saved state
+        self.videoPlaneFixedToWorld = false
         // Load saved minimized status position or use defaults
         self.statusMinimizedXPosition = UserDefaults.standard.object(forKey: "statusMinimizedXPosition") as? Float ?? 0.0
         self.statusMinimizedYPosition = UserDefaults.standard.object(forKey: "statusMinimizedYPosition") as? Float ?? -0.3
