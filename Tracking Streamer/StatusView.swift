@@ -45,10 +45,6 @@ struct StatusOverlay: View {
     @State private var hidePreviewTask: Task<Void, Never>?
     @State private var showStatusPositionControls: Bool = false
     
-    // Tutorial State
-    @AppStorage("hasSeenTutorial") private var hasSeenTutorial: Bool = false
-    @State private var tutorialStep: Int = 0
-    
     init(hasFrames: Binding<Bool> = .constant(false), showVideoStatus: Bool = true, isMinimized: Binding<Bool> = .constant(false), showViewControls: Binding<Bool> = .constant(false), previewZDistance: Binding<Float?> = .constant(nil), previewActive: Binding<Bool> = .constant(false), userInteracted: Binding<Bool> = .constant(false), videoMinimized: Binding<Bool> = .constant(false), previewStatusPosition: Binding<(x: Float, y: Float)?> = .constant(nil), previewStatusActive: Binding<Bool> = .constant(false)) {
         self._hasFrames = hasFrames
         self.showVideoStatus = showVideoStatus
@@ -78,13 +74,6 @@ struct StatusOverlay: View {
             ipAddress = getIPAddress()
             print("🔴 [StatusView] IP Address: \(ipAddress)")
             
-            // Start tutorial if not seen
-            if !hasSeenTutorial {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                    tutorialStep = 1
-                }
-            }
-            
             // Update status periodically
             Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
                 if let pythonClientIP = DataManager.shared.pythonClientIP {
@@ -107,7 +96,6 @@ struct StatusOverlay: View {
                     isMinimized = false
                     userInteracted = true  // Mark that user has interacted
                 }
-                if tutorialStep == 5 { tutorialStep = 6 }
             } label: {
                 ZStack {
                     Circle()
@@ -119,18 +107,6 @@ struct StatusOverlay: View {
                 }
             }
             .buttonStyle(.plain)
-            .overlay(
-                Group {
-                    if tutorialStep == 5 {
-                        TutorialTipView(
-                            text: "If you want to go back to see all the controls, hit this.",
-                            onNext: nil,
-                            position: .top
-                        )
-                        .offset(y: 90)
-                    }
-                }
-            )
             
             // Video minimize/maximize button (only show if video streaming mode is enabled)
             if showVideoStatus {
@@ -149,18 +125,6 @@ struct StatusOverlay: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .overlay(
-                    Group {
-                        if tutorialStep == 3 {
-                            TutorialTipView(
-                                text: "If you want to temporarily hide the video stream while you're streaming, click this button. It will hide your video stream.",
-                                onNext: { tutorialStep = 4 },
-                                position: .top
-                            )
-                            .offset(y: 100)
-                        }
-                    }
-                )
             }
             
             Button {
@@ -176,18 +140,6 @@ struct StatusOverlay: View {
                 }
             }
             .buttonStyle(.plain)
-            .overlay(
-                Group {
-                    if tutorialStep == 4 {
-                        TutorialTipView(
-                            text: "If you want to close the app, click this.",
-                            onNext: { tutorialStep = 5 },
-                            position: .top
-                        )
-                        .offset(y: 90)
-                    }
-                }
-            )
         }
         .padding(30)
         .background(Color.black.opacity(0.6))
@@ -203,7 +155,6 @@ struct StatusOverlay: View {
                         isMinimized = true
                         userInteracted = true  // Mark that user has interacted
                     }
-                    if tutorialStep == 2 { tutorialStep = 3 }
                 } label: {
                     ZStack {
                         Circle()
@@ -215,18 +166,6 @@ struct StatusOverlay: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .overlay(
-                    Group {
-                        if tutorialStep == 2 {
-                            TutorialTipView(
-                                text: "You can minimize this button whenever you want by clicking this -- but it will automatically minimize once the video stream is flowing in.",
-                                onNext: nil,
-                                position: .bottom
-                            )
-                            .offset(x: 100, y: 60)
-                        }
-                    }
-                )
                 
                 Text("Network Status")
                     .font(.headline)
@@ -434,34 +373,6 @@ struct StatusOverlay: View {
         .padding(20)
         .background(Color.black.opacity(0.7))
         .cornerRadius(16)
-        .overlay(
-            Group {
-                if tutorialStep == 1 {
-                    TutorialTipView(
-                        text: "This is a status window. You can check your IP address, connection info, and more.",
-                        onNext: { tutorialStep = 2 },
-                        position: .bottom
-                    )
-                    .offset(y: 150)
-                } else if tutorialStep == 8 {
-                    TutorialTipView(
-                        text: "Now, go install (or upgrade) `pip install --upgrade avp_stream` on your machine, and start streaming videos and subscribe to hand tracking data!",
-                        onNext: {
-                            tutorialStep = 0
-                            hasSeenTutorial = true
-                        },
-                        position: .bottom
-                    )
-                }
-            }
-        )
-        .onChange(of: tutorialStep) { newStep in
-            if newStep == 6 {
-                withAnimation { showViewControls = true }
-            } else if newStep == 7 {
-                withAnimation { showStatusPositionControls = true }
-            }
-        }
     }
     
     private var viewControlsSection: some View {
@@ -487,18 +398,6 @@ struct StatusOverlay: View {
                 .foregroundColor(.white.opacity(0.9))
             }
             .buttonStyle(.plain)
-            .overlay(
-                Group {
-                    if tutorialStep == 6 {
-                        TutorialTipView(
-                            text: "You can modify how your video stream is presented.\n• Modify how far the video is presented (Z-axis)\n• Modify how low/high the video is presented (Y-axis)",
-                            onNext: { tutorialStep = 7 },
-                            position: .bottom
-                        )
-                        .offset(y: 80)
-                    }
-                }
-            )
             
             // Distance control
             VStack(alignment: .leading, spacing: 8) {
@@ -711,18 +610,6 @@ struct StatusOverlay: View {
                 .foregroundColor(.white.opacity(0.9))
             }
             .buttonStyle(.plain)
-            .overlay(
-                Group {
-                    if tutorialStep == 7 {
-                        TutorialTipView(
-                            text: "You can also choose where the minimization control buttons will be placed.\n• Modify X Position (Left-Right)\n• Modify Y Position (Up-Down)",
-                            onNext: { tutorialStep = 8 },
-                            position: .bottom
-                        )
-                        .offset(y: 80)
-                    }
-                }
-            )
             
             // X position control
             VStack(alignment: .leading, spacing: 8) {
@@ -856,76 +743,6 @@ struct StatusOverlay: View {
                 .font(.caption2)
                 .foregroundColor(.white.opacity(0.5))
                 .multilineTextAlignment(.leading)
-        }
-    }
-}
-
-struct TutorialTipView: View {
-    let text: String
-    let onNext: (() -> Void)?
-    let position: Edge
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(text)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.black)
-                .fixedSize(horizontal: false, vertical: true)
-            
-            if let onNext = onNext {
-                Button(action: onNext) {
-                    Text("Next")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Color.blue)
-                        .cornerRadius(8)
-                }
-                .buttonStyle(.plain)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-            }
-        }
-        .padding(16)
-        .background(Color.white)
-        .cornerRadius(12)
-        .frame(width: 260)
-        .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)
-        .overlay(
-            // Simple arrow implementation
-            Image(systemName: "arrowtriangle.down.fill")
-                .font(.system(size: 20))
-                .foregroundColor(.white)
-                .rotationEffect(arrowRotation)
-                .offset(x: arrowOffset.x, y: arrowOffset.y)
-            , alignment: arrowAlignment
-        )
-    }
-    
-    var arrowRotation: Angle {
-        switch position {
-        case .top: return .degrees(0)
-        case .bottom: return .degrees(180)
-        case .leading: return .degrees(-90)
-        case .trailing: return .degrees(90)
-        }
-    }
-    
-    var arrowAlignment: Alignment {
-        switch position {
-        case .top: return .bottom
-        case .bottom: return .top
-        case .leading: return .trailing
-        case .trailing: return .leading
-        }
-    }
-    
-    var arrowOffset: CGPoint {
-        switch position {
-        case .top: return CGPoint(x: 0, y: 12)
-        case .bottom: return CGPoint(x: 0, y: -12)
-        case .leading: return CGPoint(x: 12, y: 0)
-        case .trailing: return CGPoint(x: -12, y: 0)
         }
     }
 }
