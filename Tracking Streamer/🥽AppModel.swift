@@ -56,6 +56,13 @@ class DataManager: ObservableObject {
         }
     }
     
+    // Lock video plane to world frame (persistent via UserDefaults)
+    @Published var videoPlaneFixedToWorld: Bool {
+        didSet {
+            UserDefaults.standard.set(videoPlaneFixedToWorld, forKey: "videoPlaneFixedToWorld")
+        }
+    }
+    
     // Status window minimized position (persistent via UserDefaults)
     @Published var statusMinimizedXPosition: Float {
         didSet {
@@ -76,6 +83,8 @@ class DataManager: ObservableObject {
         self.videoPlaneYPosition = UserDefaults.standard.object(forKey: "videoPlaneYPosition") as? Float ?? 0.0
         // Load saved auto-perpendicular or use default of false
         self.videoPlaneAutoPerpendicular = UserDefaults.standard.object(forKey: "videoPlaneAutoPerpendicular") as? Bool ?? false
+        // Load saved fixed-to-world preference or use default of false
+        self.videoPlaneFixedToWorld = UserDefaults.standard.object(forKey: "videoPlaneFixedToWorld") as? Bool ?? false
         // Load saved minimized status position or use defaults
         self.statusMinimizedXPosition = UserDefaults.standard.object(forKey: "statusMinimizedXPosition") as? Float ?? 0.0
         self.statusMinimizedYPosition = UserDefaults.standard.object(forKey: "statusMinimizedYPosition") as? Float ?? -0.3
@@ -167,7 +176,7 @@ extension 🥽AppModel {
         let deviceAnchor = worldTracking.queryDeviceAnchor(atTimestamp: CACurrentMediaTime())
         // print(" *** device tracking running ")
 //        print(deviceAnchor?.originFromAnchorTransform)
-        guard let deviceAnchor, deviceAnchor.isTracked else { return }
+        guard let deviceAnchor else { return }
         DataManager.shared.latestHandTrackingData.Head = deviceAnchor.originFromAnchorTransform
             }
 

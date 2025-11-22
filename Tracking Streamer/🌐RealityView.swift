@@ -67,7 +67,8 @@ struct 🌐RealityView: View {
                     showViewControls: $showViewControls,
                     previewZDistance: $previewZDistance,
                     previewActive: $previewActive,
-                    userInteracted: $userInteracted
+                    userInteracted: $userInteracted,
+                    videoFixed: .constant(false)
                 )
                 .frame(maxWidth: 300)
             }

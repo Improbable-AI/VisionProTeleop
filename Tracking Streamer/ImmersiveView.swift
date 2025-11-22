@@ -24,32 +24,38 @@ struct ImmersiveView: View {
     @State private var previewStatusPosition: (x: Float, y: Float)? = nil  // Track preview status position
     @State private var previewStatusActive = false  // Track if status preview should be shown
     @State private var stereoMaterialEntity: Entity? = nil  // Store reference to RealityKit stereo material entity
+    @State private var fixedWorldTransform: Transform? = nil  // Preserve world transform when locked
     
     var body: some View {
         RealityView { content, attachments in
             print("🟢 [ImmersiveView] RealityView content block called")
             
-            // Create the video display anchor
+            // Create the video display anchor (still used for head pose reference)
             let videoAnchor = AnchorEntity(.head)
             videoAnchor.name = "videoAnchor"
             content.add(videoAnchor)
+            
+            // Create a world anchor that always owns the video root
+            let worldAnchor = AnchorEntity(world: .zero)
+            worldAnchor.name = "videoWorldAnchor"
+            content.add(worldAnchor)
+            
+            // Container entity that holds the actual video planes
+            let videoRoot = Entity()
+            videoRoot.name = "videoRoot"
+            videoRoot.setParent(worldAnchor)
             
             // Create the video display plane (initially hidden)
             let skyBox = createSkyBox()
             skyBox.isEnabled = false  // Hide until we have frames
             skyBox.name = "videoPlane"
-            skyBox.setParent(videoAnchor)
-            
-            // Position the video plane using saved distance and height
-            skyBox.transform.translation.z = dataManager.videoPlaneZDistance
-            skyBox.transform.translation.y = dataManager.videoPlaneYPosition
+            skyBox.setParent(videoRoot)
             
             // Create preview plane (gray, initially hidden)
             let previewPlane = createPreviewPlane()
             previewPlane.name = "previewPlane"
             previewPlane.isEnabled = false
-            previewPlane.setParent(videoAnchor)
-            previewPlane.transform.translation.y = 0.0
+            previewPlane.setParent(videoRoot)
             
             // Create status display anchor
             let statusAnchor = AnchorEntity(.head)
@@ -99,6 +105,7 @@ struct ImmersiveView: View {
             let _ = dataManager.videoPlaneZDistance  // React to z-distance changes
             let _ = dataManager.videoPlaneYPosition  // React to y-position changes
             let _ = dataManager.videoPlaneAutoPerpendicular  // React to tilt setting changes
+            let _ = dataManager.videoPlaneFixedToWorld  // React to anchor mode changes
             let _ = previewZDistance  // React to preview changes
             let _ = currentAspectRatio  // React to aspect ratio changes
             let _ = dataManager.statusMinimizedXPosition  // React to status position changes
@@ -107,74 +114,71 @@ struct ImmersiveView: View {
             let _ = previewStatusActive  // React to status preview active state
             let _ = isMinimized  // React to minimized state changes
             
-            // Find the video anchor
-            guard let anchor = updateContent.entities.first(where: { 
-                $0.name == "videoAnchor" 
-            }) as? AnchorEntity else {
+            func findEntity(named name: String, in collection: RealityViewEntityCollection) -> Entity? {
+                for entity in collection {
+                    if entity.name == name {
+                        return entity
+                    }
+                    if let nested = entity.findEntity(named: name) {
+                        return nested
+                    }
+                }
+                return nil
+            }
+
+            guard let videoRoot = findEntity(named: "videoRoot", in: updateContent.entities) else {
                 return
             }
-            
-            let skyBoxEntity = anchor.children.first(where: { $0.name == "videoPlane" })
-            let previewEntity = anchor.children.first(where: { $0.name == "previewPlane" })
-            
+
+            let skyBoxEntity = videoRoot.findEntity(named: "videoPlane")
+            let previewEntity = videoRoot.findEntity(named: "previewPlane")
+            let headAnchor = findEntity(named: "videoAnchor", in: updateContent.entities) as? AnchorEntity
+            let worldAnchor = findEntity(named: "videoWorldAnchor", in: updateContent.entities) as? AnchorEntity
+
             // Check if we have actual frames available RIGHT NOW
             let framesAvailable = imageData.left != nil && imageData.right != nil
             print("DEBUG: Update block called, left=\(imageData.left != nil), right=\(imageData.right != nil), framesAvailable=\(framesAvailable)")
             print("🎬 [ImmersiveView] Preview z-distance: \(String(describing: previewZDistance))")
-            
-            // Update preview/video plane position when adjusting
-            // Show preview if previewZDistance is set OR if previewActive is true
+
+            let isFixed = dataManager.videoPlaneFixedToWorld
             let shouldShowPreview = previewZDistance != nil || previewActive
-            
-            if shouldShowPreview {
-                let zDist = previewZDistance ?? dataManager.videoPlaneZDistance
-                print("🎬 [ImmersiveView] Adjusting position to z=\(zDist)")
+            let targetZ = previewZDistance ?? dataManager.videoPlaneZDistance
+            let targetY = dataManager.videoPlaneYPosition
+
+            if isFixed {
+                guard let worldAnchor else { return }
                 
-                // If we have video frames, move the actual video plane and NEVER show gray preview
-                if framesAvailable, let skyBox = skyBoxEntity {
-                    print("🎬 [ImmersiveView] Moving actual video plane (frames available)")
-                    var videoTransform = skyBox.transform
-                    videoTransform.translation.z = zDist
-                    videoTransform.translation.y = dataManager.videoPlaneYPosition
-                    
-                    // Apply auto-perpendicular rotation if enabled
-                    if dataManager.videoPlaneAutoPerpendicular {
-                        let distance = abs(zDist)
-                        let height = dataManager.videoPlaneYPosition
-                        let angle = atan2(height, distance)
-                        videoTransform.rotation = simd_quatf(angle: angle, axis: SIMD3<Float>(1, 0, 0))
-                    } else {
-                        videoTransform.rotation = simd_quatf(angle: 0, axis: SIMD3<Float>(1, 0, 0))
-                    }
-                    
-                    skyBox.move(to: videoTransform, relativeTo: skyBox.parent, duration: 0.1, timingFunction: .linear)
-                    // ALWAYS hide gray preview when frames are available
-                    previewEntity?.isEnabled = false
-                } else if !framesAvailable {
-                    // No frames yet, show gray preview ONLY if no frames
-                    if let preview = previewEntity {
-                        print("🎬 [ImmersiveView] Showing gray preview (no frames yet)")
-                        preview.isEnabled = true
-                        var previewTransform = preview.transform
-                        previewTransform.translation.z = zDist
-                        previewTransform.translation.y = dataManager.videoPlaneYPosition
-                        
-                        // Apply auto-perpendicular rotation if enabled
-                        if dataManager.videoPlaneAutoPerpendicular {
-                            let distance = abs(zDist)
-                            let height = dataManager.videoPlaneYPosition
-                            let angle = atan2(height, distance)
-                            previewTransform.rotation = simd_quatf(angle: angle, axis: SIMD3<Float>(1, 0, 0))
-                        } else {
-                            previewTransform.rotation = simd_quatf(angle: 0, axis: SIMD3<Float>(1, 0, 0))
-                        }
-                        
-                        preview.move(to: previewTransform, relativeTo: preview.parent, duration: 0.1, timingFunction: .linear)
-                    }
+                // Ensure the panel lives under the world anchor so it stays put
+                if videoRoot.parent !== worldAnchor {
+                    videoRoot.setParent(worldAnchor, preservingWorldTransform: false)
+                    print("🔒 [ImmersiveView] Reparented videoRoot to worldAnchor")
+                }
+                
+                if let lockedTransform = fixedWorldTransform {
+                    videoRoot.move(to: lockedTransform, relativeTo: worldAnchor, duration: 0.1, timingFunction: .linear)
                 }
             } else {
-                // Not adjusting, ALWAYS hide gray preview
-                print("🎬 [ImmersiveView] Hiding preview (not adjusting)")
+                guard let headAnchor else { return }
+                // Follow the user's head by parenting to the head anchor
+                if videoRoot.parent !== headAnchor {
+                    videoRoot.setParent(headAnchor, preservingWorldTransform: true)
+                }
+                fixedWorldTransform = nil
+                var offsetTransform = Transform()
+                offsetTransform.translation = SIMD3<Float>(0.0, targetY, targetZ)
+                if dataManager.videoPlaneAutoPerpendicular {
+                    let distance = abs(targetZ)
+                    let angle = atan2(targetY, distance)
+                    offsetTransform.rotation = simd_quatf(angle: -angle, axis: SIMD3<Float>(1, 0, 0))
+                }
+                let duration: TimeInterval = shouldShowPreview ? 0.1 : 0.3
+                let timing: AnimationTimingFunction = shouldShowPreview ? .linear : .easeInOut
+                videoRoot.move(to: offsetTransform, relativeTo: headAnchor, duration: duration, timingFunction: timing)
+            }
+
+            if shouldShowPreview && !framesAvailable {
+                previewEntity?.isEnabled = true
+            } else {
                 previewEntity?.isEnabled = false
             }
             
@@ -281,29 +285,6 @@ struct ImmersiveView: View {
                 }
             }
             
-            // Update video plane position and rotation based on settings
-            if let skyBox = skyBoxEntity {
-                var videoTransform = skyBox.transform
-                videoTransform.translation.z = dataManager.videoPlaneZDistance
-                videoTransform.translation.y = dataManager.videoPlaneYPosition
-                
-                // Apply auto-perpendicular rotation if enabled
-                if dataManager.videoPlaneAutoPerpendicular {
-                    // Calculate the angle to tilt the plane to face the head
-                    let distance = abs(dataManager.videoPlaneZDistance)
-                    let height = dataManager.videoPlaneYPosition
-                    let angle = atan2(height, distance)
-                    
-                    // Rotate around X-axis to tilt the plane
-                    videoTransform.rotation = simd_quatf(angle: -angle, axis: SIMD3<Float>(1, 0, 0))
-                } else {
-                    // Reset rotation to default (facing forward)
-                    videoTransform.rotation = simd_quatf(angle: 0, axis: SIMD3<Float>(1, 0, 0))
-                }
-                
-                skyBox.move(to: videoTransform, relativeTo: skyBox.parent, duration: 0.3, timingFunction: .easeInOut)
-            }
-
             // Check if stereo mode is enabled
             let isStereo = DataManager.shared.stereoEnabled
             print("DEBUG: Stereo mode: \(isStereo)")
@@ -369,6 +350,10 @@ struct ImmersiveView: View {
                     previewActive: $previewActive,
                     userInteracted: $userInteracted,
                     videoMinimized: $videoMinimized,
+                    videoFixed: Binding(
+                        get: { dataManager.videoPlaneFixedToWorld },
+                        set: { newValue in dataManager.videoPlaneFixedToWorld = newValue }
+                    ),
                     previewStatusPosition: $previewStatusPosition,
                     previewStatusActive: $previewStatusActive
                 )
@@ -376,7 +361,10 @@ struct ImmersiveView: View {
             }
             
             Attachment(id: "statusPreview") {
-                StatusPreviewView(showVideoStatus: true)
+                StatusPreviewView(
+                    showVideoStatus: true,
+                    videoFixed: dataManager.videoPlaneFixedToWorld
+                )
             }
         }
         .onReceive(imageData.$left) { newImage in
@@ -417,6 +405,7 @@ struct ImmersiveView: View {
                 hasFrames = false
                 videoMinimized = false
                 hasAutoMinimized = false
+                fixedWorldTransform = nil
                 // Stop the video stream
                 videoStreamManager.stop()
             }
@@ -429,6 +418,7 @@ struct ImmersiveView: View {
                 imageData.right = nil
                 hasFrames = false
                 videoMinimized = false
+                fixedWorldTransform = nil
                 videoStreamManager.stop()
             } else if newValue > 0 && oldValue != newValue {
                 // New connection or reconnection
@@ -440,9 +430,36 @@ struct ImmersiveView: View {
                 }
             }
         }
+        .onChange(of: dataManager.videoPlaneFixedToWorld) { oldValue, isFixed in
+            if isFixed {
+                print("🔒 [ImmersiveView] Fixed Mode ENABLED - Capturing Transform")
+                // Capture head transform immediately when toggled
+                let headWorldMatrix = DataManager.shared.latestHandTrackingData.Head
+                
+                let targetY = dataManager.videoPlaneYPosition
+                let targetZ = dataManager.videoPlaneZDistance
+                
+                var offsetTransform = Transform()
+                offsetTransform.translation = SIMD3<Float>(0.0, targetY, targetZ)
+                if dataManager.videoPlaneAutoPerpendicular {
+                    let distance = abs(targetZ)
+                    let angle = atan2(targetY, distance)
+                    offsetTransform.rotation = simd_quatf(angle: -angle, axis: SIMD3<Float>(1, 0, 0))
+                }
+                
+                // World = Head * Offset
+                let worldMatrix = simd_mul(headWorldMatrix, offsetTransform.matrix)
+                fixedWorldTransform = Transform(matrix: worldMatrix)
+                print("🔒 [ImmersiveView] Captured Fixed Transform: \(fixedWorldTransform?.translation ?? .zero)")
+            } else {
+                print("🔓 [ImmersiveView] Fixed Mode DISABLED")
+                fixedWorldTransform = nil
+            }
+        }
         .onDisappear {
             print("DEBUG: ImmersiveView disappeared, stopping video stream")
             videoStreamManager.stop()
+            fixedWorldTransform = nil
         }
     }
 }

@@ -35,6 +35,7 @@ struct StatusOverlay: View {
     @Binding var previewActive: Bool
     @Binding var userInteracted: Bool
     @Binding var videoMinimized: Bool
+    @Binding var videoFixed: Bool
     @Binding var previewStatusPosition: (x: Float, y: Float)?
     @Binding var previewStatusActive: Bool
     @ObservedObject var dataManager = DataManager.shared
@@ -45,7 +46,7 @@ struct StatusOverlay: View {
     @State private var hidePreviewTask: Task<Void, Never>?
     @State private var showStatusPositionControls: Bool = false
     
-    init(hasFrames: Binding<Bool> = .constant(false), showVideoStatus: Bool = true, isMinimized: Binding<Bool> = .constant(false), showViewControls: Binding<Bool> = .constant(false), previewZDistance: Binding<Float?> = .constant(nil), previewActive: Binding<Bool> = .constant(false), userInteracted: Binding<Bool> = .constant(false), videoMinimized: Binding<Bool> = .constant(false), previewStatusPosition: Binding<(x: Float, y: Float)?> = .constant(nil), previewStatusActive: Binding<Bool> = .constant(false)) {
+    init(hasFrames: Binding<Bool> = .constant(false), showVideoStatus: Bool = true, isMinimized: Binding<Bool> = .constant(false), showViewControls: Binding<Bool> = .constant(false), previewZDistance: Binding<Float?> = .constant(nil), previewActive: Binding<Bool> = .constant(false), userInteracted: Binding<Bool> = .constant(false), videoMinimized: Binding<Bool> = .constant(false), videoFixed: Binding<Bool> = .constant(false), previewStatusPosition: Binding<(x: Float, y: Float)?> = .constant(nil), previewStatusActive: Binding<Bool> = .constant(false)) {
         self._hasFrames = hasFrames
         self.showVideoStatus = showVideoStatus
         self._isMinimized = isMinimized
@@ -54,6 +55,7 @@ struct StatusOverlay: View {
         self._previewActive = previewActive
         self._userInteracted = userInteracted
         self._videoMinimized = videoMinimized
+        self._videoFixed = videoFixed
         self._previewStatusPosition = previewStatusPosition
         self._previewStatusActive = previewStatusActive
         print("🟢 [StatusView] StatusOverlay init called, hasFrames: \(hasFrames.wrappedValue), showVideoStatus: \(showVideoStatus)")
@@ -140,6 +142,23 @@ struct StatusOverlay: View {
                 }
                 .buttonStyle(.plain)
             }
+
+            // Toggle world-fixed mode for the video panel
+            Button {
+                withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                    videoFixed.toggle()
+                }
+            } label: {
+                ZStack {
+                    Circle()
+                        .fill(videoFixed ? Color.orange.opacity(0.8) : Color.white.opacity(0.3))
+                        .frame(width: 60, height: 60)
+                    Image(systemName: videoFixed ? "lock.fill" : "lock.open.fill")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundColor(.white)
+                }
+            }
+            .buttonStyle(.plain)
             
             Button {
                 exit(0)
@@ -542,6 +561,24 @@ struct StatusOverlay: View {
                 .labelsHidden()
                 .tint(.blue)
             }
+
+            Divider()
+                .background(Color.white.opacity(0.2))
+            
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Lock To World")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.7))
+                    Text("Keep panel stationary")
+                        .font(.caption2)
+                        .foregroundColor(.white.opacity(0.5))
+                }
+                Spacer()
+                Toggle("", isOn: $videoFixed)
+                    .labelsHidden()
+                    .tint(.orange)
+            }
             
             HStack(spacing: 12) {
                 Spacer()
@@ -764,6 +801,7 @@ struct StatusOverlay: View {
 /// Preview view that looks exactly like the minimized status but with 50% opacity
 struct StatusPreviewView: View {
     let showVideoStatus: Bool
+    let videoFixed: Bool
     
     var body: some View {
         HStack(spacing: 24) {
@@ -787,6 +825,15 @@ struct StatusPreviewView: View {
                         .font(.system(size: 24, weight: .bold))
                         .foregroundColor(.white)
                 }
+            }
+            
+            ZStack {
+                Circle()
+                    .fill(videoFixed ? Color.orange.opacity(0.8) : Color.white.opacity(0.3))
+                    .frame(width: 60, height: 60)
+                Image(systemName: videoFixed ? "lock.fill" : "lock.open.fill")
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundColor(.white)
             }
             
             // Close button (non-functional in preview)
