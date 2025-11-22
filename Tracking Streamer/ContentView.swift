@@ -66,7 +66,7 @@ struct ContentView: View {
                     VStack(spacing: 8) {
                         Text("START")
                             .font(.largeTitle.bold())
-                        Text("with Video Streaming")
+                        Text("with Video/Audio Streaming")
                             .font(.title3)
                             .foregroundColor(.secondary)
                             .fixedSize()
