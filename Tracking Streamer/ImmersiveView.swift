@@ -650,6 +650,13 @@ class VideoFrameRenderer: NSObject, LKRTCVideoRenderer {
     weak var imageData: ImageData?
     // Reuse CIContext for performance (creating it every frame is expensive)
     private let context = CIContext()
+    private let benchmarkMagic: UInt8 = 0x5A
+    private let benchmarkRows = 8
+    private let benchmarkCols = 9
+    private let benchmarkBlockSize = 16
+    private let benchmarkMargin = 8
+    private var lastBenchmarkSequence: UInt32?
+    private let benchmarkThreshold = 127
     
     init(imageData: ImageData) {
         self.imageData = imageData
@@ -668,11 +675,15 @@ class VideoFrameRenderer: NSObject, LKRTCVideoRenderer {
         guard let cvPixelBuffer = pixelBuffer else { return }
         
         // Convert CVPixelBuffer to UIImage
+        if let payload = detectBenchmarkPayload(pixelBuffer: cvPixelBuffer) {
+            handleBenchmarkPayload(payload)
+        }
+        
         let ciImage = CIImage(cvPixelBuffer: cvPixelBuffer)
         // Use the reused context
         guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else { return }
         let uiImage = UIImage(cgImage: cgImage)
-        
+
         // Update image data directly
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
@@ -714,6 +725,122 @@ class VideoFrameRenderer: NSObject, LKRTCVideoRenderer {
         let rightImage = UIImage(cgImage: rightCGImage)
         
         return (leftImage, rightImage)
+    }
+
+    private func handleBenchmarkPayload(_ payload: (sequence: UInt32, sentTimestampMs: UInt32)) {
+        if lastBenchmarkSequence == payload.sequence {
+            return
+        }
+        lastBenchmarkSequence = payload.sequence
+        let nowNanoseconds = DispatchTime.now().uptimeNanoseconds
+        BenchmarkEventDispatcher.shared.emitDetection(
+            sequenceID: payload.sequence,
+            sentTimestampMs: payload.sentTimestampMs,
+            detectedAtNanoseconds: nowNanoseconds
+        )
+        print("🧪 [Benchmark] Detected sequence \(payload.sequence) (sent_ms=\(payload.sentTimestampMs))")
+    }
+
+    private func detectBenchmarkPayload(pixelBuffer: CVPixelBuffer) -> (sequence: UInt32, sentTimestampMs: UInt32)? {
+        let width = CVPixelBufferGetWidth(pixelBuffer)
+        let height = CVPixelBufferGetHeight(pixelBuffer)
+        let requiredWidth = benchmarkMargin * 2 + benchmarkCols * benchmarkBlockSize
+        let requiredHeight = benchmarkMargin * 2 + benchmarkRows * benchmarkBlockSize
+        guard width >= requiredWidth, height >= requiredHeight else { return nil }
+
+        CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
+
+        let pixelFormat = CVPixelBufferGetPixelFormatType(pixelBuffer)
+        guard pixelFormat == kCVPixelFormatType_32ARGB else { return nil }
+
+        guard let baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer) else { return nil }
+        let rowBytes = CVPixelBufferGetBytesPerRow(pixelBuffer)
+        let bytesPerPixel = 4
+
+        let roiWidth = benchmarkCols * benchmarkBlockSize
+        let roiHeight = benchmarkRows * benchmarkBlockSize
+        let roiX = benchmarkMargin
+        let roiY = benchmarkMargin
+        let roiOffset = roiY * rowBytes + roiX * bytesPerPixel
+        let roiPointer = baseAddress.advanced(by: roiOffset)
+
+        var roiSource = vImage_Buffer(
+            data: roiPointer,
+            height: vImagePixelCount(roiHeight),
+            width: vImagePixelCount(roiWidth),
+            rowBytes: rowBytes
+        )
+
+        var roiLuma = vImage_Buffer()
+        guard vImageBuffer_Init(&roiLuma, vImagePixelCount(roiHeight), vImagePixelCount(roiWidth), 8, vImage_Flags(kvImageNoFlags)) == kvImageNoError else {
+            return nil
+        }
+        defer { free(roiLuma.data) }
+
+        var coefficients: [Int16] = [0, 77, 150, 29]
+        let divisor: Int32 = 256
+        guard vImageMatrixMultiply_ARGB8888ToPlanar8(
+            &roiSource,
+            &roiLuma,
+            &coefficients,
+            divisor,
+            nil,
+            0,
+            vImage_Flags(kvImageNoFlags)
+        ) == kvImageNoError else {
+            return nil
+        }
+
+        let downsampleCount = benchmarkRows * benchmarkCols
+        let destPointer = UnsafeMutablePointer<UInt8>.allocate(capacity: downsampleCount)
+        destPointer.initialize(repeating: 0, count: downsampleCount)
+        defer { destPointer.deallocate() }
+
+        var downsampled = vImage_Buffer(
+            data: UnsafeMutableRawPointer(destPointer),
+            height: vImagePixelCount(benchmarkRows),
+            width: vImagePixelCount(benchmarkCols),
+            rowBytes: benchmarkCols
+        )
+
+        guard vImageScale_Planar8(
+            &roiLuma,
+            &downsampled,
+            nil,
+            vImage_Flags(kvImageHighQualityResampling)
+        ) == kvImageNoError else {
+            return nil
+        }
+
+        var bits = [UInt8](repeating: 0, count: downsampleCount)
+        for row in 0..<benchmarkRows {
+            let rowPtr = destPointer.advanced(by: row * benchmarkCols)
+            for col in 0..<benchmarkCols {
+                let value = rowPtr[col]
+                bits[row * benchmarkCols + col] = value > benchmarkThreshold ? 1 : 0
+            }
+        }
+
+        guard bits.count >= 72 else { return nil }
+
+        var magic: UInt8 = 0
+        for bit in bits[0..<8] {
+            magic = (magic << 1) | bit
+        }
+        guard magic == benchmarkMagic else { return nil }
+
+        var sequence: UInt32 = 0
+        for bit in bits[8..<(8 + 32)] {
+            sequence = (sequence << 1) | UInt32(bit)
+        }
+
+        var sentTimestamp: UInt32 = 0
+        for bit in bits[(8 + 32)..<(8 + 64)] {
+            sentTimestamp = (sentTimestamp << 1) | UInt32(bit)
+        }
+
+        return (sequence, sentTimestamp)
     }
 }
 

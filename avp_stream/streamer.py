@@ -1,6 +1,6 @@
 import grpc
 from avp_stream.grpc_msg import * 
-from threading import Thread
+from threading import Thread, Lock, Condition
 from avp_stream.utils.grpc_utils import * 
 import time 
 import numpy as np
@@ -9,6 +9,7 @@ import socket
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import json
 import fractions 
+import math
 
 
 YUP2ZUP = np.array([[[1, 0, 0, 0], 
@@ -19,11 +20,15 @@ YUP2ZUP = np.array([[[1, 0, 0, 0],
 
 class VisionProStreamer:
 
-    def __init__(self, ip, record = True): 
+    def __init__(self, ip, record=True, ht_backend="grpc"):
 
         # Vision Pro IP 
         self.ip = ip
         self.record = record 
+        self.ht_backend = ht_backend.lower()
+        if self.ht_backend not in {"grpc", "webrtc"}:
+            raise ValueError(f"Unsupported ht_backend '{ht_backend}'. Expected 'grpc' or 'webrtc'.")
+
         self.recording = [] 
         self.latest = None 
         self.axis_transform = YUP2ZUP
@@ -33,14 +38,123 @@ class VisionProStreamer:
         self.audio_callback = None  # User-registered audio processing function
         self.camera = None  # Processed video track (accessible after start_video_streaming)
         self.user_frame = None  # User-provided frame to override camera input
+
+        self._latest_lock = Lock()
+        self._webrtc_hand_channel = None
+        self._webrtc_hand_ready = False
+        self._benchmark_epoch = time.perf_counter()
+        self._benchmark_condition = Condition()
+        self._benchmark_events = {}
+
         self.start_streaming()
         self._start_info_server()  # Start HTTP endpoint immediately
+
+    def _process_hand_update(self, hand_update, source="grpc"):
+        if getattr(hand_update.Head, "m00", 0.0) == 777.0:
+            self._handle_benchmark_response(hand_update)
+            return
+
+        if source == "grpc" and self.ht_backend == "webrtc" and self._webrtc_hand_ready:
+            # Prefer WebRTC data once channel is active.
+            return
+
+        try:
+            transformations = {
+                "left_wrist": self.axis_transform @ process_matrix(hand_update.left_hand.wristMatrix),
+                "right_wrist": self.axis_transform @ process_matrix(hand_update.right_hand.wristMatrix),
+                "left_fingers": process_matrices(hand_update.left_hand.skeleton.jointMatrices),
+                "right_fingers": process_matrices(hand_update.right_hand.skeleton.jointMatrices),
+                "head": rotate_head(self.axis_transform @ process_matrix(hand_update.Head)),
+                "left_pinch_distance": get_pinch_distance(hand_update.left_hand.skeleton.jointMatrices),
+                "right_pinch_distance": get_pinch_distance(hand_update.right_hand.skeleton.jointMatrices),
+            }
+
+            transformations["right_wrist_roll"] = get_wrist_roll(transformations["right_wrist"])
+            transformations["left_wrist_roll"] = get_wrist_roll(transformations["left_wrist"])
+        except Exception as exc:
+            print(f"⚠️  Failed to process hand update from {source}: {exc}")
+            return
+
+        with self._latest_lock:
+            if self.record:
+                self.recording.append(transformations)
+            self.latest = transformations
+        
+    def _handle_benchmark_response(self, hand_update):
+        sequence_value = getattr(hand_update.Head, "m01", 0.0)
+        if not math.isfinite(sequence_value):
+            return
+
+        sequence_id = int(round(sequence_value))
+        sent_value = getattr(hand_update.Head, "m02", float("nan"))
+        swift_value = getattr(hand_update.Head, "m03", float("nan"))
+
+        sent_timestamp_ms = int(round(sent_value)) if math.isfinite(sent_value) else None
+        swift_detected_ms = int(round(swift_value)) if math.isfinite(swift_value) else None
+        python_receive_ms = int((time.perf_counter() - self._benchmark_epoch) * 1000)
+
+        event = {
+            "sequence_id": sequence_id,
+            "sent_timestamp_ms": sent_timestamp_ms,
+            "swift_detected_ms": swift_detected_ms,
+            "python_receive_ms": python_receive_ms,
+            "round_trip_ms": None if sent_timestamp_ms is None else python_receive_ms - sent_timestamp_ms,
+        }
+
+        with self._benchmark_condition:
+            self._benchmark_events[sequence_id] = event
+            self._benchmark_condition.notify_all()
+
+        if event["round_trip_ms"] is not None:
+            print(f"🧪 Benchmark seq={sequence_id} round-trip={event['round_trip_ms']} ms")
+        else:
+            print(f"🧪 Benchmark seq={sequence_id} received (missing sent timestamp)")
+
+    def _handle_webrtc_hand_message(self, message):
+        if isinstance(message, str):
+            print("⚠️  Received text message on hand data channel; ignoring")
+            return
+
+        if isinstance(message, memoryview):
+            message = message.tobytes()
+
+        update = handtracking_pb2.HandUpdate()
+        try:
+            update.ParseFromString(message)
+        except Exception as exc:
+            print(f"⚠️  Could not decode hand update from WebRTC data channel: {exc}")
+            return
+
+        self._process_hand_update(update, source="webrtc")
+        if not self._webrtc_hand_ready:
+            print("🟢 WebRTC hand data flow established")
+            self._webrtc_hand_ready = True
+
+    def _register_webrtc_data_channel(self, channel):
+        self._webrtc_hand_channel = channel
+
+        @channel.on("open")
+        def _on_open():
+            print("🟢 WebRTC hand data channel opened")
+
+        @channel.on("close")
+        def _on_close():
+            print("🔴 WebRTC hand data channel closed")
+            self._webrtc_hand_ready = False
+            self._webrtc_hand_channel = None
+
+        @channel.on("message")
+        def _on_message(message):
+            self._handle_webrtc_hand_message(message)
 
     def start_streaming(self): 
 
         stream_thread = Thread(target = self.stream, daemon=True)
         stream_thread.start() 
         
+        print(f"Hand tracking backend set to {self.ht_backend.upper()}")
+        if self.ht_backend == "webrtc":
+            print("Note: WebRTC hand tracking requires an active WebRTC session (start_video_streaming).")
         print('Waiting for hand tracking data...')
         retry_count = 0
         while self.latest is None: 
@@ -106,21 +220,7 @@ class VisionProStreamer:
                 print("✓ Stream established, waiting for responses...")
                 
                 for response in responses:
-                    transformations = {
-                        "left_wrist": self.axis_transform @  process_matrix(response.left_hand.wristMatrix),
-                        "right_wrist": self.axis_transform @  process_matrix(response.right_hand.wristMatrix),
-                        "left_fingers":   process_matrices(response.left_hand.skeleton.jointMatrices),
-                        "right_fingers":  process_matrices(response.right_hand.skeleton.jointMatrices),
-                        "head": rotate_head(self.axis_transform @  process_matrix(response.Head)) , 
-                        "left_pinch_distance": get_pinch_distance(response.left_hand.skeleton.jointMatrices),
-                        "right_pinch_distance": get_pinch_distance(response.right_hand.skeleton.jointMatrices),
-                        # "rgb": response.rgb, # TODO: should figure out how to get the rgb image from vision pro 
-                    }
-                    transformations["right_wrist_roll"] = get_wrist_roll(transformations["right_wrist"])
-                    transformations["left_wrist_roll"] = get_wrist_roll(transformations["left_wrist"])
-                    if self.record: 
-                        self.recording.append(transformations)
-                    self.latest = transformations
+                    self._process_hand_update(response, source="grpc")
                 
                 # If we get here, connection was successful
                 channel.close()
@@ -154,10 +254,12 @@ class VisionProStreamer:
                     break 
 
     def get_latest(self): 
-        return self.latest
+        with self._latest_lock:
+            return self.latest
         
     def get_recording(self): 
-        return self.recording
+        with self._latest_lock:
+            return list(self.recording)
     
     def get_local_ip(self):
         """Get the local IP address of this machine"""
@@ -231,6 +333,26 @@ class VisionProStreamer:
             streamer.update_frame(frame)
         """
         self.user_frame = user_frame
+
+    def reset_benchmark_epoch(self, epoch=None):
+        if epoch is None:
+            epoch = time.perf_counter()
+        self._benchmark_epoch = epoch
+        return self._benchmark_epoch
+
+    def wait_for_benchmark_event(self, sequence_id, timeout=2.0):
+        deadline = time.perf_counter() + timeout
+        with self._benchmark_condition:
+            while True:
+                event = self._benchmark_events.pop(sequence_id, None)
+                if event is not None:
+                    return event
+                remaining = deadline - time.perf_counter()
+                if remaining <= 0:
+                    # Drop any stale data for this sequence if it arrives late.
+                    self._benchmark_events.pop(sequence_id, None)
+                    return None
+                self._benchmark_condition.wait(timeout=remaining)
     
     def _start_info_server(self, port=8888):
         """
@@ -628,6 +750,20 @@ class VisionProStreamer:
                 
                 pc.addTrack(processed_track)
                 
+                if streamer_instance.ht_backend == "webrtc":
+                    hand_channel = pc.createDataChannel(
+                        "hand-tracking",
+                        ordered=False,
+                        maxRetransmits=0,
+                    )
+                    streamer_instance._register_webrtc_data_channel(hand_channel)
+
+                    @pc.on("datachannel")
+                    def _on_remote_datachannel(channel):
+                        if channel.label == "hand-tracking":
+                            print("🔁 Remote hand data channel detected")
+                            streamer_instance._register_webrtc_data_channel(channel)
+
                 # Add audio track if audio device is specified OR if audio callback is registered
                 if audio_device is not None or self.audio_callback is not None:
                     try:
@@ -765,6 +901,8 @@ class VisionProStreamer:
                     webrtc_msg.Head.m13 = 1.0 if stereo_audio else 0.0  # Stereo audio flag
                     webrtc_msg.Head.m20 = 1.0 if audio_enabled else 0.0  # Audio enabled flag
                     
+                    self._webrtc_info_to_send = webrtc_msg
+
                     stub = handtracking_pb2_grpc.HandTrackingServiceStub(channel)
                     # Send the message and immediately close
                     responses = stub.StreamHandUpdates(webrtc_msg)

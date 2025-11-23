@@ -1,5 +1,6 @@
 import Foundation
 import LiveKitWebRTC
+import SwiftProtobuf
 import UIKit
 
 /// WebRTC client that connects to the Python server and receives video frames
@@ -8,6 +9,9 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
     private let factory: LKRTCPeerConnectionFactory
     private var videoTrack: LKRTCVideoTrack?
     private var audioTrack: LKRTCAudioTrack?
+    private var handDataChannel: LKRTCDataChannel?
+    private var handStreamTask: Task<Void, Never>?
+    private let handStreamIntervalNanoseconds: UInt64 = 10_000_000
     
     var onFrameReceived: ((CVPixelBuffer) -> Void)?
     
@@ -33,6 +37,7 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
     }
     
     deinit {
+        handStreamTask?.cancel()
         LKRTCCleanupSSL()
     }
     
@@ -134,6 +139,48 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
             DataManager.shared.connectionStatus = "Answer sent, waiting for video..."
         }
     }
+
+    private func startHandTrackingStream(on channel: LKRTCDataChannel) {
+        handStreamTask?.cancel()
+
+        let interval = handStreamIntervalNanoseconds
+        handStreamTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let _ = self else { return }
+                do {
+                    let update = fill_handUpdate()
+                    let payload = try update.serializedData()
+                    let buffer = LKRTCDataBuffer(data: payload, isBinary: true)
+
+                    let sendResult = await MainActor.run { () -> Bool in
+                        guard let strongChannel = self?.handDataChannel else { return false }
+                        if strongChannel.readyState != .open {
+                            return false
+                        }
+                        return strongChannel.sendData(buffer)
+                    }
+
+                    if !sendResult {
+                        print("ERROR: Failed to send hand tracking update over WebRTC (channel not open or backpressure)")
+                    }
+                } catch {
+                    print("ERROR: Unable to serialize hand tracking update: \(error)")
+                }
+
+                do {
+                    try await Task.sleep(nanoseconds: interval)
+                } catch {
+                    return
+                }
+            }
+        }
+    }
+
+    private func stopHandTrackingStream() {
+        handStreamTask?.cancel()
+        handStreamTask = nil
+        handDataChannel = nil
+    }
     
     @MainActor
     private func waitForICEGatheringComplete() async throws {
@@ -191,6 +238,7 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
         peerConnection = nil
         videoTrack = nil
         audioTrack = nil
+        stopHandTrackingStream()
     }
 }
 
@@ -294,7 +342,31 @@ extension WebRTCClient {
     }
     
     func peerConnection(_ peerConnection: LKRTCPeerConnection, didOpen dataChannel: LKRTCDataChannel) {
-        print("DEBUG: Data channel opened")
+        print("DEBUG: Data channel opened (label=\(dataChannel.label), state=\(dataChannel.readyState.rawValue))")
+        handDataChannel = dataChannel
+        dataChannel.delegate = self
+        startHandTrackingStream(on: dataChannel)
+        Task { @MainActor in
+            DataManager.shared.connectionStatus = "Hand data channel open"
+        }
+    }
+}
+
+extension WebRTCClient: LKRTCDataChannelDelegate {
+    func dataChannelDidChangeState(_ dataChannel: LKRTCDataChannel) {
+        print("DEBUG: Data channel state changed to: \(dataChannel.readyState.rawValue)")
+        if dataChannel.readyState == .closed || dataChannel.readyState == .closing {
+            if dataChannel == handDataChannel {
+                stopHandTrackingStream()
+                Task { @MainActor in
+                    DataManager.shared.connectionStatus = "Hand data channel closed"
+                }
+            }
+        }
+    }
+
+    func dataChannel(_ dataChannel: LKRTCDataChannel, didReceiveMessageWith buffer: LKRTCDataBuffer) {
+        print("DEBUG: Received \(buffer.data.count) bytes on data channel (ignored)")
     }
 }
 
@@ -404,3 +476,5 @@ extension OutputStream {
         }
     }
 }
+
+extension LKRTCDataChannel: @unchecked Sendable {}

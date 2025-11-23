@@ -1,6 +1,7 @@
 import SwiftUI
 import RealityKit
 import ARKit
+import Foundation
 import GRPC
 import NIO
 
@@ -19,6 +20,75 @@ struct HandTrackingData {
     var leftSkeleton: Skeleton = Skeleton()
     var rightSkeleton: Skeleton = Skeleton()
     var Head: simd_float4x4 = simd_float4x4(1)
+}
+
+struct BenchmarkEvent {
+    let sequenceID: UInt32
+    let sentTimestampMs: UInt32
+    let detectedTimestampMs: UInt32
+}
+
+final class BenchmarkEventDispatcher {
+    static let shared = BenchmarkEventDispatcher()
+
+    private let lock = NSLock()
+    private weak var context: StreamingResponseCallContext<Handtracking_HandUpdate>?
+    private var eventLoop: EventLoop?
+    private var swiftEpochNanoseconds: UInt64?
+
+    private init() {}
+
+    func register(context: StreamingResponseCallContext<Handtracking_HandUpdate>) {
+        lock.lock()
+        self.context = context
+        self.eventLoop = context.eventLoop
+        self.swiftEpochNanoseconds = nil
+        lock.unlock()
+    }
+
+    func clear() {
+        lock.lock()
+        context = nil
+        eventLoop = nil
+        swiftEpochNanoseconds = nil
+        lock.unlock()
+    }
+
+    func emitDetection(sequenceID: UInt32, sentTimestampMs: UInt32, detectedAtNanoseconds: UInt64) {
+        lock.lock()
+        guard let loop = eventLoop, let ctx = context else {
+            lock.unlock()
+            print("⚠️ [Benchmark] No active gRPC stream; dropping detection for seq=\(sequenceID)")
+            return
+        }
+
+        if swiftEpochNanoseconds == nil {
+            swiftEpochNanoseconds = detectedAtNanoseconds
+        }
+
+        let base = swiftEpochNanoseconds ?? detectedAtNanoseconds
+        let relativeNanoseconds = detectedAtNanoseconds &- base
+        let detectedMs = UInt32(relativeNanoseconds / 1_000_000)
+
+        let event = BenchmarkEvent(
+            sequenceID: sequenceID,
+            sentTimestampMs: sentTimestampMs,
+            detectedTimestampMs: detectedMs
+        )
+        lock.unlock()
+
+        loop.execute {
+            var message = Handtracking_HandUpdate()
+            message.head.m00 = 777.0
+            message.head.m01 = Float(event.sequenceID)
+            message.head.m02 = Float(event.sentTimestampMs)
+            message.head.m03 = Float(event.detectedTimestampMs)
+
+            ctx.sendResponse(message).whenFailure { error in
+                print("⚠️ [Benchmark] Failed to send detection event: \(error)")
+            }
+        }
+    }
 }
 
 class DataManager: ObservableObject {
@@ -321,6 +391,10 @@ class HandTrackingServiceProvider: Handtracking_HandTrackingServiceProvider {
             print("⚠️ [DEBUG] Not a special message (expected m00=888.0 or 999.0, got \(request.head.m00))")
         }
         
+        if !isWebRTCInfoOnly {
+            BenchmarkEventDispatcher.shared.register(context: context)
+        }
+
         print("🔄 [DEBUG] Starting hand tracking data stream...")
         print("hey...")
         // Example task to simulate sending hand tracking data.
@@ -345,6 +419,10 @@ class HandTrackingServiceProvider: Handtracking_HandTrackingServiceProvider {
         context.statusPromise.futureResult.whenComplete { result in
             print("🔌 [DEBUG] Client disconnected or stream closed. Sent \(updateCount) updates. Result: \(result)")
             task.cancel()
+
+            if !isWebRTCInfoOnly {
+                BenchmarkEventDispatcher.shared.clear()
+            }
             
             // Only clear connection state if this was NOT a WebRTC info-only connection
             // WebRTC info connections close immediately after sending info, but that's normal
