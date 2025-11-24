@@ -82,6 +82,8 @@ def main():
     parser.add_argument("--resolution", type=str, default="640x480", help="Streaming resolution (WIDTHxHEIGHT)")
     parser.add_argument("--sweep", action="store_true", help="Sweep over common resolutions")
     parser.add_argument("--trials", type=int, default=1000, help="Number of trials per resolution in sweep mode")
+    parser.add_argument("--warmup", type=int, default=100, help="Number of warmup frames before collecting data")
+    parser.add_argument("--stereo", action="store_true", help="Enable stereo video streaming (doubles width)")
     args = parser.parse_args()
 
     print(f"Connecting to Vision Pro at {args.ip}...")
@@ -97,14 +99,26 @@ def main():
             self.collecting = False
             self.target_trials = 0
             self.current_resolution = ""
+            self.last_frame_time = 0
+            self.warmup_frames = 0
+            self.in_warmup = False
             
-    state = LatencyState()
+    state = LatencyState()    
     
     def frame_callback(frame):
         # 1. Get current timestamp
         now = time.perf_counter()
         if state.sequence_id == 0:
             state.streamer.reset_benchmark_epoch(now)
+            state.last_frame_time = now
+        else:
+            # Sleep to maintain target FPS (30fps = 33.33ms per frame)
+            elapsed = now - state.last_frame_time
+            target_frame_time = 1.0 / args.fps
+            # if elapsed < target_frame_time:
+            #     time.sleep(target_frame_time - elapsed)
+            now = time.perf_counter()
+            state.last_frame_time = now
             
         timestamp_ms = int((now - state.streamer._benchmark_epoch) * 1000)
         
@@ -120,17 +134,32 @@ def main():
     streamer.register_frame_callback(frame_callback)
     
     # Define resolutions for sweep
-    resolutions = [
-        ("240p", "426x240"),
-        ("360p", "640x360"),
-        ("720p", "1280x720"),
-        ("1080p", "1920x1080"),
-        ("2160p", "3840x2160")
-    ]
+    if args.stereo:
+        # Double the width for stereo mode
+        resolutions = [
+            ("240p", "852x240"),
+            ("360p", "1280x360"),
+            ("720p", "2560x720"),
+            ("1080p", "3840x1080"),
+            ("2160p", "7680x2160")
+        ]
+    else:
+        resolutions = [
+            ("240p", "426x240"),
+            ("360p", "640x360"),
+            ("720p", "1280x720"),
+            ("1080p", "1920x1080"),
+            ("2160p", "3840x2160")
+        ]
     
     if not args.sweep:
         # Single resolution mode
-        streamer.start_video_streaming(device=None, size=args.resolution, fps=args.fps)
+        resolution = args.resolution
+        if args.stereo:
+            # Double the width for stereo
+            width, height = map(int, resolution.split('x'))
+            resolution = f"{width * 2}x{height}"
+        streamer.start_video_streaming(device=None, size=resolution, fps=args.fps, stereo_video=args.stereo)
         print("Streaming started. Measuring latency...")
         try:
             while True:
@@ -141,7 +170,7 @@ def main():
         # Sweep mode
         # Start with the first resolution
         first_res_name, first_res_size = resolutions[0]
-        streamer.start_video_streaming(device=None, size=first_res_size, fps=args.fps)
+        streamer.start_video_streaming(device=None, size=first_res_size, fps=args.fps, stereo_video=args.stereo)
         
         print(f"Starting sweep over {len(resolutions)} resolutions: {[r[0] for r in resolutions]}")
         
@@ -151,7 +180,9 @@ def main():
             "test_config": {
                 "ip": args.ip,
                 "fps": args.fps,
-                "trials_per_resolution": args.trials
+                "trials_per_resolution": args.trials,
+                "warmup_frames": args.warmup,
+                "stereo": args.stereo
             },
             "resolutions": {}
         }
@@ -169,6 +200,33 @@ def main():
             state.latencies = []
             state.collecting = True
             state.target_trials = args.trials
+            state.warmup_frames = args.warmup
+            state.in_warmup = True
+            
+            # Warmup phase
+            print(f"🔥 Warming up ({args.warmup} frames)...")
+            warmup_start_seq = state.sequence_id
+            warmup_pbar = tqdm(total=args.warmup, desc="Warmup", unit="frames")
+            
+            warmup_check_seq = warmup_start_seq
+            warmup_collected = 0
+            
+            while warmup_collected < args.warmup:
+                event = streamer.wait_for_benchmark_event(warmup_check_seq, timeout=1.0)
+                
+                if event:
+                    warmup_collected += 1
+                    warmup_pbar.update(1)
+                    warmup_check_seq += 1
+                else:
+                    # Check if we should skip
+                    if state.sequence_id > warmup_check_seq + 100:
+                        warmup_pbar.write(f"⚠️  Skipping missing warmup sequence {warmup_check_seq}")
+                        warmup_check_seq += 1
+            
+            warmup_pbar.close()
+            state.in_warmup = False
+            print(f"✅ Warmup complete. Starting data collection...")
             
             # Collect samples
             # We need to capture the return events.

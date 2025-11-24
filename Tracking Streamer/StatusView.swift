@@ -45,6 +45,7 @@ struct StatusOverlay: View {
     @State private var webrtcConnected: Bool = false
     @State private var hidePreviewTask: Task<Void, Never>?
     @State private var showStatusPositionControls: Bool = false
+    @State private var showExitConfirmation: Bool = false
     
     init(hasFrames: Binding<Bool> = .constant(false), showVideoStatus: Bool = true, isMinimized: Binding<Bool> = .constant(false), showViewControls: Binding<Bool> = .constant(false), previewZDistance: Binding<Float?> = .constant(nil), previewActive: Binding<Bool> = .constant(false), userInteracted: Binding<Bool> = .constant(false), videoMinimized: Binding<Bool> = .constant(false), videoFixed: Binding<Bool> = .constant(false), previewStatusPosition: Binding<(x: Float, y: Float)?> = .constant(nil), previewStatusActive: Binding<Bool> = .constant(false)) {
         self._hasFrames = hasFrames
@@ -161,7 +162,7 @@ struct StatusOverlay: View {
             .buttonStyle(.plain)
             
             Button {
-                exit(0)
+                showExitConfirmation = true
             } label: {
                 ZStack {
                     Circle()
@@ -173,10 +174,17 @@ struct StatusOverlay: View {
                 }
             }
             .buttonStyle(.plain)
+            .confirmationDialog("Are you sure you want to exit?", isPresented: $showExitConfirmation, titleVisibility: .visible) {
+                Button("Exit", role: .destructive) {
+                    exit(0)
+                }
+                Button("Cancel", role: .cancel) {}
+            }
         }
         .padding(30)
         .background(Color.black.opacity(0.6))
         .cornerRadius(36)
+        .fixedSize()
     }
     
     private var expandedView: some View {
@@ -206,7 +214,7 @@ struct StatusOverlay: View {
                 Spacer()
                 
                 Button {
-                    exit(0)
+                    showExitConfirmation = true
                 } label: {
                     ZStack {
                         Circle()
@@ -218,6 +226,12 @@ struct StatusOverlay: View {
                     }
                 }
                 .buttonStyle(.plain)
+                .confirmationDialog("Are you sure you want to exit?", isPresented: $showExitConfirmation, titleVisibility: .visible) {
+                    Button("Exit", role: .destructive) {
+                        exit(0)
+                    }
+                    Button("Cancel", role: .cancel) {}
+                }
             }
             
             Divider()
@@ -853,6 +867,7 @@ struct StatusPreviewView: View {
         .padding(30)
         .background(Color.black.opacity(0.6))
         .cornerRadius(36)
+        .fixedSize()
         .opacity(0.5)  // 50% transparent
     }
 }

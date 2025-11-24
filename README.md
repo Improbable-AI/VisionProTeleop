@@ -29,12 +29,22 @@ This VisionOS app and python library streams your Head + Wrist + Hand Tracking r
 
 [![Star History Chart](https://api.star-history.com/svg?repos=improbable-ai/visionproteleop&type=date&legend=top-left)](https://www.star-history.com/#improbable-ai/visionproteleop&type=date&legend=top-left)
 
+
+## Benchmark Results
+
+We performed comprehensive glass-to-glass latency measurements to evaluate the end-to-end performance of our video streaming system. The results show consistently low latency across all tested resolutions, with wired connections achieving **~20ms** at lower resolutions and wireless connections maintaining **~50-100ms** even at 4K.
+
+For detailed methodology, test configurations, and complete results, see the **[Benchmark Documentation](docs/benchmark.md)**.
+
+![](comparison.png)
+
+
 ## How to Use
 
 If you use this repository in your work, consider citing:
 
     @software{park2024avp,
-        title={Using Apple Vision Pro to Train and Control Robots},
+        title={Using Apple Vision Pro to Train and Control Robots},`
         author={Park, Younghyo and Agrawal, Pulkit},
         year={2024},
         url = {https://github.com/Improbable-AI/VisionProTeleop},
