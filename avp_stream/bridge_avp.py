@@ -128,10 +128,10 @@ class VisionProBridge:
         else:
             raise BridgeSetupError(f"Unsupported platform: {self.os_type}")
         
-        # Calculate network base and bridge IP
-        parts = self.ip_addr.split('.')
-        self.network_base = '.'.join(parts[:3])
-        self.bridge_ip = f"{self.network_base}.200"
+        # For USB connections, Vision Pro uses link-local addressing (169.254.x.x)
+        # We should use a compatible address on the same subnet
+        self.network_base = "169.254.220"
+        self.bridge_ip = "169.254.220.1"  # Use .1 as the host IP
     
     def setup_bridge_macos(self):
         """Set up bridge on macOS."""
@@ -234,14 +234,22 @@ class VisionProBridge:
                 
                 # Configure the USB interface
                 print(f"  • Configuring {usb_iface} with IP {self.bridge_ip}...")
+                print(f"    (Vision Pro should be at 169.254.220.107)")
                 # Remove any existing IPs
                 self.run_command(["sudo", "ip", "addr", "flush", "dev", usb_iface], check=False, capture=False)
-                # Add our IP
+                # Add our IP on the same link-local subnet as Vision Pro
+                # Use /16 for link-local addressing
                 self.run_command([
-                    "sudo", "ip", "addr", "add", f"{self.bridge_ip}/24", "dev", usb_iface
+                    "sudo", "ip", "addr", "add", f"{self.bridge_ip}/16", "dev", usb_iface
                 ], check=False, capture=False)
                 # Bring it up
                 self.run_command(["sudo", "ip", "link", "set", usb_iface, "up"], capture=False)
+                
+                # Add route to Vision Pro's subnet
+                print("  • Adding route to Vision Pro...")
+                self.run_command([
+                    "sudo", "ip", "route", "add", "169.254.220.0/24", "dev", usb_iface
+                ], check=False, capture=False)
                 
                 # Set up NAT
                 print("  • Configuring NAT...")
