@@ -81,8 +81,22 @@ struct ContentView: View {
             .padding(.top, 16)
             
             VStack(spacing: 8) {
-                Text("You're on IP address [\(getIPAddress())]")
-                    .font(.largeTitle.weight(.medium))
+                VStack(spacing: 4) {
+                    Text("Device IP Addresses:")
+                        .font(.title2)
+                        .foregroundColor(.secondary)
+                    
+                    ForEach(getIPAddresses(), id: \.address) { ip in
+                        HStack {
+                            Text(ip.name + ":")
+                                .font(.title3.bold())
+                                .foregroundColor(.secondary)
+                            Text(ip.address)
+                                .font(.title3)
+                        }
+                    }
+                }
+                .padding(.bottom, 8)
                 
                 HStack(spacing: 8) {
                     Circle()
@@ -139,30 +153,29 @@ struct ContentView: View {
     }
 }
 
-func getIPAddress() -> String {
-    var address: String?
+func getIPAddresses() -> [(name: String, address: String)] {
+    var addresses: [(name: String, address: String)] = []
     var ifaddr: UnsafeMutablePointer<ifaddrs>? = nil
     if getifaddrs(&ifaddr) == 0 {
         var ptr = ifaddr
         while ptr != nil {
             defer { ptr = ptr?.pointee.ifa_next }
 
-            guard let interface = ptr?.pointee else { return "" }
+            guard let interface = ptr?.pointee else { continue }
             let addrFamily = interface.ifa_addr.pointee.sa_family
             if addrFamily == UInt8(AF_INET) {
-                // Only check en0 (WiFi interface)
                 let name: String = String(cString: (interface.ifa_name))
-                if name == "en0" {
-                    var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-                    getnameinfo(interface.ifa_addr, socklen_t((interface.ifa_addr.pointee.sa_len)), &hostname, socklen_t(hostname.count), nil, socklen_t(0), NI_NUMERICHOST)
-                    address = String(cString: hostname)
-                    break  // Found en0, no need to continue
+                var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+                getnameinfo(interface.ifa_addr, socklen_t((interface.ifa_addr.pointee.sa_len)), &hostname, socklen_t(hostname.count), nil, socklen_t(0), NI_NUMERICHOST)
+                let address = String(cString: hostname)
+                if address != "127.0.0.1" {
+                    addresses.append((name: name, address: address))
                 }
             }
         }
         freeifaddrs(ifaddr)
     }
-    return address ?? ""
+    return addresses
 }
 
 

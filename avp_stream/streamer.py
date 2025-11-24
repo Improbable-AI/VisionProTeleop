@@ -10,6 +10,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 import json
 import fractions 
 import math
+import cv2
 
 
 YUP2ZUP = np.array([[[1, 0, 0, 0], 
@@ -20,7 +21,7 @@ YUP2ZUP = np.array([[[1, 0, 0, 0],
 
 class VisionProStreamer:
 
-    def __init__(self, ip, record=True, ht_backend="grpc"):
+    def __init__(self, ip, record=True, ht_backend="grpc", benchmark_quiet=False):
 
         # Vision Pro IP 
         self.ip = ip
@@ -38,6 +39,7 @@ class VisionProStreamer:
         self.audio_callback = None  # User-registered audio processing function
         self.camera = None  # Processed video track (accessible after start_video_streaming)
         self.user_frame = None  # User-provided frame to override camera input
+        self.benchmark_quiet = benchmark_quiet  # Suppress benchmark print statements
 
         self._latest_lock = Lock()
         self._webrtc_hand_channel = None
@@ -105,10 +107,11 @@ class VisionProStreamer:
             self._benchmark_events[sequence_id] = event
             self._benchmark_condition.notify_all()
 
-        if event["round_trip_ms"] is not None:
-            print(f"🧪 Benchmark seq={sequence_id} round-trip={event['round_trip_ms']} ms")
-        else:
-            print(f"🧪 Benchmark seq={sequence_id} received (missing sent timestamp)")
+        if not self.benchmark_quiet:
+            if event["round_trip_ms"] is not None:
+                print(f"🧪 Benchmark seq={sequence_id} round-trip={event['round_trip_ms']} ms")
+            else:
+                print(f"🧪 Benchmark seq={sequence_id} received (missing sent timestamp)")
 
     def _handle_webrtc_hand_message(self, message):
         if isinstance(message, str):
@@ -266,7 +269,10 @@ class VisionProStreamer:
         try:
             # Create a socket to find out our local IP
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("8.8.8.8", 80))
+            # Use the Vision Pro IP to determine the correct local interface
+            # This ensures we pick the network interface that can reach the Vision Pro
+            target_ip = self.ip if self.ip else "8.8.8.8"
+            s.connect((target_ip, 80))
             ip = s.getsockname()[0]
             s.close()
             return ip
@@ -337,8 +343,30 @@ class VisionProStreamer:
     def reset_benchmark_epoch(self, epoch=None):
         if epoch is None:
             epoch = time.perf_counter()
-        self._benchmark_epoch = epoch
+        with self._benchmark_condition:
+            self._benchmark_epoch = epoch
+            self._benchmark_events.clear()
         return self._benchmark_epoch
+
+    def update_stream_resolution(self, size):
+        """Request the video track to emit frames at a new resolution."""
+        if self.camera is None:
+            print("⚠️  Cannot update stream resolution before starting video streaming")
+            return
+
+        try:
+            width, height = map(int, size.lower().split("x", 1))
+        except ValueError:
+            print(f"⚠️  Invalid resolution '{size}' (expected WIDTHxHEIGHT)")
+            return
+
+        if hasattr(self.camera, "set_resolution"):
+            self.camera.set_resolution((width, height))
+
+        if self.webrtc_info is not None:
+            self.webrtc_info["size"] = size
+
+        print(f"🔄 Updated WebRTC stream resolution to {width}x{height}")
 
     def wait_for_benchmark_event(self, sequence_id, timeout=2.0):
         deadline = time.perf_counter() + timeout
@@ -403,10 +431,19 @@ class VisionProStreamer:
         info_thread = Thread(target=run_http_server, daemon=True)
         info_thread.start()
     
-    def start_video_streaming(self, device="0:none", format="avfoundation", 
-                             fps=30, size="640x480", 
-                             port=9999, stereo_video=False, stereo_audio=False,
-                             audio_device=None, audio_format=None):
+    def start_video_streaming(
+        self,
+        device="0:none",
+        format="avfoundation",
+        fps=30,
+        size="640x480",
+        port=9999,
+        stereo_video=False,
+        stereo_audio=False,
+        audio_device=None,
+        audio_format=None,
+        audio_sample_rate=None,
+    ):
         """
         Start WebRTC video streaming server with optional audio.
         VisionOS will discover the server address by querying the info HTTP endpoint.
@@ -425,6 +462,8 @@ class VisionProStreamer:
                          Example: ":0" for default microphone on macOS.
             audio_format: Audio input format (default: None, auto-detect).
                          Use "avfoundation" for macOS audio input.
+            audio_sample_rate: Optional sample rate (Hz) for synthetic audio frames.
+                                Defaults to 48000 when not specified.
         
         Note:
             - Use register_frame_callback() to add custom frame processing
@@ -432,7 +471,7 @@ class VisionProStreamer:
             - If device=None, the callback MUST generate frames (not just modify them)
             - Without device, callback receives a blank frame to populate
         """
-        from aiortc import VideoStreamTrack
+        from aiortc import VideoStreamTrack, AudioStreamTrack
         from aiortc.contrib.media import MediaPlayer
         from av import VideoFrame
         
@@ -451,7 +490,9 @@ class VisionProStreamer:
             "status": "ready",
             "stereo_video": stereo_video,
             "stereo_audio": stereo_audio,
-            "audio_enabled": audio_enabled
+            "audio_enabled": audio_enabled,
+            "size": size,
+            "audio_sample_rate": audio_sample_rate if audio_sample_rate else 48000,
         }
         
         # Send WebRTC server info via gRPC
@@ -465,14 +506,15 @@ class VisionProStreamer:
         streamer_instance = self
         
         # Define custom audio track for audio processing
-        class ProcessedAudioTrack(VideoStreamTrack):
+        class ProcessedAudioTrack(AudioStreamTrack):
             kind = "audio"
             
-            def __init__(self, audio_device, audio_fmt, callback, stereo=False):
+            def __init__(self, audio_device, audio_fmt, callback, stereo=False, sample_rate=None):
                 super().__init__()
                 self.callback = callback
                 self.use_microphone = audio_device is not None
                 self.stereo = stereo
+                self.sample_rate = sample_rate or 48000
                 
                 if self.use_microphone:
                     # Use physical microphone
@@ -485,12 +527,15 @@ class VisionProStreamer:
                     # Generate frames programmatically
                     self.player = None
                     self.audio_track = None
-                    self.sample_rate = 48000
-                    self.samples_per_frame = 960  # 20ms at 48kHz (reduces CPU load)
+                    frame_duration_s = 0.02  # 20 ms
+                    self.samples_per_frame = max(1, int(self.sample_rate * frame_duration_s))
                     self.frame_count = 0
                     self.start_time = None
                     channels = "stereo" if stereo else "mono"
-                    print(f"🎤 Synthetic audio initialized (48kHz, {self.samples_per_frame} samples/frame, {channels}, 20ms frames)")
+                    print(
+                        "🎤 Synthetic audio initialized "
+                        f"({self.sample_rate}Hz, {self.samples_per_frame} samples/frame, {channels}, 20ms frames)"
+                    )
             
             async def recv(self):
                 if self.use_microphone:
@@ -584,7 +629,15 @@ class VisionProStreamer:
                     self.video_track = None
                     self.fps = framerate
                     self.frame_count = 0
-                    self.start_time = time.time()
+                    self.start_time = None
+
+            def set_resolution(self, resolution):
+                width, height = resolution
+                if width <= 0 or height <= 0:
+                    print(f"⚠️  Ignoring invalid resolution update: {width}x{height}")
+                    return
+                self.width, self.height = width, height
+                print(f"🔧 ProcessedVideoTrack target resolution set to {width}x{height}")
                 
             async def recv(self):
                 if self.use_camera:
@@ -607,6 +660,9 @@ class VisionProStreamer:
                         img = frame.to_ndarray(format="bgr24")
                         pts = frame.pts
                         time_base = frame.time_base
+
+                    if img.shape[:2] != (self.height, self.width):
+                        img = cv2.resize(img, (self.width, self.height))
                     
                     # Store frame for reference
                     self.frame = img.copy()
@@ -646,11 +702,21 @@ class VisionProStreamer:
                 else:
                     # Generate frame programmatically
                     # Wait to maintain target FPS
+                    if self.start_time is None:
+                        self.start_time = asyncio.get_event_loop().time()
+
                     target_time = self.start_time + (self.frame_count / self.fps)
-                    current_time = time.time()
+                    current_time = asyncio.get_event_loop().time()
                     wait_time = target_time - current_time
+                    
                     if wait_time > 0:
                         await asyncio.sleep(wait_time)
+                    elif wait_time < -0.01:
+                        # Reset clock if we are behind by more than 10ms to prevent buffer bloat
+                        # This ensures we don't burst frames to catch up
+                        if wait_time < -0.1:
+                            print(f"⚠️  Streamer lag {-wait_time*1000:.0f}ms - resetting clock")
+                        self.start_time = current_time - (self.frame_count / self.fps)
                     
                     # Check if user provided a frame override
                     if streamer_instance.user_frame is not None:
@@ -702,9 +768,9 @@ class VisionProStreamer:
                 
                 @pc.on("iceconnectionstatechange")
                 async def on_ice_state_change():
-                    print(f"ICE state: {pc.iceConnectionState}")
+                    print(f"ICE state ({client_addr}): {pc.iceConnectionState}")
                     if pc.iceConnectionState == "connected":
-                        print("🎥 WebRTC connection established - video should flow now")
+                        print(f"🎥 WebRTC connection established ({client_addr}) - video should flow now")
                     if pc.iceConnectionState in ("failed", "closed"):
                         await pc.close()
                         writer.close()
@@ -771,7 +837,8 @@ class VisionProStreamer:
                             audio_device, 
                             audio_format, 
                             self.audio_callback,
-                            stereo=stereo_audio
+                            stereo=stereo_audio,
+                            sample_rate=audio_sample_rate,
                         )
                         pc.addTrack(processed_audio_track)
                         channels = "stereo" if stereo_audio else "mono"

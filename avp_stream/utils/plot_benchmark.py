@@ -216,7 +216,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--backend",
         action="append",
         dest="backends",
-        help="Filter to specific backend(s) (can be used multiple times). Default: grpc only"
+        help="Filter to specific backend(s) (can be used multiple times). Default: all backends"
     )
     parser.add_argument(
         "--all-backends",
@@ -252,13 +252,9 @@ def main() -> None:
         output_path = args.input.with_suffix(".png")
     
     # Determine which backends to plot
-    backends = None
-    if not args.all_backends:
-        if args.backends:
-            backends = args.backends
-        else:
-            # Default: only gRPC
-            backends = ["grpc"]
+    backends = args.backends
+    if args.all_backends:
+        backends = None
     
     # Generate plot
     plot_benchmark_results(

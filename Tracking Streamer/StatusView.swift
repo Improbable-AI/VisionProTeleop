@@ -4,7 +4,7 @@ import Network
 
 /// Network information manager for displaying connection status
 class NetworkInfoManager: ObservableObject {
-    @Published var ipAddress: String = ""
+    @Published var ipAddresses: [(name: String, address: String)] = []
     @Published var pythonClientIP: String? = nil
     @Published var webrtcServerInfo: (host: String, port: Int)? = nil
     
@@ -19,7 +19,7 @@ class NetworkInfoManager: ObservableObject {
     }
     
     func updateNetworkInfo() {
-        ipAddress = getIPAddress()
+        ipAddresses = getIPAddresses()
         pythonClientIP = DataManager.shared.pythonClientIP
         webrtcServerInfo = DataManager.shared.webrtcServerInfo
     }
@@ -39,7 +39,7 @@ struct StatusOverlay: View {
     @Binding var previewStatusPosition: (x: Float, y: Float)?
     @Binding var previewStatusActive: Bool
     @ObservedObject var dataManager = DataManager.shared
-    @State private var ipAddress: String = ""
+    @State private var ipAddresses: [(name: String, address: String)] = []
     @State private var pythonConnected: Bool = false
     @State private var pythonIP: String = "Not connected"
     @State private var webrtcConnected: Bool = false
@@ -73,8 +73,8 @@ struct StatusOverlay: View {
         .animation(.spring(response: 0.45, dampingFraction: 0.85), value: isMinimized)
         .onAppear {
             print("🔴 [StatusView] StatusOverlay onAppear called")
-            ipAddress = getIPAddress()
-            print("🔴 [StatusView] IP Address: \(ipAddress)")
+            ipAddresses = getIPAddresses()
+            print("🔴 [StatusView] IP Addresses: \(ipAddresses)")
             
             // Update status periodically
             Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
@@ -223,17 +223,21 @@ struct StatusOverlay: View {
             Divider()
                 .background(Color.white.opacity(0.3))
             
-            HStack {
-                Circle()
-                    .fill(Color.green)
-                    .frame(width: 10, height: 10)
-                Text("Vision Pro IP:")
-                    .foregroundColor(.white.opacity(0.8))
-                Text(ipAddress)
-                    .foregroundColor(.white)
-                    .fontWeight(.medium)
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(ipAddresses, id: \.address) { ip in
+                    HStack {
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 10, height: 10)
+                        Text("\(ip.name):")
+                            .foregroundColor(.white.opacity(0.8))
+                        Text(ip.address)
+                            .foregroundColor(.white)
+                            .fontWeight(.medium)
+                    }
+                    .font(.subheadline)
+                }
             }
-            .font(.subheadline)
             
             HStack {
                 Circle()
