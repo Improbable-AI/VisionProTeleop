@@ -194,19 +194,43 @@ class VisionProBridge:
             
             # Find USB network interfaces (usually enp*, usb*)
             result = self.run_command(["ip", "link", "show"], check=False)
-            usb_interfaces = []
-            for line in result.stdout.split('\n'):
-                # Look for USB ethernet interfaces
-                if 'enp' in line or 'usb' in line or 'eth' in line:
-                    match = re.search(r'\d+:\s+(\S+):', line)
-                    if match:
-                        iface = match.group(1)
-                        if iface != self.primary_interface:
-                            usb_interfaces.append(iface)
             
-            if usb_interfaces:
-                usb_iface = usb_interfaces[0]
-                print(f"  • Found USB interface: {usb_iface}")
+            # Show all interfaces for debugging
+            print("\n  Available network interfaces:")
+            all_interfaces = []
+            for line in result.stdout.split('\n'):
+                match = re.search(r'\d+:\s+(\S+):', line)
+                if match and '@' not in line:  # Skip VLAN interfaces
+                    iface = match.group(1)
+                    if iface not in ['lo', self.primary_interface]:
+                        all_interfaces.append(iface)
+                        print(f"    - {iface}")
+            
+            # Wait a moment for interface to appear
+            if not all_interfaces:
+                print("  • Waiting 3 seconds for USB interface to appear...")
+                subprocess.run(["sleep", "3"])
+                result = self.run_command(["ip", "link", "show"], check=False)
+                for line in result.stdout.split('\n'):
+                    match = re.search(r'\d+:\s+(\S+):', line)
+                    if match and '@' not in line:
+                        iface = match.group(1)
+                        if iface not in ['lo', self.primary_interface]:
+                            all_interfaces.append(iface)
+            
+            if all_interfaces:
+                # Prefer interfaces that look like USB/ethernet
+                usb_iface = None
+                for iface in all_interfaces:
+                    if any(pattern in iface for pattern in ['enp', 'usb', 'eth', 'en']):
+                        usb_iface = iface
+                        break
+                
+                # If no specific USB pattern found, use the first available
+                if not usb_iface:
+                    usb_iface = all_interfaces[0]
+                
+                print(f"\n  • Using interface: {usb_iface}")
                 
                 # Configure the USB interface
                 print(f"  • Configuring {usb_iface} with IP {self.bridge_ip}...")
@@ -238,10 +262,14 @@ class VisionProBridge:
                     "-o", usb_iface, "-m", "state", "--state", "RELATED,ESTABLISHED",
                     "-j", "ACCEPT"
                 ], check=False, capture=False)
+                
+                # Store the USB interface for cleanup
+                self.usb_interface = usb_iface
             else:
-                print("  ⚠️  No USB network interface found!")
+                print("\n  ⚠️  No additional network interfaces found!")
                 print("  • Please ensure Vision Pro is plugged in via USB-C")
-                print("  • The USB network interface should appear automatically")
+                print("  • Try unplugging and replugging the Vision Pro")
+                print("  • Run 'ip link show' to see all interfaces")
                 raise BridgeSetupError("USB network interface not detected")
         else:
             # For wired: Create a proper bridge
