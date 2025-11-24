@@ -108,6 +108,15 @@ class VisionProBridge:
         except Exception as e:
             raise BridgeSetupError(f"Failed to detect network configuration: {e}")
     
+    def is_wireless_interface(self, interface: str) -> bool:
+        """Check if an interface is wireless."""
+        if self.os_type == "Linux":
+            # Check if wireless directory exists
+            wireless_path = f"/sys/class/net/{interface}/wireless"
+            import os
+            return os.path.exists(wireless_path)
+        return False
+    
     def detect_configuration(self):
         """Detect network configuration for the current platform."""
         print("Detecting configuration...")
@@ -166,6 +175,13 @@ class VisionProBridge:
         """Set up bridge on Linux."""
         print("\nSetting up bridge...")
         
+        # Check if primary interface is wireless
+        is_wireless = self.is_wireless_interface(self.primary_interface)
+        if is_wireless:
+            print(f"  ⚠️  Detected wireless interface ({self.primary_interface})")
+            print("  • Wireless interfaces cannot be bridged directly")
+            print("  • Setting up routing-based configuration instead...")
+        
         # 1. Enable IP forwarding
         print("  • Enabling IP forwarding...")
         self.run_command(["sudo", "sysctl", "-w", "net.ipv4.ip_forward=1"], capture=False)
@@ -182,11 +198,14 @@ class VisionProBridge:
             "sudo", "ip", "addr", "add", f"{self.bridge_ip}/24", "dev", "br0"
         ], check=False, capture=False)
         
-        # 4. Add primary interface to bridge
-        print(f"  • Adding {self.primary_interface} to bridge...")
-        self.run_command([
-            "sudo", "brctl", "addif", "br0", self.primary_interface
-        ], check=False, capture=False)
+        # 4. Only add to bridge if NOT wireless
+        if not is_wireless:
+            print(f"  • Adding {self.primary_interface} to bridge...")
+            self.run_command([
+                "sudo", "brctl", "addif", "br0", self.primary_interface
+            ], check=False, capture=False)
+        else:
+            print(f"  • Skipping bridge attachment (wireless interface)")
         
         # 5. Bring up the bridge
         print("  • Bringing up bridge interface...")
@@ -244,6 +263,8 @@ echo "✅ Cleanup complete!"
     
     def create_cleanup_script_linux(self):
         """Create cleanup script for Linux."""
+        is_wireless = self.is_wireless_interface(self.primary_interface)
+        
         cleanup_script = f"""#!/bin/bash
 # Vision Pro Bridge Cleanup Script (Linux)
 
@@ -254,10 +275,15 @@ sudo iptables -t nat -D POSTROUTING -s {self.network_base}.0/24 -o {self.primary
 sudo iptables -D FORWARD -i br0 -o {self.primary_interface} -j ACCEPT 2>/dev/null || true
 sudo iptables -D FORWARD -i {self.primary_interface} -o br0 -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
 
-# Remove interface from bridge
+"""
+        # Only try to remove from bridge if not wireless
+        if not is_wireless:
+            cleanup_script += f"""# Remove interface from bridge
 sudo brctl delif br0 {self.primary_interface} 2>/dev/null || true
 
-# Bring down and delete bridge
+"""
+        
+        cleanup_script += """# Bring down and delete bridge
 sudo ip link set br0 down 2>/dev/null || true
 sudo brctl delbr br0 2>/dev/null || true
 
