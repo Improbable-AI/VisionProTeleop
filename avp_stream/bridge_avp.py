@@ -194,6 +194,14 @@ class VisionProBridge:
         
         # 3. Configure bridge IP
         print("  • Configuring bridge IP...")
+        # Check if IP is already assigned and remove it first
+        result = self.run_command(["ip", "addr", "show", "br0"], check=False)
+        if self.bridge_ip in result.stdout:
+            print(f"    (Removing existing IP {self.bridge_ip})")
+            self.run_command([
+                "sudo", "ip", "addr", "del", f"{self.bridge_ip}/24", "dev", "br0"
+            ], check=False, capture=False)
+        
         self.run_command([
             "sudo", "ip", "addr", "add", f"{self.bridge_ip}/24", "dev", "br0"
         ], check=False, capture=False)
