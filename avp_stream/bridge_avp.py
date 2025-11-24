@@ -172,72 +172,125 @@ class VisionProBridge:
         subprocess.run(["sleep", "2"])
     
     def setup_bridge_linux(self):
-        """Set up bridge on Linux."""
+        """Set up bridge on Linux.
+        
+        For wired interfaces: Creates a true bridge
+        For wireless interfaces: Uses USB network interface directly with NAT
+        """
         print("\nSetting up bridge...")
         
         # Check if primary interface is wireless
         is_wireless = self.is_wireless_interface(self.primary_interface)
-        if is_wireless:
-            print(f"  ⚠️  Detected wireless interface ({self.primary_interface})")
-            print("  • Wireless interfaces cannot be bridged directly")
-            print("  • Setting up routing-based configuration instead...")
         
         # 1. Enable IP forwarding
         print("  • Enabling IP forwarding...")
         self.run_command(["sudo", "sysctl", "-w", "net.ipv4.ip_forward=1"], capture=False)
         
-        # 2. Create bridge interface if it doesn't exist
-        print("  • Creating bridge interface...")
-        result = self.run_command(["ip", "link", "show", "br0"], check=False)
-        if result.returncode != 0:
-            self.run_command(["sudo", "brctl", "addbr", "br0"], capture=False)
-        
-        # 3. Configure bridge IP
-        print("  • Configuring bridge IP...")
-        # Check if IP is already assigned and remove it first
-        result = self.run_command(["ip", "addr", "show", "br0"], check=False)
-        if self.bridge_ip in result.stdout:
-            print(f"    (Removing existing IP {self.bridge_ip})")
+        if is_wireless:
+            # For wireless: Skip bridge creation, use USB network interface directly
+            print(f"  ⚠️  Detected wireless interface ({self.primary_interface})")
+            print("  • Setting up direct USB network routing (wireless can't bridge)")
+            print("  • Looking for USB network interface...")
+            
+            # Find USB network interfaces (usually enp*, usb*)
+            result = self.run_command(["ip", "link", "show"], check=False)
+            usb_interfaces = []
+            for line in result.stdout.split('\n'):
+                # Look for USB ethernet interfaces
+                if 'enp' in line or 'usb' in line or 'eth' in line:
+                    match = re.search(r'\d+:\s+(\S+):', line)
+                    if match:
+                        iface = match.group(1)
+                        if iface != self.primary_interface:
+                            usb_interfaces.append(iface)
+            
+            if usb_interfaces:
+                usb_iface = usb_interfaces[0]
+                print(f"  • Found USB interface: {usb_iface}")
+                
+                # Configure the USB interface
+                print(f"  • Configuring {usb_iface} with IP {self.bridge_ip}...")
+                # Remove any existing IPs
+                self.run_command(["sudo", "ip", "addr", "flush", "dev", usb_iface], check=False, capture=False)
+                # Add our IP
+                self.run_command([
+                    "sudo", "ip", "addr", "add", f"{self.bridge_ip}/24", "dev", usb_iface
+                ], check=False, capture=False)
+                # Bring it up
+                self.run_command(["sudo", "ip", "link", "set", usb_iface, "up"], capture=False)
+                
+                # Set up NAT
+                print("  • Configuring NAT...")
+                self.run_command([
+                    "sudo", "iptables", "-t", "nat", "-A", "POSTROUTING",
+                    "-s", f"{self.network_base}.0/24",
+                    "-o", self.primary_interface, "-j", "MASQUERADE"
+                ], check=False, capture=False)
+                
+                # Allow forwarding
+                self.run_command([
+                    "sudo", "iptables", "-A", "FORWARD", "-i", usb_iface,
+                    "-o", self.primary_interface, "-j", "ACCEPT"
+                ], check=False, capture=False)
+                
+                self.run_command([
+                    "sudo", "iptables", "-A", "FORWARD", "-i", self.primary_interface,
+                    "-o", usb_iface, "-m", "state", "--state", "RELATED,ESTABLISHED",
+                    "-j", "ACCEPT"
+                ], check=False, capture=False)
+            else:
+                print("  ⚠️  No USB network interface found!")
+                print("  • Please ensure Vision Pro is plugged in via USB-C")
+                print("  • The USB network interface should appear automatically")
+                raise BridgeSetupError("USB network interface not detected")
+        else:
+            # For wired: Create a proper bridge
+            print(f"  • Using wired interface ({self.primary_interface})")
+            
+            # 2. Create bridge interface if it doesn't exist
+            print("  • Creating bridge interface...")
+            result = self.run_command(["ip", "link", "show", "br0"], check=False)
+            if result.returncode != 0:
+                self.run_command(["sudo", "brctl", "addbr", "br0"], capture=False)
+            
+            # 3. Configure bridge IP
+            print("  • Configuring bridge IP...")
+            # Flush any existing IPs
+            self.run_command(["sudo", "ip", "addr", "flush", "dev", "br0"], check=False, capture=False)
+            
             self.run_command([
-                "sudo", "ip", "addr", "del", f"{self.bridge_ip}/24", "dev", "br0"
+                "sudo", "ip", "addr", "add", f"{self.bridge_ip}/24", "dev", "br0"
             ], check=False, capture=False)
-        
-        self.run_command([
-            "sudo", "ip", "addr", "add", f"{self.bridge_ip}/24", "dev", "br0"
-        ], check=False, capture=False)
-        
-        # 4. Only add to bridge if NOT wireless
-        if not is_wireless:
+            
+            # 4. Add primary interface to bridge
             print(f"  • Adding {self.primary_interface} to bridge...")
             self.run_command([
                 "sudo", "brctl", "addif", "br0", self.primary_interface
             ], check=False, capture=False)
-        else:
-            print(f"  • Skipping bridge attachment (wireless interface)")
-        
-        # 5. Bring up the bridge
-        print("  • Bringing up bridge interface...")
-        self.run_command(["sudo", "ip", "link", "set", "br0", "up"], capture=False)
-        
-        # 6. Set up NAT with iptables
-        print("  • Configuring NAT...")
-        self.run_command([
-            "sudo", "iptables", "-t", "nat", "-A", "POSTROUTING",
-            "-s", f"{self.network_base}.0/24",
-            "-o", self.primary_interface, "-j", "MASQUERADE"
-        ], check=False, capture=False)
-        
-        # Allow forwarding
-        self.run_command([
-            "sudo", "iptables", "-A", "FORWARD", "-i", "br0",
-            "-o", self.primary_interface, "-j", "ACCEPT"
-        ], check=False, capture=False)
-        
-        self.run_command([
-            "sudo", "iptables", "-A", "FORWARD", "-i", self.primary_interface,
-            "-o", "br0", "-m", "state", "--state", "RELATED,ESTABLISHED",
-            "-j", "ACCEPT"
-        ], check=False, capture=False)
+            
+            # 5. Bring up the bridge
+            print("  • Bringing up bridge interface...")
+            self.run_command(["sudo", "ip", "link", "set", "br0", "up"], capture=False)
+            
+            # 6. Set up NAT with iptables
+            print("  • Configuring NAT...")
+            self.run_command([
+                "sudo", "iptables", "-t", "nat", "-A", "POSTROUTING",
+                "-s", f"{self.network_base}.0/24",
+                "-o", self.primary_interface, "-j", "MASQUERADE"
+            ], check=False, capture=False)
+            
+            # Allow forwarding
+            self.run_command([
+                "sudo", "iptables", "-A", "FORWARD", "-i", "br0",
+                "-o", self.primary_interface, "-j", "ACCEPT"
+            ], check=False, capture=False)
+            
+            self.run_command([
+                "sudo", "iptables", "-A", "FORWARD", "-i", self.primary_interface,
+                "-o", "br0", "-m", "state", "--state", "RELATED,ESTABLISHED",
+                "-j", "ACCEPT"
+            ], check=False, capture=False)
         
         subprocess.run(["sleep", "2"])
     
@@ -280,22 +333,37 @@ echo "Cleaning up Vision Pro bridge..."
 
 # Remove iptables rules
 sudo iptables -t nat -D POSTROUTING -s {self.network_base}.0/24 -o {self.primary_interface} -j MASQUERADE 2>/dev/null || true
-sudo iptables -D FORWARD -i br0 -o {self.primary_interface} -j ACCEPT 2>/dev/null || true
-sudo iptables -D FORWARD -i {self.primary_interface} -o br0 -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
-
-"""
-        # Only try to remove from bridge if not wireless
-        if not is_wireless:
-            cleanup_script += f"""# Remove interface from bridge
-sudo brctl delif br0 {self.primary_interface} 2>/dev/null || true
 
 """
         
-        cleanup_script += """# Bring down and delete bridge
+        if is_wireless:
+            # For wireless setup, clean up USB interface
+            cleanup_script += """# Find and clean up USB network interfaces
+for iface in $(ip link show | grep -E 'enp|usb|eth' | awk -F': ' '{print $2}'); do
+    if [ "$iface" != "$primary_iface" ]; then
+        sudo iptables -D FORWARD -i $iface -o """ + self.primary_interface + """ -j ACCEPT 2>/dev/null || true
+        sudo iptables -D FORWARD -i """ + self.primary_interface + """ -o $iface -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
+        sudo ip addr flush dev $iface 2>/dev/null || true
+        sudo ip link set $iface down 2>/dev/null || true
+    fi
+done
+
+"""
+        else:
+            # For wired setup, clean up bridge
+            cleanup_script += f"""sudo iptables -D FORWARD -i br0 -o {self.primary_interface} -j ACCEPT 2>/dev/null || true
+sudo iptables -D FORWARD -i {self.primary_interface} -o br0 -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
+
+# Remove interface from bridge
+sudo brctl delif br0 {self.primary_interface} 2>/dev/null || true
+
+# Bring down and delete bridge
 sudo ip link set br0 down 2>/dev/null || true
 sudo brctl delbr br0 2>/dev/null || true
 
-# Disable IP forwarding
+"""
+        
+        cleanup_script += """# Disable IP forwarding
 sudo sysctl -w net.ipv4.ip_forward=0 > /dev/null
 
 echo "✅ Cleanup complete!"
