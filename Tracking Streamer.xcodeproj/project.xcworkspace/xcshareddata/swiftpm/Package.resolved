@@ -1,5 +1,4 @@
 {
-  "originHash" : "6af95a3a2945e2934a451ce8d2221a9bee7f59a123ddc997841e607904049c93",
   "pins" : [
     {
       "identity" : "grpc-swift",
@@ -119,5 +118,5 @@
       }
     }
   ],
-  "version" : 3
+  "version" : 2
 }

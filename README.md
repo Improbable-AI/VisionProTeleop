@@ -27,7 +27,6 @@ This VisionOS app and python library streams your Head + Wrist + Hand Tracking r
 > **For a more detailed explanation, check out this short [paper](./assets/short_paper_new.pdf).*
 
 
-[![Star History Chart](https://api.star-history.com/svg?repos=improbable-ai/visionproteleop&type=date&legend=top-left)](https://www.star-history.com/#improbable-ai/visionproteleop&type=date&legend=top-left)
 
 
 ## Benchmark Results
@@ -221,3 +220,4 @@ You can also modify the video viewport -- where and how the streamed video is pr
 
 We acknowledge support from Hyundai Motor Company and ARO MURI grant number W911NF-23-1-0277. 
 
+[![Star History Chart](https://api.star-history.com/svg?repos=improbable-ai/visionproteleop&type=date&legend=top-left)](https://www.star-history.com/#improbable-ai/visionproteleop&type=date&legend=top-left)
