@@ -1,0 +1,248 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Installation &mdash; VisionProTeleop 2.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=60dbed4a"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/remove_prefix.js?v=e2af7392"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Quick Start" href="quickstart.html" />
+    <link rel="prev" title="VisionProTeleop Documentation" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            VisionProTeleop
+              <img src="_static/new-logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#python-package">Python Package</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#vision-pro-app">Vision Pro App</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#app-store-installation">App Store Installation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#manual-installation-development">Manual Installation (Development)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#network-setup">Network Setup</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#wifi-connection">WiFi Connection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#wired-connection">Wired Connection</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#basic-hand-tracking">Basic Hand Tracking</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#with-video-streaming">With Video Streaming</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="quickstart.html#finding-the-right-camera-configuration">Finding the Right Camera Configuration</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api/modules.html">Python API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="api/modules.html#avp_stream.streamer.VisionProStreamer"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.streamer.VisionProStreamer.__init__"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.streamer.VisionProStreamer.stream"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.stream()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.streamer.VisionProStreamer.get_latest"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.get_latest()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.streamer.VisionProStreamer.get_recording"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.get_recording()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.streamer.VisionProStreamer.get_local_ip"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.get_local_ip()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.streamer.VisionProStreamer.register_frame_callback"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.register_frame_callback()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.streamer.VisionProStreamer.register_audio_callback"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.register_audio_callback()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.streamer.VisionProStreamer.update_frame"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.update_frame()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.streamer.VisionProStreamer.reset_benchmark_epoch"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.reset_benchmark_epoch()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.streamer.VisionProStreamer.update_stream_resolution"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.update_stream_resolution()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.streamer.VisionProStreamer.wait_for_benchmark_event"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.wait_for_benchmark_event()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.streamer.VisionProStreamer.start_streaming"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.start_streaming()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api/modules.html#module-avp_stream.bridge_avp">Bridge Setup</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.bridge_avp.BridgeSetupError"><code class="docutils literal notranslate"><span class="pre">BridgeSetupError</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.bridge_avp.VisionProBridge"><code class="docutils literal notranslate"><span class="pre">VisionProBridge</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="api/modules.html#avp_stream.bridge_avp.VisionProBridge.check_prerequisites"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.check_prerequisites()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/modules.html#avp_stream.bridge_avp.VisionProBridge.run_command"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.run_command()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/modules.html#avp_stream.bridge_avp.VisionProBridge.detect_primary_interface_macos"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.detect_primary_interface_macos()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/modules.html#avp_stream.bridge_avp.VisionProBridge.detect_primary_interface_linux"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.detect_primary_interface_linux()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/modules.html#avp_stream.bridge_avp.VisionProBridge.is_wireless_interface"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.is_wireless_interface()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/modules.html#avp_stream.bridge_avp.VisionProBridge.detect_configuration"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.detect_configuration()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/modules.html#avp_stream.bridge_avp.VisionProBridge.setup_bridge_macos"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.setup_bridge_macos()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/modules.html#avp_stream.bridge_avp.VisionProBridge.setup_bridge_linux"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.setup_bridge_linux()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/modules.html#avp_stream.bridge_avp.VisionProBridge.create_cleanup_script_macos"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.create_cleanup_script_macos()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/modules.html#avp_stream.bridge_avp.VisionProBridge.create_cleanup_script_linux"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.create_cleanup_script_linux()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/modules.html#avp_stream.bridge_avp.VisionProBridge.setup"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.setup()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.bridge_avp.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api/modules.html#module-avp_stream.latency_test">Latency Testing</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.latency_test.inject_benchmark_payload"><code class="docutils literal notranslate"><span class="pre">inject_benchmark_payload()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.latency_test.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Additional Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="acknowledgements.html">Acknowledgements</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="acknowledgements.html#research-team">Research Team</a></li>
+<li class="toctree-l2"><a class="reference internal" href="acknowledgements.html#related-projects">Related Projects</a></li>
+<li class="toctree-l2"><a class="reference internal" href="acknowledgements.html#publications">Publications</a></li>
+<li class="toctree-l2"><a class="reference internal" href="acknowledgements.html#contact">Contact</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="license.html">License</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="license.html#mit-license">MIT License</a></li>
+<li class="toctree-l2"><a class="reference internal" href="license.html#what-this-means">What This Means</a></li>
+<li class="toctree-l2"><a class="reference internal" href="license.html#third-party-licenses">Third-Party Licenses</a></li>
+<li class="toctree-l2"><a class="reference internal" href="license.html#attribution">Attribution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="license.html#disclaimer">Disclaimer</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">VisionProTeleop</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Installation</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/installation.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="installation">
+<h1>Installation<a class="headerlink" href="#installation" title="Link to this heading"></a></h1>
+<section id="python-package">
+<h2>Python Package<a class="headerlink" href="#python-package" title="Link to this heading"></a></h2>
+<p>The easiest way to install the VisionProTeleop Python package is via pip:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>avp_stream
+</pre></div>
+</div>
+</section>
+<section id="vision-pro-app">
+<h2>Vision Pro App<a class="headerlink" href="#vision-pro-app" title="Link to this heading"></a></h2>
+<section id="app-store-installation">
+<h3>App Store Installation<a class="headerlink" href="#app-store-installation" title="Link to this heading"></a></h3>
+<p>The official way to install the app is through the VisionOS App Store:</p>
+<ol class="arabic simple">
+<li><p>Open the App Store on your Vision Pro</p></li>
+<li><p>Search for <strong>Tracking Streamer</strong></p></li>
+<li><p>Download and install the app</p></li>
+</ol>
+</section>
+<section id="manual-installation-development">
+<h3>Manual Installation (Development)<a class="headerlink" href="#manual-installation-development" title="Link to this heading"></a></h3>
+<p>If you want to build and install the app yourself for development purposes, you need:</p>
+<ul class="simple">
+<li><p>Apple Developer Account</p></li>
+<li><p>Vision Pro Developer Strap</p></li>
+<li><p>Mac with Xcode installed</p></li>
+</ul>
+<p>See <a class="reference external" href="https://github.com/Improbable-AI/VisionProTeleop/blob/main/how_to_install.md">here</a> for detailed instructions on building and installing the app manually.</p>
+</section>
+</section>
+<section id="network-setup">
+<h2>Network Setup<a class="headerlink" href="#network-setup" title="Link to this heading"></a></h2>
+<section id="wifi-connection">
+<h3>WiFi Connection<a class="headerlink" href="#wifi-connection" title="Link to this heading"></a></h3>
+<p>For wireless operation, both your Vision Pro and the device running the Python package must be connected to the same WiFi network. No additional network configuration is required.</p>
+</section>
+<section id="wired-connection">
+<h3>Wired Connection<a class="headerlink" href="#wired-connection" title="Link to this heading"></a></h3>
+<p>For optimal performance with the lowest latency, you can connect your Vision Pro via a wired USB-C connection. This requires:</p>
+<ul class="simple">
+<li><p><strong>Vision Pro Developer Strap</strong> (available from Apple)</p></li>
+<li><p>USB-C cable connected from the developer strap to your computer</p></li>
+</ul>
+<p>After physically connecting your Vision Pro via the developer strap, run the wired setup command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>setup-avp-wired
+</pre></div>
+</div>
+<p>This command (provided by the <code class="docutils literal notranslate"><span class="pre">avp_stream</span></code> package) configures the network bridge to enable communication over the USB-C connection. Wired connections typically provide significantly lower latency compared to WiFi - see the <a class="reference external" href="https://github.com/Improbable-AI/VisionProTeleop/blob/main/docs/benchmark.md">benchmark documentation</a> for detailed performance comparisons.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>On the Vision Pro, the app displays the IP addresses registered on different network interfaces. You’ll see separate IPs for WiFi and wired (USB-C) connections when both are available. Make sure to use the correct IP address corresponding to your connection type when connecting from Python.</p>
+</div>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="VisionProTeleop Documentation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="quickstart.html" class="btn btn-neutral float-right" title="Quick Start" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Younghyo Park.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

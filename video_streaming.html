@@ -1,0 +1,417 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Video Streaming &mdash; VisionProTeleop 2.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=60dbed4a"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/remove_prefix.js?v=e2af7392"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            VisionProTeleop
+              <img src="_static/new-logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#python-package">Python Package</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#vision-pro-app">Vision Pro App</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="installation.html#app-store-installation">App Store Installation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="installation.html#manual-installation-development">Manual Installation (Development)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#network-setup">Network Setup</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="installation.html#wifi-connection">WiFi Connection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="installation.html#wired-connection">Wired Connection</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#basic-hand-tracking">Basic Hand Tracking</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#with-video-streaming">With Video Streaming</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="quickstart.html#finding-the-right-camera-configuration">Finding the Right Camera Configuration</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api/modules.html">Python API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="api/modules.html#avp_stream.streamer.VisionProStreamer"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.streamer.VisionProStreamer.__init__"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.streamer.VisionProStreamer.stream"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.stream()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.streamer.VisionProStreamer.get_latest"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.get_latest()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.streamer.VisionProStreamer.get_recording"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.get_recording()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.streamer.VisionProStreamer.get_local_ip"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.get_local_ip()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.streamer.VisionProStreamer.register_frame_callback"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.register_frame_callback()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.streamer.VisionProStreamer.register_audio_callback"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.register_audio_callback()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.streamer.VisionProStreamer.update_frame"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.update_frame()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.streamer.VisionProStreamer.reset_benchmark_epoch"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.reset_benchmark_epoch()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.streamer.VisionProStreamer.update_stream_resolution"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.update_stream_resolution()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.streamer.VisionProStreamer.wait_for_benchmark_event"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.wait_for_benchmark_event()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.streamer.VisionProStreamer.start_streaming"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.start_streaming()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api/modules.html#module-avp_stream.bridge_avp">Bridge Setup</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.bridge_avp.BridgeSetupError"><code class="docutils literal notranslate"><span class="pre">BridgeSetupError</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.bridge_avp.VisionProBridge"><code class="docutils literal notranslate"><span class="pre">VisionProBridge</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="api/modules.html#avp_stream.bridge_avp.VisionProBridge.check_prerequisites"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.check_prerequisites()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/modules.html#avp_stream.bridge_avp.VisionProBridge.run_command"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.run_command()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/modules.html#avp_stream.bridge_avp.VisionProBridge.detect_primary_interface_macos"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.detect_primary_interface_macos()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/modules.html#avp_stream.bridge_avp.VisionProBridge.detect_primary_interface_linux"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.detect_primary_interface_linux()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/modules.html#avp_stream.bridge_avp.VisionProBridge.is_wireless_interface"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.is_wireless_interface()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/modules.html#avp_stream.bridge_avp.VisionProBridge.detect_configuration"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.detect_configuration()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/modules.html#avp_stream.bridge_avp.VisionProBridge.setup_bridge_macos"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.setup_bridge_macos()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/modules.html#avp_stream.bridge_avp.VisionProBridge.setup_bridge_linux"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.setup_bridge_linux()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/modules.html#avp_stream.bridge_avp.VisionProBridge.create_cleanup_script_macos"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.create_cleanup_script_macos()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/modules.html#avp_stream.bridge_avp.VisionProBridge.create_cleanup_script_linux"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.create_cleanup_script_linux()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api/modules.html#avp_stream.bridge_avp.VisionProBridge.setup"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.setup()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.bridge_avp.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api/modules.html#module-avp_stream.latency_test">Latency Testing</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.latency_test.inject_benchmark_payload"><code class="docutils literal notranslate"><span class="pre">inject_benchmark_payload()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/modules.html#avp_stream.latency_test.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Additional Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="acknowledgements.html">Acknowledgements</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="acknowledgements.html#research-team">Research Team</a></li>
+<li class="toctree-l2"><a class="reference internal" href="acknowledgements.html#related-projects">Related Projects</a></li>
+<li class="toctree-l2"><a class="reference internal" href="acknowledgements.html#publications">Publications</a></li>
+<li class="toctree-l2"><a class="reference internal" href="acknowledgements.html#contact">Contact</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="license.html">License</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="license.html#mit-license">MIT License</a></li>
+<li class="toctree-l2"><a class="reference internal" href="license.html#what-this-means">What This Means</a></li>
+<li class="toctree-l2"><a class="reference internal" href="license.html#third-party-licenses">Third-Party Licenses</a></li>
+<li class="toctree-l2"><a class="reference internal" href="license.html#attribution">Attribution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="license.html#disclaimer">Disclaimer</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">VisionProTeleop</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Video Streaming</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/video_streaming.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="video-streaming">
+<h1>Video Streaming<a class="headerlink" href="#video-streaming" title="Link to this heading"></a></h1>
+<p>VisionProTeleop supports low-latency video streaming from your robot back to Vision Pro using WebRTC.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>The video streaming feature allows you to:</p>
+<ul class="simple">
+<li><p>Stream camera feeds from your robot to Vision Pro</p></li>
+<li><p>Support both mono and stereo camera configurations</p></li>
+<li><p>Process frames before streaming</p></li>
+<li><p>Generate synthetic frames (e.g., from simulation)</p></li>
+<li><p>Achieve low latency (typically 50-150ms) over WiFi</p></li>
+</ul>
+</section>
+<section id="basic-setup">
+<h2>Basic Setup<a class="headerlink" href="#basic-setup" title="Link to this heading"></a></h2>
+<section id="enable-video-on-vision-pro">
+<h3>Enable Video on Vision Pro<a class="headerlink" href="#enable-video-on-vision-pro" title="Link to this heading"></a></h3>
+<p>Start the app with video streaming enabled by clicking <strong>“START with Video Streaming”</strong> (right button).</p>
+</section>
+<section id="start-streaming-from-python">
+<h3>Start Streaming from Python<a class="headerlink" href="#start-streaming-from-python" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">avp_stream</span><span class="w"> </span><span class="kn">import</span> <span class="n">VisionProStreamer</span>
+
+<span class="n">avp_ip</span> <span class="o">=</span> <span class="s2">&quot;10.31.181.201&quot;</span>
+<span class="n">s</span> <span class="o">=</span> <span class="n">VisionProStreamer</span><span class="p">(</span><span class="n">ip</span><span class="o">=</span><span class="n">avp_ip</span><span class="p">)</span>
+
+<span class="n">s</span><span class="o">.</span><span class="n">start_streaming</span><span class="p">(</span>
+    <span class="n">device</span><span class="o">=</span><span class="s2">&quot;/dev/video0&quot;</span><span class="p">,</span>
+    <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;v4l2&quot;</span><span class="p">,</span>
+    <span class="n">size</span><span class="o">=</span><span class="s2">&quot;640x480&quot;</span><span class="p">,</span>
+    <span class="n">fps</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span>
+    <span class="n">stereo</span><span class="o">=</span><span class="kc">False</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="parameters">
+<h3>Parameters<a class="headerlink" href="#parameters" title="Link to this heading"></a></h3>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">device</span></code></dt><dd><p>Path to the video device (e.g., <code class="docutils literal notranslate"><span class="pre">&quot;/dev/video0&quot;</span></code> on Linux, <code class="docutils literal notranslate"><span class="pre">0</span></code> on Windows)</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">format</span></code></dt><dd><p>Video capture format (<code class="docutils literal notranslate"><span class="pre">&quot;v4l2&quot;</span></code> for Linux, <code class="docutils literal notranslate"><span class="pre">&quot;dshow&quot;</span></code> for Windows, <code class="docutils literal notranslate"><span class="pre">&quot;avfoundation&quot;</span></code> for macOS)</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">size</span></code></dt><dd><p>Frame dimensions as string (e.g., <code class="docutils literal notranslate"><span class="pre">&quot;640x480&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;1280x720&quot;</span></code>)</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">fps</span></code></dt><dd><p>Frames per second (typically 30 or 60)</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">stereo</span></code></dt><dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> for side-by-side stereo, <code class="docutils literal notranslate"><span class="pre">False</span></code> for mono</p>
+</dd>
+</dl>
+</section>
+</section>
+<section id="finding-camera-configuration">
+<h2>Finding Camera Configuration<a class="headerlink" href="#finding-camera-configuration" title="Link to this heading"></a></h2>
+<section id="use-the-test-script">
+<h3>Use the Test Script<a class="headerlink" href="#use-the-test-script" title="Link to this heading"></a></h3>
+<p>The repository includes a helper script to identify the correct camera parameters:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>test_video_devices.py<span class="w"> </span>--live
+</pre></div>
+</div>
+<p>This script will:</p>
+<ol class="arabic simple">
+<li><p>List all available video devices</p></li>
+<li><p>Test different format/size/fps combinations</p></li>
+<li><p>Show a live preview when a valid configuration is found</p></li>
+</ol>
+</section>
+<section id="example-output">
+<h3>Example Output<a class="headerlink" href="#example-output" title="Link to this heading"></a></h3>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Found devices:
+  /dev/video0 - USB Camera
+  /dev/video2 - Integrated Webcam
+
+Testing /dev/video0...
+  ✓ v4l2 @ 640x480 @ 30fps - Working!
+  ✓ v4l2 @ 1280x720 @ 30fps - Working!
+  ✗ v4l2 @ 1920x1080 @ 60fps - Failed
+</pre></div>
+</div>
+</section>
+<section id="common-configurations">
+<h3>Common Configurations<a class="headerlink" href="#common-configurations" title="Link to this heading"></a></h3>
+<p><strong>Linux with USB Camera:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">s</span><span class="o">.</span><span class="n">start_streaming</span><span class="p">(</span>
+    <span class="n">device</span><span class="o">=</span><span class="s2">&quot;/dev/video0&quot;</span><span class="p">,</span>
+    <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;v4l2&quot;</span><span class="p">,</span>
+    <span class="n">size</span><span class="o">=</span><span class="s2">&quot;640x480&quot;</span><span class="p">,</span>
+    <span class="n">fps</span><span class="o">=</span><span class="mi">30</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Windows with USB Camera:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">s</span><span class="o">.</span><span class="n">start_streaming</span><span class="p">(</span>
+    <span class="n">device</span><span class="o">=</span><span class="s2">&quot;0&quot;</span><span class="p">,</span>
+    <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;dshow&quot;</span><span class="p">,</span>
+    <span class="n">size</span><span class="o">=</span><span class="s2">&quot;640x480&quot;</span><span class="p">,</span>
+    <span class="n">fps</span><span class="o">=</span><span class="mi">30</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>macOS with Built-in Camera:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">s</span><span class="o">.</span><span class="n">start_streaming</span><span class="p">(</span>
+    <span class="n">device</span><span class="o">=</span><span class="s2">&quot;0&quot;</span><span class="p">,</span>
+    <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;avfoundation&quot;</span><span class="p">,</span>
+    <span class="n">size</span><span class="o">=</span><span class="s2">&quot;1280x720&quot;</span><span class="p">,</span>
+    <span class="n">fps</span><span class="o">=</span><span class="mi">30</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="advanced-usage">
+<h2>Advanced Usage<a class="headerlink" href="#advanced-usage" title="Link to this heading"></a></h2>
+<section id="stereo-camera-streaming">
+<h3>Stereo Camera Streaming<a class="headerlink" href="#stereo-camera-streaming" title="Link to this heading"></a></h3>
+<p>For stereo cameras that output side-by-side images:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">s</span><span class="o">.</span><span class="n">start_streaming</span><span class="p">(</span>
+    <span class="n">device</span><span class="o">=</span><span class="s2">&quot;/dev/video0&quot;</span><span class="p">,</span>
+    <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;v4l2&quot;</span><span class="p">,</span>
+    <span class="n">size</span><span class="o">=</span><span class="s2">&quot;1280x480&quot;</span><span class="p">,</span>  <span class="c1"># Width is double for side-by-side</span>
+    <span class="n">fps</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span>
+    <span class="n">stereo</span><span class="o">=</span><span class="kc">True</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>The streamer expects the frame to be horizontally concatenated: <code class="docutils literal notranslate"><span class="pre">[left_image</span> <span class="pre">|</span> <span class="pre">right_image]</span></code></p>
+</section>
+<section id="frame-processing">
+<h3>Frame Processing<a class="headerlink" href="#frame-processing" title="Link to this heading"></a></h3>
+<p>Add custom processing to frames before streaming:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">add_overlay</span><span class="p">(</span><span class="n">frame</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Add information overlay to frame.&quot;&quot;&quot;</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">cv2</span>
+
+    <span class="c1"># frame is a numpy array (H, W, 3) in RGB format</span>
+    <span class="n">cv2</span><span class="o">.</span><span class="n">putText</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="s2">&quot;Robot View&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">30</span><span class="p">),</span>
+                <span class="n">cv2</span><span class="o">.</span><span class="n">FONT_HERSHEY_SIMPLEX</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="p">(</span><span class="mi">255</span><span class="p">,</span> <span class="mi">255</span><span class="p">,</span> <span class="mi">255</span><span class="p">),</span> <span class="mi">2</span><span class="p">)</span>
+
+    <span class="c1"># Draw bounding boxes, add filters, etc.</span>
+    <span class="k">return</span> <span class="n">frame</span>
+
+<span class="n">s</span><span class="o">.</span><span class="n">register_frame_callback</span><span class="p">(</span><span class="n">add_overlay</span><span class="p">)</span>
+<span class="n">s</span><span class="o">.</span><span class="n">start_streaming</span><span class="p">(</span>
+    <span class="n">device</span><span class="o">=</span><span class="s2">&quot;/dev/video0&quot;</span><span class="p">,</span>
+    <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;v4l2&quot;</span><span class="p">,</span>
+    <span class="n">size</span><span class="o">=</span><span class="s2">&quot;640x480&quot;</span><span class="p">,</span>
+    <span class="n">fps</span><span class="o">=</span><span class="mi">30</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="multiple-processing-steps">
+<h3>Multiple Processing Steps<a class="headerlink" href="#multiple-processing-steps" title="Link to this heading"></a></h3>
+<p>Chain multiple processing functions:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">preprocessing</span><span class="p">(</span><span class="n">frame</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Adjust brightness/contrast.&quot;&quot;&quot;</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">cv2</span>
+    <span class="n">alpha</span> <span class="o">=</span> <span class="mf">1.2</span>  <span class="c1"># Contrast</span>
+    <span class="n">beta</span> <span class="o">=</span> <span class="mi">10</span>    <span class="c1"># Brightness</span>
+    <span class="k">return</span> <span class="n">cv2</span><span class="o">.</span><span class="n">convertScaleAbs</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="n">alpha</span><span class="p">,</span> <span class="n">beta</span><span class="o">=</span><span class="n">beta</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">add_info</span><span class="p">(</span><span class="n">frame</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Add information overlay.&quot;&quot;&quot;</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">cv2</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+    <span class="n">timestamp</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;%H:%M:%S&quot;</span><span class="p">)</span>
+    <span class="n">cv2</span><span class="o">.</span><span class="n">putText</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="n">timestamp</span><span class="p">,</span> <span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">30</span><span class="p">),</span>
+                <span class="n">cv2</span><span class="o">.</span><span class="n">FONT_HERSHEY_SIMPLEX</span><span class="p">,</span> <span class="mf">0.7</span><span class="p">,</span> <span class="p">(</span><span class="mi">255</span><span class="p">,</span> <span class="mi">255</span><span class="p">,</span> <span class="mi">255</span><span class="p">),</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">frame</span>
+
+<span class="c1"># Apply preprocessing first</span>
+<span class="n">processed</span> <span class="o">=</span> <span class="n">preprocessing</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
+<span class="c1"># Then add overlay</span>
+<span class="n">final</span> <span class="o">=</span> <span class="n">add_info</span><span class="p">(</span><span class="n">processed</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="synthetic-frame-generation">
+<h3>Synthetic Frame Generation<a class="headerlink" href="#synthetic-frame-generation" title="Link to this heading"></a></h3>
+<p>Generate frames without a physical camera (useful for simulation):</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">generate_synthetic_frame</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Generate a test pattern or simulation render.&quot;&quot;&quot;</span>
+    <span class="c1"># Create a synthetic image (720p RGB)</span>
+    <span class="n">height</span><span class="p">,</span> <span class="n">width</span> <span class="o">=</span> <span class="mi">720</span><span class="p">,</span> <span class="mi">1280</span>
+    <span class="n">frame</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">height</span><span class="p">,</span> <span class="n">width</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+
+    <span class="c1"># Draw something (example: gradient)</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">height</span><span class="p">):</span>
+        <span class="n">frame</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="mi">255</span> <span class="o">*</span> <span class="n">i</span> <span class="o">/</span> <span class="n">height</span><span class="p">)</span>  <span class="c1"># Red gradient</span>
+
+    <span class="k">return</span> <span class="n">frame</span>
+
+<span class="n">s</span><span class="o">.</span><span class="n">register_frame_callback</span><span class="p">(</span><span class="n">generate_synthetic_frame</span><span class="p">)</span>
+<span class="n">s</span><span class="o">.</span><span class="n">start_streaming</span><span class="p">(</span>
+    <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>    <span class="c1"># No physical device</span>
+    <span class="nb">format</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>    <span class="c1"># No format needed</span>
+    <span class="n">size</span><span class="o">=</span><span class="s2">&quot;1280x720&quot;</span><span class="p">,</span>
+    <span class="n">fps</span><span class="o">=</span><span class="mi">60</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="integration-with-simulation">
+<h3>Integration with Simulation<a class="headerlink" href="#integration-with-simulation" title="Link to this heading"></a></h3>
+<p>Example with Isaac Gym or other simulators:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">get_simulation_frame</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Get rendered frame from simulator.&quot;&quot;&quot;</span>
+    <span class="c1"># Get camera image from simulator</span>
+    <span class="n">camera_image</span> <span class="o">=</span> <span class="n">sim</span><span class="o">.</span><span class="n">render_camera</span><span class="p">()</span>  <span class="c1"># Your simulator API</span>
+
+    <span class="c1"># Convert to RGB numpy array if needed</span>
+    <span class="n">frame</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">camera_image</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">frame</span>
+
+<span class="n">s</span><span class="o">.</span><span class="n">register_frame_callback</span><span class="p">(</span><span class="n">get_simulation_frame</span><span class="p">)</span>
+<span class="n">s</span><span class="o">.</span><span class="n">start_streaming</span><span class="p">(</span>
+    <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="nb">format</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">size</span><span class="o">=</span><span class="s2">&quot;1280x720&quot;</span><span class="p">,</span>
+    <span class="n">fps</span><span class="o">=</span><span class="mi">30</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Younghyo Park.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
