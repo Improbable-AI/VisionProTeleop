@@ -14,6 +14,7 @@
 | **[06_stream_from_camera.py](06_stream_from_camera.py)** | Stream live camera feed to Vision Pro | ✅ | Callback | ❌ | ❌ |
 | **[07_process_frames.py](07_process_frames.py)** | Camera streaming with custom frame processing | ✅ | Callback | ❌ | ❌ |
 | **[08_stream_audio_file.py](08_stream_audio_file.py)** | Hand tracking with looping audio file playback | ❌ | Callback | ✅ | ❌ |
+| **[09_stream_pointcloud.py](09_stream_pointcloud.py)** | Point cloud streaming with Draco compression (experimental) | ❌ | N/A | ❌ | ❌ |
 
 **Legend:**
 - **Hardware Camera**: Whether the example requires a physical camera device (✅) or generates synthetic video (❌)

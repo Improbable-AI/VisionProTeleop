@@ -152,8 +152,32 @@ python test_video_devices.py --live
 ```
 When it's the right combination, it'll show up a live feed of the selected camera. 
 
+### [🧪 Experimental] Point Cloud Streaming with Draco Compression
 
+The library now includes experimental support for streaming 3D point cloud data using Google's Draco encoder. This enables efficient transmission of depth sensor data (e.g., from RealSense, Kinect) with 3-6x compression ratios.
 
+```bash
+# Install with point cloud support
+pip install avp_stream[pointcloud]
+```
+
+```python
+from avp_stream import PointCloudEncoder, PointCloudDecoder, is_draco_available
+import numpy as np
+
+if is_draco_available():
+    encoder = PointCloudEncoder(quantization_bits=14, compression_level=1)
+    
+    # Encode a point cloud (e.g., from depth camera)
+    points = np.random.rand(10000, 3).astype(np.float32)
+    encoded = encoder.encode(points)
+    
+    print(f"Compression ratio: {encoder.get_compression_ratio():.2f}x")
+```
+
+For detailed documentation, see **[Point Cloud Streaming Documentation](docs/pointcloud_streaming.md)**.
+
+> **Note:** Full VisionOS integration for point cloud rendering is planned for a future release. The current implementation provides the Python-side encoding/decoding infrastructure.
 
 
 

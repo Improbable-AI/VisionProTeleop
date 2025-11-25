@@ -12,6 +12,7 @@ setup(
         'aiortc', 'av', 'requests', 'pyyaml'
     ],
     extras_require={
+        'pointcloud': ['DracoPy>=1.0.0'],
     },
     entry_points={
         'console_scripts': [
