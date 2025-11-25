@@ -228,7 +228,7 @@ extension 🥽AppModel {
 
     @MainActor
     func processDeviceAnchorUpdates() async {
-        await run_device_tracking(function: self.queryAndProcessLatestDeviceAnchor, withFrequency: 90)
+        await run_device_tracking(function: self.queryAndProcessLatestDeviceAnchor, withFrequency: 120)
     }
     
     func processReconstructionUpdates() async {
@@ -259,55 +259,51 @@ extension 🥽AppModel {
             // print("processHandUpates is running.")
             switch handAnchor.chirality {
             case .left:
-                DispatchQueue.main.async {
-                    DataManager.shared.latestHandTrackingData.leftWrist = handAnchor.originFromAnchorTransform
-                    // print(handAnchor.originFromAnchorTransform)
-                    
+                DataManager.shared.latestHandTrackingData.leftWrist = handAnchor.originFromAnchorTransform
+                // print(handAnchor.originFromAnchorTransform)
+                
 
-                    let jointTypes: [HandSkeleton.JointName] = [
-                        .wrist,
-                        .thumbKnuckle, .thumbIntermediateBase, .thumbIntermediateTip, .thumbTip,
-                        .indexFingerMetacarpal, .indexFingerKnuckle, .indexFingerIntermediateBase, .indexFingerIntermediateTip, .indexFingerTip,
-                        .middleFingerMetacarpal, .middleFingerKnuckle, .middleFingerIntermediateBase, .middleFingerIntermediateTip, .middleFingerTip,
-                        .ringFingerMetacarpal, .ringFingerKnuckle, .ringFingerIntermediateBase, .ringFingerIntermediateTip, .ringFingerTip,
-                        .littleFingerMetacarpal, .littleFingerKnuckle, .littleFingerIntermediateBase, .littleFingerIntermediateTip, .littleFingerTip,
-                    ]
-                    
-                    for (index, jointType) in jointTypes.enumerated() {
-                        guard let joint = handAnchor.handSkeleton?.joint(jointType) else {
-                            continue
-                        }
-                        DataManager.shared.latestHandTrackingData.leftSkeleton.joints[index] = joint.anchorFromJointTransform
+                let jointTypes: [HandSkeleton.JointName] = [
+                    .wrist,
+                    .thumbKnuckle, .thumbIntermediateBase, .thumbIntermediateTip, .thumbTip,
+                    .indexFingerMetacarpal, .indexFingerKnuckle, .indexFingerIntermediateBase, .indexFingerIntermediateTip, .indexFingerTip,
+                    .middleFingerMetacarpal, .middleFingerKnuckle, .middleFingerIntermediateBase, .middleFingerIntermediateTip, .middleFingerTip,
+                    .ringFingerMetacarpal, .ringFingerKnuckle, .ringFingerIntermediateBase, .ringFingerIntermediateTip, .ringFingerTip,
+                    .littleFingerMetacarpal, .littleFingerKnuckle, .littleFingerIntermediateBase, .littleFingerIntermediateTip, .littleFingerTip,
+                ]
+                
+                for (index, jointType) in jointTypes.enumerated() {
+                    guard let joint = handAnchor.handSkeleton?.joint(jointType) else {
+                        continue
                     }
-                    
-                    // print("Updated left hand skeleton")
-                    // Repeat for right hand and other fingers as needed
+                    DataManager.shared.latestHandTrackingData.leftSkeleton.joints[index] = joint.anchorFromJointTransform
                 }
+                
+                // print("Updated left hand skeleton")
+                // Repeat for right hand and other fingers as needed
 
             case .right:
-                DispatchQueue.main.async {
-                    DataManager.shared.latestHandTrackingData.rightWrist = handAnchor.originFromAnchorTransform
-                    // print(handAnchor.originFromAnchorTransform)
-                    
-                    let jointTypes: [HandSkeleton.JointName] = [
-                        .wrist,
-                        .thumbKnuckle, .thumbIntermediateBase, .thumbIntermediateTip, .thumbTip,
-                        .indexFingerMetacarpal, .indexFingerKnuckle, .indexFingerIntermediateBase, .indexFingerIntermediateTip, .indexFingerTip,
-                        .middleFingerMetacarpal, .middleFingerKnuckle, .middleFingerIntermediateBase, .middleFingerIntermediateTip, .middleFingerTip,
-                        .ringFingerMetacarpal, .ringFingerKnuckle, .ringFingerIntermediateBase, .ringFingerIntermediateTip, .ringFingerTip,
-                        .littleFingerMetacarpal, .littleFingerKnuckle, .littleFingerIntermediateBase, .littleFingerIntermediateTip, .littleFingerTip,
-                    ]
- 
-                    for (index, jointType) in jointTypes.enumerated() {
-                        guard let joint = handAnchor.handSkeleton?.joint(jointType) else {
-                            continue
-                        }
-                        // print(index)
-                        DataManager.shared.latestHandTrackingData.rightSkeleton.joints[index] = joint.anchorFromJointTransform
+                DataManager.shared.latestHandTrackingData.rightWrist = handAnchor.originFromAnchorTransform
+                // print(handAnchor.originFromAnchorTransform)
+                
+                let jointTypes: [HandSkeleton.JointName] = [
+                    .wrist,
+                    .thumbKnuckle, .thumbIntermediateBase, .thumbIntermediateTip, .thumbTip,
+                    .indexFingerMetacarpal, .indexFingerKnuckle, .indexFingerIntermediateBase, .indexFingerIntermediateTip, .indexFingerTip,
+                    .middleFingerMetacarpal, .middleFingerKnuckle, .middleFingerIntermediateBase, .middleFingerIntermediateTip, .middleFingerTip,
+                    .ringFingerMetacarpal, .ringFingerKnuckle, .ringFingerIntermediateBase, .ringFingerIntermediateTip, .ringFingerTip,
+                    .littleFingerMetacarpal, .littleFingerKnuckle, .littleFingerIntermediateBase, .littleFingerIntermediateTip, .littleFingerTip,
+                ]
+
+                for (index, jointType) in jointTypes.enumerated() {
+                    guard let joint = handAnchor.handSkeleton?.joint(jointType) else {
+                        continue
                     }
-                    
-                    // print("Updated right hand skeleton")
+                    // print(index)
+                    DataManager.shared.latestHandTrackingData.rightSkeleton.joints[index] = joint.anchorFromJointTransform
                 }
+                
+                // print("Updated right hand skeleton")
             }
             
         }
@@ -408,7 +404,8 @@ class HandTrackingServiceProvider: Handtracking_HandTrackingServiceProvider {
         // In a real application, you would replace this with actual data collection and streaming.
         print("⏱️ [DEBUG] Scheduling repeated task for hand tracking updates (10ms interval)...")
         var updateCount = 0
-        let task = eventLoop.scheduleRepeatedAsyncTask(initialDelay: .milliseconds(10), delay: .milliseconds(10)) { task -> EventLoopFuture<Void> in
+        // Reduce delay to increase frequency (compensating for execution time)
+        let task = eventLoop.scheduleRepeatedAsyncTask(initialDelay: .milliseconds(10), delay: .milliseconds(5)) { task -> EventLoopFuture<Void> in
 //            var handUpdate = Handtracking_HandUpdate()
             
             let recent_hand = fill_handUpdate()

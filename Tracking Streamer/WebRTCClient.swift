@@ -11,7 +11,7 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
     private var audioTrack: LKRTCAudioTrack?
     private var handDataChannel: LKRTCDataChannel?
     private var handStreamTask: Task<Void, Never>?
-    private let handStreamIntervalNanoseconds: UInt64 = 10_000_000
+    private let handStreamIntervalNanoseconds: UInt64 = 2_000_000
     
     var onFrameReceived: ((CVPixelBuffer) -> Void)?
     

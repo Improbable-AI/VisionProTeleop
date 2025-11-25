@@ -292,34 +292,41 @@ struct ImmersiveView: View {
             if isStereo {
                 // Stereo mode: Use the loaded ShaderGraphMaterial from RealityKitContent
                 do {
-                    // For stereo, we need to split the side-by-side image
-                    // Left half goes to left eye, right half to right eye
-                    let leftTexture = try TextureResource.generate(
-                        from: imageLeft.cgImage!,
-                        options: TextureResource.CreateOptions.init(semantic: nil)
-                    )
-                    let rightTexture = try TextureResource.generate(
-                        from: imageRight.cgImage!,
-                        options: TextureResource.CreateOptions.init(semantic: nil)
-                    )
-                    
                     // Get the stereo material from the loaded RealityKit entity
-                    if let sphereEntity = stereoMaterialEntity,
-                       var stereoMaterial = sphereEntity.components[ModelComponent.self]?.materials.first as? ShaderGraphMaterial {
-                        // Update the material parameters with new textures
-                        try stereoMaterial.setParameter(name: "left", value: .textureResource(leftTexture))
-                        try stereoMaterial.setParameter(name: "right", value: .textureResource(rightTexture))
-                        
-                        // Apply the stereo material to the video plane
-                        skyBox.components[ModelComponent.self]?.materials = [stereoMaterial]
-                        print("✅ DEBUG: Updated stereo textures successfully (left + right)")
-                    } else {
+                    guard let sphereEntity = stereoMaterialEntity,
+                          var stereoMaterial = sphereEntity.components[ModelComponent.self]?.materials.first as? ShaderGraphMaterial else {
                         // Fallback if stereo material isn't loaded yet
                         print("⚠️ WARNING: StereoMaterial not loaded yet, falling back to mono display")
                         var skyBoxMaterial = UnlitMaterial()
-                        skyBoxMaterial.color = .init(texture: .init(rightTexture))
+                        var textureOptions = TextureResource.CreateOptions(semantic: .hdrColor)
+                        textureOptions.mipmapsMode = .none
+                        let texture = try TextureResource.generate(from: imageRight.cgImage!, options: textureOptions)
+                        skyBoxMaterial.color = .init(texture: .init(texture))
                         skyBox.components[ModelComponent.self]?.materials = [skyBoxMaterial]
+                        return
                     }
+                    
+                    // Use .hdrColor for linear color space without conversions
+                    var textureOptions = TextureResource.CreateOptions(semantic: .hdrColor)
+                    textureOptions.mipmapsMode = .none  // No mipmaps to avoid filtering artifacts
+                    
+                    // Generate textures directly from CGImages (skip UIImage wrapper overhead)
+                    let leftTexture = try TextureResource.generate(
+                        from: imageLeft.cgImage!,
+                        options: textureOptions
+                    )
+                    let rightTexture = try TextureResource.generate(
+                        from: imageRight.cgImage!,
+                        options: textureOptions
+                    )
+                    
+                    // Update the material parameters with new textures
+                    try stereoMaterial.setParameter(name: "left", value: .textureResource(leftTexture))
+                    try stereoMaterial.setParameter(name: "right", value: .textureResource(rightTexture))
+                    
+                    // Apply the stereo material to the video plane
+                    skyBox.components[ModelComponent.self]?.materials = [stereoMaterial]
+                    print("✅ DEBUG: Updated stereo textures successfully (left + right)")
                 } catch {
                     print("❌ ERROR: Failed to load stereo textures: \(error)")
                 }
@@ -328,9 +335,13 @@ struct ImmersiveView: View {
                 var skyBoxMaterial = UnlitMaterial()
                 do {
                     // Use right image for mono display
+                    // Use .hdrColor for linear color space without conversions
+                    var textureOptions = TextureResource.CreateOptions(semantic: .hdrColor)
+                    textureOptions.mipmapsMode = .none  // No mipmaps to avoid filtering artifacts
+                    
                     let texture = try TextureResource.generate(
                         from: imageRight.cgImage!,
-                        options: TextureResource.CreateOptions.init(semantic: nil)
+                        options: textureOptions
                     )
                     skyBoxMaterial.color = .init(texture: .init(texture))
                     
@@ -714,9 +725,11 @@ class VideoFrameRenderer: NSObject, LKRTCVideoRenderer {
             let isStereo = DataManager.shared.stereoEnabled
             
             if isStereo {
-                let (leftImage, rightImage) = self.splitSideBySideImage(uiImage)
-                self.imageData?.left = leftImage
-                self.imageData?.right = rightImage
+                // Optimize: Return CGImages directly instead of wrapping in UIImage
+                if let (leftCG, rightCG) = self.splitSideBySideImage(uiImage) {
+                    self.imageData?.left = UIImage(cgImage: leftCG)
+                    self.imageData?.right = UIImage(cgImage: rightCG)
+                }
             } else {
                 self.imageData?.left = uiImage
                 self.imageData?.right = uiImage
@@ -725,9 +738,9 @@ class VideoFrameRenderer: NSObject, LKRTCVideoRenderer {
     }
 
     
-    private func splitSideBySideImage(_ image: UIImage) -> (UIImage, UIImage) {
+    private func splitSideBySideImage(_ image: UIImage) -> (CGImage, CGImage)? {
         guard let cgImage = image.cgImage else {
-            return (image, image)
+            return nil
         }
         
         let width = cgImage.width
@@ -737,18 +750,16 @@ class VideoFrameRenderer: NSObject, LKRTCVideoRenderer {
         // Crop left half
         let leftRect = CGRect(x: 0, y: 0, width: halfWidth, height: height)
         guard let leftCGImage = cgImage.cropping(to: leftRect) else {
-            return (image, image)
+            return nil
         }
-        let leftImage = UIImage(cgImage: leftCGImage)
         
         // Crop right half
         let rightRect = CGRect(x: halfWidth, y: 0, width: halfWidth, height: height)
         guard let rightCGImage = cgImage.cropping(to: rightRect) else {
-            return (image, image)
+            return nil
         }
-        let rightImage = UIImage(cgImage: rightCGImage)
         
-        return (leftImage, rightImage)
+        return (leftCGImage, rightCGImage)
     }
 
     private func handleBenchmarkPayload(_ payload: (sequence: UInt32, sentTimestampMs: UInt32)) {

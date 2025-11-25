@@ -74,9 +74,9 @@ def Xform "Root"
             uniform token info:id = "ND_UsdPreviewSurface_surfaceshader"
             color3f inputs:diffuseColor = (0, 0, 0)
             color3f inputs:emissiveColor.connect = </Root/StereoMaterial/GeometrySwitchCameraIndex.outputs:out>
-            float inputs:metallic
-            float inputs:opacity
-            float inputs:roughness
+            float inputs:metallic = 0
+            float inputs:opacity = 1
+            float inputs:roughness = 1
             token outputs:out
             float2 ui:nodegraph:node:pos = (506.33984, 110.46875)
             float2 ui:nodegraph:node:size = (148.5, 210.5)

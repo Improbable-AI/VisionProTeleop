@@ -57,6 +57,11 @@ class VisionProStreamer:
         self.camera = None  # Processed video track (accessible after start_streaming)
         self.user_frame = None  # User-provided frame to override camera input
         self.benchmark_quiet = benchmark_quiet  # Suppress benchmark print statements
+        
+        # Audio/Video synchronization state
+        self._latest_cached = None  # Thread-local cache to reduce lock contention
+        self._latest_cache_time = 0  # Timestamp of cached data
+        self._av_sync_epoch = None  # Shared A/V timing reference
 
         self._latest_lock = Lock()
         self._webrtc_hand_channel = None
@@ -273,7 +278,7 @@ class VisionProStreamer:
                 else:
                     break 
 
-    def get_latest(self): 
+    def get_latest(self, use_cache=False, cache_ms=10): 
         """Return the most recent tracking sample.
 
         Keys in the returned dict:
@@ -283,6 +288,8 @@ class VisionProStreamer:
           - left_pinch_distance / right_pinch_distance (float): Thumb–index pinch distance (m)
           - left_wrist_roll / right_wrist_roll (float): Axial wrist rotation (rad)
 
+        :param use_cache: If True, return cached data if recent enough (reduces lock contention)
+        :param cache_ms: Cache validity in milliseconds (default: 10ms)
         :return: Tracking dictionary or None if not yet available.
         :rtype: dict | None
 
@@ -293,8 +300,20 @@ class VisionProStreamer:
             if sample:
                 left_pos = sample["left_wrist"][0, :3, 3]
         """
-        with self._latest_lock:
-            return self.latest
+        if use_cache:
+            current_time = time.perf_counter()
+            if (self._latest_cached is not None and 
+                (current_time - self._latest_cache_time) < (cache_ms / 1000.0)):
+                return self._latest_cached
+            
+            # Cache expired, update it
+            with self._latest_lock:
+                self._latest_cached = self.latest
+                self._latest_cache_time = current_time
+                return self._latest_cached
+        else:
+            with self._latest_lock:
+                return self.latest
         
     def get_recording(self): 
         """Return a copy of all recorded tracking samples (requires `record=True`).
@@ -599,6 +618,7 @@ class VisionProStreamer:
         # Define custom audio track for audio processing
         class ProcessedAudioTrack(AudioStreamTrack):
             kind = "audio"
+            _track_counter = 0  # Class-level counter for unique track IDs
             
             def __init__(self, audio_device, audio_fmt, callback, stereo=False, sample_rate=None):
                 super().__init__()
@@ -647,6 +667,13 @@ class VisionProStreamer:
                     from av import AudioFrame
                     import numpy as np
                     
+                    # Synchronize with video timing if available
+                    if streamer_instance._av_sync_epoch is None:
+                        streamer_instance._av_sync_epoch = asyncio.get_event_loop().time()
+                    
+                    if self.start_time is None:
+                        self.start_time = streamer_instance._av_sync_epoch
+                    
                     # Create blank audio frame (silence)
                     layout = 'stereo' if self.stereo else 'mono'
                     frame = AudioFrame(format='s16', layout=layout, samples=self.samples_per_frame)
@@ -664,16 +691,16 @@ class VisionProStreamer:
                     if self.frame_count < 3:
                         print(f"🎤 Generated audio frame #{self.frame_count}: {self.samples_per_frame} samples, {frame.sample_rate}Hz, {layout}")
                     
-                    # Throttle audio generation to match expected timing (reduce CPU)
-                    if self.start_time is None:
-                        self.start_time = asyncio.get_event_loop().time()
-                    
+                    # Precise timing control with jitter compensation
                     expected_time = self.start_time + (self.frame_count * self.samples_per_frame / self.sample_rate)
                     current_time = asyncio.get_event_loop().time()
                     sleep_time = expected_time - current_time
                     
+                    # Adaptive timing: sleep if ahead, reset if too far behind
                     if sleep_time > 0:
                         await asyncio.sleep(sleep_time)
+                    elif sleep_time < -0.05:  # More than 50ms behind - reset to avoid drift
+                        self.start_time = current_time - (self.frame_count * self.samples_per_frame / self.sample_rate)
                     
                     # Apply callback if registered (callback should generate audio)
                     if self.callback is not None:
@@ -681,7 +708,7 @@ class VisionProStreamer:
                             processed_frame = self.callback(frame)
                             self.frame_count += 1
                             if self.frame_count == 10:
-                                print(f"🎤 Audio streaming normally (generated {self.frame_count} frames, 20ms per frame)")
+                                print(f"🎤 Audio streaming normally (generated {self.frame_count} frames, ~20ms per frame)")
                             return processed_frame
                         except Exception as e:
                             print(f"⚠️  Audio callback error: {e}")
@@ -792,9 +819,12 @@ class VisionProStreamer:
                         return new_frame
                 else:
                     # Generate frame programmatically
-                    # Wait to maintain target FPS
+                    # Synchronize with audio timing if available
+                    if streamer_instance._av_sync_epoch is None:
+                        streamer_instance._av_sync_epoch = asyncio.get_event_loop().time()
+                    
                     if self.start_time is None:
-                        self.start_time = asyncio.get_event_loop().time()
+                        self.start_time = streamer_instance._av_sync_epoch
 
                     target_time = self.start_time + (self.frame_count / self.fps)
                     current_time = asyncio.get_event_loop().time()
@@ -802,11 +832,10 @@ class VisionProStreamer:
                     
                     if wait_time > 0:
                         await asyncio.sleep(wait_time)
-                    elif wait_time < -0.01:
-                        # Reset clock if we are behind by more than 10ms to prevent buffer bloat
-                        # This ensures we don't burst frames to catch up
+                    elif wait_time < -0.05:
+                        # Reset clock if we are behind by more than 50ms to prevent buffer bloat
                         if wait_time < -0.1:
-                            print(f"⚠️  Streamer lag {-wait_time*1000:.0f}ms - resetting clock")
+                            print(f"⚠️  Video lag {-wait_time*1000:.0f}ms - resetting clock")
                         self.start_time = current_time - (self.frame_count / self.fps)
                     
                     # Check if user provided a frame override
