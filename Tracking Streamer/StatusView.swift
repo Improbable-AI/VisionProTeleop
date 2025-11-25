@@ -106,7 +106,7 @@ struct StatusOverlay: View {
     }
     
     private var minimizedView: some View {
-        HStack(spacing: 24) {
+        HStack(spacing: 16) {
             // Expand button
             Button {
                 withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
@@ -117,9 +117,9 @@ struct StatusOverlay: View {
                 ZStack {
                     Circle()
                         .fill(Color.white.opacity(0.3))
-                        .frame(width: 60, height: 60)
+                        .frame(width: 42, height: 42)
                     Image(systemName: "arrow.up.left.and.arrow.down.right")
-                        .font(.system(size: 24, weight: .bold))
+                        .font(.system(size: 18, weight: .bold))
                         .foregroundColor(.white)
                 }
             }
@@ -135,9 +135,9 @@ struct StatusOverlay: View {
                     ZStack {
                         Circle()
                             .fill(Color.blue.opacity(0.8))
-                            .frame(width: 60, height: 60)
+                            .frame(width: 42, height: 42)
                         Image(systemName: videoMinimized ? "video.fill" : "video.slash.fill")
-                            .font(.system(size: 24, weight: .bold))
+                            .font(.system(size: 18, weight: .bold))
                             .foregroundColor(.white)
                     }
                 }
@@ -153,9 +153,9 @@ struct StatusOverlay: View {
                 ZStack {
                     Circle()
                         .fill(videoFixed ? Color.orange.opacity(0.8) : Color.white.opacity(0.3))
-                        .frame(width: 60, height: 60)
+                        .frame(width: 42, height: 42)
                     Image(systemName: videoFixed ? "lock.fill" : "lock.open.fill")
-                        .font(.system(size: 24, weight: .bold))
+                        .font(.system(size: 18, weight: .bold))
                         .foregroundColor(.white)
                 }
             }
@@ -167,24 +167,24 @@ struct StatusOverlay: View {
                 ZStack {
                     Circle()
                         .fill(Color.red)
-                        .frame(width: 60, height: 60)
+                        .frame(width: 42, height: 42)
                     Text("✕")
-                        .font(.system(size: 27, weight: .bold))
+                        .font(.system(size: 20, weight: .bold))
                         .foregroundColor(.white)
                 }
             }
             .buttonStyle(.plain)
-            .confirmationDialog("Are you sure you want to exit?", isPresented: $showExitConfirmation, titleVisibility: .visible) {
-                Button("Exit", role: .destructive) {
-                    exit(0)
-                }
-                Button("Cancel", role: .cancel) {}
-            }
         }
-        .padding(30)
+        .padding(20)
         .background(Color.black.opacity(0.6))
-        .cornerRadius(36)
+        .cornerRadius(25)
         .fixedSize()
+        .confirmationDialog("Are you sure you want to exit?", isPresented: $showExitConfirmation, titleVisibility: .visible) {
+            Button("Exit", role: .destructive) {
+                exit(0)
+            }
+            Button("Cancel", role: .cancel) {}
+        }
     }
     
     private var expandedView: some View {
@@ -822,14 +822,14 @@ struct StatusPreviewView: View {
     let videoFixed: Bool
     
     var body: some View {
-        HStack(spacing: 24) {
+        HStack(spacing: 16) {
             // Expand button (non-functional in preview)
             ZStack {
                 Circle()
                     .fill(Color.white.opacity(0.3))
-                    .frame(width: 60, height: 60)
+                    .frame(width: 42, height: 42)
                 Image(systemName: "arrow.up.left.and.arrow.down.right")
-                    .font(.system(size: 24, weight: .bold))
+                    .font(.system(size: 18, weight: .bold))
                     .foregroundColor(.white)
             }
             
@@ -838,9 +838,9 @@ struct StatusPreviewView: View {
                 ZStack {
                     Circle()
                         .fill(Color.blue.opacity(0.8))
-                        .frame(width: 60, height: 60)
+                        .frame(width: 42, height: 42)
                     Image(systemName: "video.fill")
-                        .font(.system(size: 24, weight: .bold))
+                        .font(.system(size: 18, weight: .bold))
                         .foregroundColor(.white)
                 }
             }
@@ -848,9 +848,9 @@ struct StatusPreviewView: View {
             ZStack {
                 Circle()
                     .fill(videoFixed ? Color.orange.opacity(0.8) : Color.white.opacity(0.3))
-                    .frame(width: 60, height: 60)
+                    .frame(width: 42, height: 42)
                 Image(systemName: videoFixed ? "lock.fill" : "lock.open.fill")
-                    .font(.system(size: 24, weight: .bold))
+                    .font(.system(size: 18, weight: .bold))
                     .foregroundColor(.white)
             }
             
@@ -858,15 +858,15 @@ struct StatusPreviewView: View {
             ZStack {
                 Circle()
                     .fill(Color.red)
-                    .frame(width: 60, height: 60)
+                    .frame(width: 42, height: 42)
                 Text("✕")
-                    .font(.system(size: 27, weight: .bold))
+                    .font(.system(size: 20, weight: .bold))
                     .foregroundColor(.white)
             }
         }
-        .padding(30)
+        .padding(20)
         .background(Color.black.opacity(0.6))
-        .cornerRadius(36)
+        .cornerRadius(25)
         .fixedSize()
         .opacity(0.5)  // 50% transparent
     }

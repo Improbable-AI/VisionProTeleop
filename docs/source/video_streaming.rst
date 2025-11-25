@@ -32,7 +32,7 @@ Start Streaming from Python
    avp_ip = "10.31.181.201"
    s = VisionProStreamer(ip=avp_ip)
    
-   s.start_video_streaming(
+   s.start_streaming(
        device="/dev/video0",
        format="v4l2",
        size="640x480",
@@ -97,7 +97,7 @@ Common Configurations
 
 .. code-block:: python
 
-   s.start_video_streaming(
+   s.start_streaming(
        device="/dev/video0",
        format="v4l2",
        size="640x480",
@@ -108,7 +108,7 @@ Common Configurations
 
 .. code-block:: python
 
-   s.start_video_streaming(
+   s.start_streaming(
        device="0",
        format="dshow",
        size="640x480",
@@ -119,7 +119,7 @@ Common Configurations
 
 .. code-block:: python
 
-   s.start_video_streaming(
+   s.start_streaming(
        device="0",
        format="avfoundation",
        size="1280x720",
@@ -136,7 +136,7 @@ For stereo cameras that output side-by-side images:
 
 .. code-block:: python
 
-   s.start_video_streaming(
+   s.start_streaming(
        device="/dev/video0",
        format="v4l2",
        size="1280x480",  # Width is double for side-by-side
@@ -165,7 +165,7 @@ Add custom processing to frames before streaming:
        return frame
    
    s.register_frame_callback(add_overlay)
-   s.start_video_streaming(
+   s.start_streaming(
        device="/dev/video0",
        format="v4l2",
        size="640x480",
@@ -222,7 +222,7 @@ Generate frames without a physical camera (useful for simulation):
        return frame
    
    s.register_frame_callback(generate_synthetic_frame)
-   s.start_video_streaming(
+   s.start_streaming(
        device=None,    # No physical device
        format=None,    # No format needed
        size="1280x720",
@@ -247,90 +247,10 @@ Example with Isaac Gym or other simulators:
        return frame
    
    s.register_frame_callback(get_simulation_frame)
-   s.start_video_streaming(
+   s.start_streaming(
        device=None,
        format=None,
        size="1280x720",
        fps=30
    )
 
-Performance Optimization
-------------------------
-
-Resolution Guidelines
-^^^^^^^^^^^^^^^^^^^^^
-
-Choose resolution based on your use case:
-
-- **640x480**: Low bandwidth, good for monitoring, ~1-2 Mbps
-- **1280x720**: Balance of quality and bandwidth, ~3-5 Mbps
-- **1920x1080**: High quality, requires good WiFi, ~8-12 Mbps
-
-Frame Rate Guidelines
-^^^^^^^^^^^^^^^^^^^^^
-
-- **30 fps**: Standard, works well for most applications
-- **60 fps**: Smoother motion, requires 2x bandwidth
-- **15-20 fps**: Acceptable for slow-moving scenarios, saves bandwidth
-
-Reducing Latency
-^^^^^^^^^^^^^^^^
-
-1. **Use a 5GHz WiFi network** (lower congestion)
-2. **Reduce resolution** if latency is high
-3. **Ensure good signal strength** between Vision Pro and router
-4. **Minimize WiFi network traffic** from other devices
-5. **Use wired connection** for the robot if possible
-
-Monitoring Performance
-^^^^^^^^^^^^^^^^^^^^^^
-
-Check the Vision Pro status window for:
-
-- Current frame rate
-- Connection quality
-- Latency indicators
-
-Troubleshooting
----------------
-
-No Video Appears
-^^^^^^^^^^^^^^^^
-
-1. Verify you clicked "START with Video Streaming" on Vision Pro
-2. Check that ``start_video_streaming()`` was called successfully
-3. Ensure camera is not being used by another application
-4. Check the camera parameters are correct
-
-Poor Video Quality
-^^^^^^^^^^^^^^^^^^
-
-1. Increase resolution (if bandwidth allows)
-2. Check WiFi signal strength
-3. Reduce other network traffic
-4. Verify camera supports the requested quality
-
-High Latency
-^^^^^^^^^^^^
-
-1. Switch to 5GHz WiFi if available
-2. Reduce resolution or frame rate
-3. Move closer to WiFi router
-4. Check for network congestion
-
-Frame Drops
-^^^^^^^^^^^
-
-1. Reduce frame rate or resolution
-2. Check CPU usage (processing callbacks may be too heavy)
-3. Verify WiFi stability
-4. Simplify frame processing callbacks
-
-Examples
---------
-
-See the ``examples/`` directory for complete working examples:
-
-- ``01_stream_from_camera.py``: Basic camera streaming
-- ``02_process_frames.py``: Frame processing pipeline
-- ``03_synthetic_frames.py``: Synthetic frame generation

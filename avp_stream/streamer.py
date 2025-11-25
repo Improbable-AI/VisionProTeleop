@@ -22,6 +22,23 @@ YUP2ZUP = np.array([[[1, 0, 0, 0],
 class VisionProStreamer:
 
     def __init__(self, ip, record=True, ht_backend="grpc", benchmark_quiet=False):
+        """Initialize the VisionProStreamer.
+
+        Parameters
+        ----------
+        ip : str
+            Vision Pro IP address (shown inside the Tracking Streamer app – pick the wired one when using `setup-avp-wired`).
+        record : bool, default True
+            If True, every processed hand tracking sample is appended to an internal list retrievable via `get_recording()`.
+        ht_backend : {"grpc","webrtc"}, default "grpc"
+            Transport used for hand tracking. Use "webrtc" for lower latency after a WebRTC session is established.
+        benchmark_quiet : bool, default False
+            Suppress benchmark printouts (see latency measurements in `latency_test.py`).
+
+        Notes
+        -----
+        Instantiates background threads immediately: (1) gRPC hand tracking stream and (2) HTTP info server for WebRTC discovery.
+        """
 
         # Vision Pro IP 
         self.ip = ip
@@ -37,7 +54,7 @@ class VisionProStreamer:
         self.info_server = None  # HTTP server for sharing WebRTC address
         self.frame_callback = None  # User-registered frame processing function
         self.audio_callback = None  # User-registered audio processing function
-        self.camera = None  # Processed video track (accessible after start_video_streaming)
+        self.camera = None  # Processed video track (accessible after start_streaming)
         self.user_frame = None  # User-provided frame to override camera input
         self.benchmark_quiet = benchmark_quiet  # Suppress benchmark print statements
 
@@ -157,7 +174,7 @@ class VisionProStreamer:
         
         print(f"Hand tracking backend set to {self.ht_backend.upper()}")
         if self.ht_backend == "webrtc":
-            print("Note: WebRTC hand tracking requires an active WebRTC session (start_video_streaming).")
+            print("Note: WebRTC hand tracking requires an active WebRTC session (start_streaming).")
         print('Waiting for hand tracking data...')
         retry_count = 0
         while self.latest is None: 
@@ -257,10 +274,42 @@ class VisionProStreamer:
                     break 
 
     def get_latest(self): 
+        """Return the most recent tracking sample.
+
+        Keys in the returned dict:
+          - head (1,4,4 ndarray): Head pose (Z-up)
+          - left_wrist / right_wrist (1,4,4 ndarray): Wrist poses
+          - left_fingers / right_fingers (25,4,4 ndarray): Finger joints in wrist frame
+          - left_pinch_distance / right_pinch_distance (float): Thumb–index pinch distance (m)
+          - left_wrist_roll / right_wrist_roll (float): Axial wrist rotation (rad)
+
+        :return: Tracking dictionary or None if not yet available.
+        :rtype: dict | None
+
+        Example::
+            streamer = VisionProStreamer(ip=avp_ip)
+            streamer.start_streaming(device="0:none", format="avfoundation")
+            sample = streamer.get_latest()
+            if sample:
+                left_pos = sample["left_wrist"][0, :3, 3]
+        """
         with self._latest_lock:
             return self.latest
         
     def get_recording(self): 
+        """Return a copy of all recorded tracking samples (requires `record=True`).
+
+        Each element is a dict identical to `get_latest()`. Useful for offline analysis or saving to disk.
+
+        Example
+        -------
+        .. code-block:: python
+
+            streamer = VisionProStreamer(ip=avp_ip, record=True)
+            # ... run for a while
+            samples = streamer.get_recording()
+            print(f"Collected {len(samples)} frames")
+        """
         with self._latest_lock:
             return list(self.recording)
     
@@ -288,14 +337,29 @@ class VisionProStreamer:
                      and returns a processed numpy array of the same shape.
                      Example: lambda frame: cv2.putText(frame, "Hello", (10,30), ...)
         
-        Example:
-            def my_processor(frame):
-                import cv2
-                return cv2.putText(frame, "Hello VisionPro!", (50, 50), 
-                                  cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            
-            streamer.register_frame_callback(my_processor)
-            streamer.start_video_streaming()
+        Examples
+        --------
+        Camera overlay (``examples/04_process_frames.py``)::
+
+            def add_text(frame):
+                return cv2.putText(frame, "Hello VisionPro!", (50,50), cv2.FONT_HERSHEY_SIMPLEX, 1,
+                                   (0,255,0), 2)
+            streamer.register_frame_callback(add_text)
+            streamer.start_streaming(device="0:none", format="avfoundation")
+
+        Synthetic visualization (``examples/01_visualize_hand_callback.py``)::
+
+            def hand_visualizer(blank):
+                latest = streamer.get_latest()
+                # draw wrists/fingers on blank
+                return blank
+            streamer.register_frame_callback(hand_visualizer)
+            streamer.start_streaming(device=None, size="1280x720", fps=60)
+
+        Stereo depth visualization (``examples/07_stereo_depth_visualization.py``)::
+
+            streamer.register_frame_callback(create_stereo_depth_visualizer(streamer, disparity_scale=100))
+            streamer.start_streaming(device=None, stereo_video=True, size="2000x1000")
         """
         self.frame_callback = callback
         print(f"✓ Frame callback registered: {callback.__name__ if hasattr(callback, '__name__') else 'anonymous function'}")
@@ -308,14 +372,25 @@ class VisionProStreamer:
             callback: A function that takes an AudioFrame and returns a processed AudioFrame.
                      The AudioFrame has properties: samples (numpy array), sample_rate, channels.
         
-        Example:
-            def my_audio_processor(frame):
-                # Apply volume boost
-                frame.samples = frame.samples * 1.5
+        Examples
+        --------
+        Microphone processing (simple gain)::
+
+            def boost(frame):
+                frame.samples = frame.samples * 1.2
                 return frame
-            
-            streamer.register_audio_callback(my_audio_processor)
-            streamer.start_video_streaming(audio_device=":0")
+            streamer.register_audio_callback(boost)
+            streamer.start_streaming(audio_device=":0")
+
+        Pinch-triggered beeps (``examples/01_visualize_hand_with_audio_callback.py``)::
+
+            streamer.register_audio_callback(beep_audio_generator(streamer))
+            streamer.start_streaming(device=None, audio_device=None)
+
+        Looping audio file (``examples/06_stream_audio_file.py``)::
+
+            streamer.register_audio_callback(audio_file_streamer("music.mp3", stereo=True))
+            streamer.start_streaming(device=None, stereo_audio=True)
         """
         self.audio_callback = callback
         print(f"✓ Audio callback registered: {callback.__name__ if hasattr(callback, '__name__') else 'anonymous function'}")
@@ -327,16 +402,21 @@ class VisionProStreamer:
         
         Args:
             user_frame: A numpy array in BGR24 format (H, W, 3) to send instead of camera input.
-                       Should match the resolution specified in start_video_streaming().
+                       Should match the resolution specified in start_streaming().
         
-        Example:
-            import numpy as np
-            
-            # Create a custom frame
-            frame = np.zeros((480, 640, 3), dtype=np.uint8)
-            frame[:, :] = [0, 255, 0]  # Green frame
-            
+        Examples
+        --------
+        Single override while camera running::
+
+            frame = np.zeros((480,640,3), dtype=np.uint8); frame[:] = (0,255,0)
             streamer.update_frame(frame)
+
+        Continuous manual generation (``examples/01_visualize_hand_direct.py``)::
+
+            while True:
+                frame = generate_hand_visualization(streamer, width=1280, height=720)
+                streamer.update_frame(frame)
+                time.sleep(1/60.)
         """
         self.user_frame = user_frame
 
@@ -349,7 +429,14 @@ class VisionProStreamer:
         return self._benchmark_epoch
 
     def update_stream_resolution(self, size):
-        """Request the video track to emit frames at a new resolution."""
+        """Request the video track to emit frames at a new resolution.
+
+        Example
+        -------
+        .. code-block:: python
+
+            streamer.update_stream_resolution("1024x768")
+        """
         if self.camera is None:
             print("⚠️  Cannot update stream resolution before starting video streaming")
             return
@@ -431,18 +518,21 @@ class VisionProStreamer:
         info_thread = Thread(target=run_http_server, daemon=True)
         info_thread.start()
     
-    def start_video_streaming(
+    def start_streaming(
         self,
-        device="0:none",
-        format="avfoundation",
-        fps=30,
+        # Video configuration
+        device=None,
+        format=None,
         size="640x480",
-        port=9999,
+        fps=30,
         stereo_video=False,
-        stereo_audio=False,
+        # Audio configuration
         audio_device=None,
         audio_format=None,
         audio_sample_rate=None,
+        stereo_audio=False,
+        # Network configuration
+        port=9999,
     ):
         """
         Start WebRTC video streaming server with optional audio.

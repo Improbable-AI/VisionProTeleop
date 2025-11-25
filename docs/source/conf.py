@@ -36,6 +36,9 @@ html_theme_options = {
     'includehidden': True,
     'titles_only': False,
 }
+html_js_files = [
+    'remove_prefix.js',  # strip VisionProStreamer. from method names in signatures
+]
 
 # -- Extension configuration -------------------------------------------------
 autodoc_member_order = 'bysource'

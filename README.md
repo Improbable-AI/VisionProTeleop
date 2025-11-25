@@ -2,7 +2,7 @@ VisionProTeleop
 ===========
 
 
-> **🎉 UPDATE: Now supporting Low-Latency Video Streaming!** You can now stream back your robot's camera feed back to Vision Pro via webRTC protocol, alongside the original hand tracking data stream. No complicated network setting required.  Update the app, `pip install --upgrade avp_stream`, and you're done!
+> **🎉 UPDATE: Now supporting Low-Latency Video Streaming!** You can now stream back your robot's video/audio feed back to Vision Pro via webRTC protocol, alongside the original hand tracking data stream. No complicated network setting required.  Update the app, `pip install --upgrade avp_stream`, and you're done!
 
 
 <div align="center">
@@ -22,9 +22,9 @@ VisionProTeleop
 
 
 
-This VisionOS app and python library streams your Head + Wrist + Hand Tracking result via gRPC over a WiFi network, so any robots connected to the same wifi network can subscribe and use. **It can also stream stereo (or mono) camera feeds from your robot, back to the Vision Pro.**
+This VisionOS app and python library streams your Head + Wrist + Hand Tracking result via gRPC over a WiFi network, so any robots connected to the same wifi network can subscribe and use. **It can also stream stereo (or mono) video / audio feeds from your robot, back to the Vision Pro.**
 
-> **For a more detailed explanation, check out this short [paper](./assets/short_paper_new.pdf).**
+> **For a more detailed explanation, check out this short [paper](./assets/short_paper_new.pdf).*
 
 
 [![Star History Chart](https://api.star-history.com/svg?repos=improbable-ai/visionproteleop&type=date&legend=top-left)](https://www.star-history.com/#improbable-ai/visionproteleop&type=date&legend=top-left)
@@ -32,11 +32,19 @@ This VisionOS app and python library streams your Head + Wrist + Hand Tracking r
 
 ## Benchmark Results
 
-We performed comprehensive glass-to-glass latency measurements to evaluate the end-to-end performance of our video streaming system. The results show consistently low latency across all tested resolutions, with wired connections achieving **~20ms** at lower resolutions and wireless connections maintaining **~50-100ms** even at 4K.
+We performed comprehensive round-trip latency measurements to benchmark our video streaming system. The measurement captures the full cycle: 
+1. Python encodes a timestamp into a video frame as a marker
+2. WebRTC transmission happens over the network
+3. Vision Pro decodes the image, and reads the marekr
+4. sends timing data back via gRPC 
+5. Python calculates latency. 
+
+This provides a conservative upper bound on user-experienced latency. According to our own testing, the system can consistently hit under 100ms both in wired mode and wireless mode for resolution under 720p. When wired up (requires developer strap), you can get stable 50ms latency even for **stereo 4K streaming**. 
 
 For detailed methodology, test configurations, and complete results, see the **[Benchmark Documentation](docs/benchmark.md)**.
 
 ![](comparison.png)
+
 
 
 ## How to Use
@@ -92,7 +100,7 @@ while True:
 
 ### Step 4. [🎉V2 Update🎉] Stream video feeds back to Vision Pro! 
 
-Streaming your robot's video feed back to Vision Pro requires one additional line: `start_video_streaming`. This feature is only supported on the latest version of the VisionOS app, and python package. Make sure you upgrade both python library / visionOS app. 
+Streaming your robot's video feed back to Vision Pro requires one additional line: `start_streaming`. This feature is only supported on the latest version of the VisionOS app, and python package. Make sure you upgrade both python library / visionOS app. 
 
 ```python
 from avp_stream import VisionProStreamer
@@ -101,8 +109,8 @@ s = VisionProStreamer(ip = avp_ip)
 
 # you can simply start a video stream 
 # by defining which video device you want to use
-s.start_video_streaming(device="/dev/video0", format="v4l2", \
-                        size="640x480", fps=30, stereo=False)
+s.start_streaming(device="/dev/video0", format="v4l2", \
+                        size="640x480", fps=30, stereo_video=False)
 
 while True:
     r = s.latest
@@ -116,7 +124,7 @@ You can also:
   s = VisionProStreamer(ip = avp_ip)
   # define your own image processing function, and register
   s.register_frame_callback(my_own_processor)
-  s.start_video_streaming(device="/dev/video0", format="v4l2", \
+  s.start_streaming(device="/dev/video0", format="v4l2", \
                         size="640x480", fps=30)
   ```
 
@@ -124,8 +132,8 @@ You can also:
 
   ```python
   s = VisionProStreamer(ip = avp_ip)
-  s.start_video_streaming(device="/dev/video0", format="v4l2", \
-                        size="640x480", fps=30, stereo=True)
+  s.start_streaming(device="/dev/video0", format="v4l2", \
+                        size="640x480", fps=30, stereo_video=True)
   ```
 
 - work without a physical camera and send over synthetically generated frames (i.e., simulation renderings, or purely synthetic images)
@@ -133,8 +141,7 @@ You can also:
   s = VisionProStreamer(ip = avp_ip)
   # define your own image generating function, and register
   s.register_frame_callback(synthetic_frame_generator)
-  s.start_video_streaming(device = None, format = None, \
-                          size="1280x720", fps=60)
+  s.start_streaming(size="1280x720", fps=60)
   ```
 
 which is explained in detail in [examples](examples) folder. 
@@ -214,19 +221,3 @@ You can also modify the video viewport -- where and how the streamed video is pr
 
 We acknowledge support from Hyundai Motor Company and ARO MURI grant number W911NF-23-1-0277. 
 
-<!-- Misc 
-
-If you want to modify the message type, feel free to modify the `.proto` file. You can recompile the gRPC proto file as follows: 
-
-#### for Python
-
-```bash
-python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. handtracking.proto
-```
-
-
-#### for Swift
-```bash
-protoc handtracking.proto --swift_out=. --grpc-swift_out=.
-```
-After you recompile it, make sure you add it to the Xcode so the app can use the latest version of the swift_proto file.  -->

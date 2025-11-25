@@ -23,17 +23,6 @@ struct ContentView: View {
             }
             .padding(.top, 32)
             
-            if showSettings {
-                VStack(spacing: 16) {
-                    Text("Python Server IP:")
-                        .font(.title2)
-                    TextField("e.g., 10.29.239.70", text: $pythonServerIP)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.title3)
-                        .padding(.horizontal, 32)
-                        .multilineTextAlignment(.center)
-                }
-            }
             
             // Two start buttons side by side
             HStack(spacing: 40) {
@@ -119,19 +108,6 @@ struct ContentView: View {
             
             // Settings and Exit buttons
             HStack(spacing: 24) {
-                Button {
-                    showSettings.toggle()
-                } label: {
-                    ZStack {
-                        Circle()
-                            .fill(Color.gray.opacity(0.3))
-                            .frame(width: 50, height: 50)
-                        Image(systemName: "gearshape.fill")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                    }
-                }
-                .buttonStyle(.plain)
                 
                 Button {
                     exit(0)

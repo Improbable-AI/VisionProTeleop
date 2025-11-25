@@ -34,7 +34,7 @@ Quick Start
    s = VisionProStreamer(ip=avp_ip)
    
    # Optional: Start video streaming
-   s.start_video_streaming(device="/dev/video0", format="v4l2",
+   s.start_streaming(device="/dev/video0", format="v4l2",
                           size="640x480", fps=30, stereo=False)
    
    while True:
@@ -64,20 +64,12 @@ Contents
 
    installation
    quickstart
-   usage
-   data_format
-   video_streaming
-   examples
 
 .. toctree::
    :maxdepth: 2
    :caption: API Reference
 
    api/modules
-   api/streamer
-   api/isaac_env
-   api/utils
-   api/visual
 
 .. toctree::
    :maxdepth: 1

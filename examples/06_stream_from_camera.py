@@ -15,7 +15,7 @@ import time
 def main(args):
     streamer = VisionProStreamer(ip=args.ip, record=True)
     
-    streamer.start_video_streaming(
+    streamer.start_streaming(
         device="0:none",
         format="avfoundation",
         size = "640x480",

@@ -464,7 +464,7 @@ def run_benchmark(args: argparse.Namespace) -> Tuple[Dict[str, float], List[Dict
             print(f"🎧 Streaming audio sample rate: {audio_sample_rate} Hz")
 
     print("⏳ Waiting for VisionOS client to establish WebRTC connection...")
-    streamer.start_video_streaming(
+    streamer.start_streaming(
         device=None, 
         size=args.resolution, 
         fps=effective_fps,
@@ -577,7 +577,7 @@ def run_sweep(args: argparse.Namespace) -> Tuple[List[Dict[str, object]], List[T
                 print(f"🎧 Streaming audio sample rate: {audio_sample_rate} Hz")
 
         print("⏳ Waiting for VisionOS client to establish WebRTC connection...")
-        streamer.start_video_streaming(
+        streamer.start_streaming(
             device=None,
             size=base_resolution,
             fps=effective_fps,

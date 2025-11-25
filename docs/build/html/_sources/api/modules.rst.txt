@@ -1,12 +1,23 @@
-API Reference
-=============
+Python API
+============
 
-This section provides detailed API documentation for all modules.
+.. autoclass:: avp_stream.streamer.VisionProStreamer
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :special-members: __init__
 
-.. toctree::
-   :maxdepth: 2
+Bridge Setup
+------------
+.. automodule:: avp_stream.bridge_avp
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
-   streamer
-   isaac_env
-   utils
-   visual
+Latency Testing
+---------------
+.. automodule:: avp_stream.latency_test
+   :members:
+   :undoc-members:
+   :show-inheritance:
+

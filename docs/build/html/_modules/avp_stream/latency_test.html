@@ -1,0 +1,526 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>avp_stream.latency_test &mdash; VisionProTeleop 2.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=60dbed4a"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/remove_prefix.js?v=e2af7392"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            VisionProTeleop
+              <img src="../../_static/new-logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../installation.html#python-package">Python Package</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation.html#vision-pro-app">Vision Pro App</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../installation.html#app-store-installation">App Store Installation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../installation.html#manual-installation-development">Manual Installation (Development)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation.html#network-setup">Network Setup</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../installation.html#wifi-connection">WiFi Connection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../installation.html#wired-connection">Wired Connection</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quick Start</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../quickstart.html#basic-hand-tracking">Basic Hand Tracking</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../quickstart.html#with-video-streaming">With Video Streaming</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../quickstart.html#finding-the-right-camera-configuration">Finding the Right Camera Configuration</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api/modules.html">Python API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../api/modules.html#avp_stream.streamer.VisionProStreamer"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.streamer.VisionProStreamer.__init__"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.streamer.VisionProStreamer.stream"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.stream()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.streamer.VisionProStreamer.get_latest"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.get_latest()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.streamer.VisionProStreamer.get_recording"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.get_recording()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.streamer.VisionProStreamer.get_local_ip"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.get_local_ip()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.streamer.VisionProStreamer.register_frame_callback"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.register_frame_callback()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.streamer.VisionProStreamer.register_audio_callback"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.register_audio_callback()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.streamer.VisionProStreamer.update_frame"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.update_frame()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.streamer.VisionProStreamer.reset_benchmark_epoch"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.reset_benchmark_epoch()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.streamer.VisionProStreamer.update_stream_resolution"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.update_stream_resolution()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.streamer.VisionProStreamer.wait_for_benchmark_event"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.wait_for_benchmark_event()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.streamer.VisionProStreamer.start_streaming"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.start_streaming()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/modules.html#module-avp_stream.bridge_avp">Bridge Setup</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.bridge_avp.BridgeSetupError"><code class="docutils literal notranslate"><span class="pre">BridgeSetupError</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge"><code class="docutils literal notranslate"><span class="pre">VisionProBridge</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.check_prerequisites"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.check_prerequisites()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.run_command"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.run_command()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.detect_primary_interface_macos"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.detect_primary_interface_macos()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.detect_primary_interface_linux"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.detect_primary_interface_linux()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.is_wireless_interface"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.is_wireless_interface()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.detect_configuration"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.detect_configuration()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.setup_bridge_macos"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.setup_bridge_macos()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.setup_bridge_linux"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.setup_bridge_linux()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.create_cleanup_script_macos"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.create_cleanup_script_macos()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.create_cleanup_script_linux"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.create_cleanup_script_linux()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.setup"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.setup()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.bridge_avp.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/modules.html#module-avp_stream.latency_test">Latency Testing</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.latency_test.inject_benchmark_payload"><code class="docutils literal notranslate"><span class="pre">inject_benchmark_payload()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.latency_test.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Additional Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../acknowledgements.html">Acknowledgements</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../acknowledgements.html#research-team">Research Team</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../acknowledgements.html#related-projects">Related Projects</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../acknowledgements.html#publications">Publications</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../acknowledgements.html#contact">Contact</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../license.html">License</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../license.html#mit-license">MIT License</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../license.html#what-this-means">What This Means</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../license.html#third-party-licenses">Third-Party Licenses</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../license.html#attribution">Attribution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../license.html#disclaimer">Disclaimer</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">VisionProTeleop</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">avp_stream.latency_test</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for avp_stream.latency_test</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">cv2</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">tqdm</span><span class="w"> </span><span class="kn">import</span> <span class="n">tqdm</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">avp_stream.streamer</span><span class="w"> </span><span class="kn">import</span> <span class="n">VisionProStreamer</span>
+
+<div class="viewcode-block" id="inject_benchmark_payload">
+<a class="viewcode-back" href="../../api/modules.html#avp_stream.latency_test.inject_benchmark_payload">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">inject_benchmark_payload</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="n">sequence_id</span><span class="p">,</span> <span class="n">timestamp_ms</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Injects a 8x9 grid of 16x16 blocks encoding the benchmark payload.</span>
+<span class="sd">    </span>
+<span class="sd">    Payload Format (72 bits):</span>
+<span class="sd">    - Bits 0-7:   Magic Byte (0x5A)</span>
+<span class="sd">    - Bits 8-39:  Sequence ID (32-bit, Little Endian)</span>
+<span class="sd">    - Bits 40-71: Timestamp (32-bit, Little Endian)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">rows</span> <span class="o">=</span> <span class="mi">8</span>
+    <span class="n">cols</span> <span class="o">=</span> <span class="mi">9</span>
+    <span class="n">block_size</span> <span class="o">=</span> <span class="mi">16</span>
+    <span class="n">margin</span> <span class="o">=</span> <span class="mi">8</span>
+    <span class="n">magic</span> <span class="o">=</span> <span class="mh">0x5A</span>
+    
+    <span class="c1"># Construct the 72-bit payload</span>
+    <span class="c1"># We&#39;ll use a list of 0s and 1s</span>
+    <span class="n">bits</span> <span class="o">=</span> <span class="p">[]</span>
+    
+    <span class="c1"># 1. Magic Byte (8 bits) - MSB first for the byte itself? </span>
+    <span class="c1"># Swift: </span>
+    <span class="c1"># var magic: UInt8 = 0</span>
+    <span class="c1"># for bit in bits[0..&lt;8] { magic = (magic &lt;&lt; 1) | bit }</span>
+    <span class="c1"># So Swift reads MSB first (big-endian bit order within the byte).</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+        <span class="n">bits</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">magic</span> <span class="o">&gt;&gt;</span> <span class="n">i</span><span class="p">)</span> <span class="o">&amp;</span> <span class="mi">1</span><span class="p">)</span>
+        
+    <span class="c1"># 2. Sequence ID (32 bits)</span>
+    <span class="c1"># Swift:</span>
+    <span class="c1"># var sequence: UInt32 = 0</span>
+    <span class="c1"># for bit in bits[8..&lt;(8 + 32)] { sequence = (sequence &lt;&lt; 1) | UInt32(bit) }</span>
+    <span class="c1"># So Swift reads MSB first.</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">31</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+        <span class="n">bits</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">sequence_id</span> <span class="o">&gt;&gt;</span> <span class="n">i</span><span class="p">)</span> <span class="o">&amp;</span> <span class="mi">1</span><span class="p">)</span>
+        
+    <span class="c1"># 3. Timestamp (32 bits)</span>
+    <span class="c1"># Swift:</span>
+    <span class="c1"># var sentTimestamp: UInt32 = 0</span>
+    <span class="c1"># for bit in bits[(8 + 32)..&lt;(8 + 64)] { sentTimestamp = (sentTimestamp &lt;&lt; 1) | UInt32(bit) }</span>
+    <span class="c1"># So Swift reads MSB first.</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">31</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+        <span class="n">bits</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">timestamp_ms</span> <span class="o">&gt;&gt;</span> <span class="n">i</span><span class="p">)</span> <span class="o">&amp;</span> <span class="mi">1</span><span class="p">)</span>
+        
+    <span class="c1"># Draw the grid</span>
+    <span class="c1"># Swift reads row by row, then col by col:</span>
+    <span class="c1"># bits[row * benchmarkCols + col]</span>
+    
+    <span class="c1"># Draw background (black) for the ROI to ensure clean reading</span>
+    <span class="n">roi_width</span> <span class="o">=</span> <span class="n">cols</span> <span class="o">*</span> <span class="n">block_size</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">margin</span>
+    <span class="n">roi_height</span> <span class="o">=</span> <span class="n">rows</span> <span class="o">*</span> <span class="n">block_size</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">margin</span>
+    <span class="n">cv2</span><span class="o">.</span><span class="n">rectangle</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="n">roi_width</span><span class="p">,</span> <span class="n">roi_height</span><span class="p">),</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    
+    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">rows</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">cols</span><span class="p">):</span>
+            <span class="n">idx</span> <span class="o">=</span> <span class="n">r</span> <span class="o">*</span> <span class="n">cols</span> <span class="o">+</span> <span class="n">c</span>
+            <span class="k">if</span> <span class="n">idx</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">bits</span><span class="p">)</span> <span class="ow">and</span> <span class="n">bits</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">x</span> <span class="o">=</span> <span class="n">margin</span> <span class="o">+</span> <span class="n">c</span> <span class="o">*</span> <span class="n">block_size</span>
+                <span class="n">y</span> <span class="o">=</span> <span class="n">margin</span> <span class="o">+</span> <span class="n">r</span> <span class="o">*</span> <span class="n">block_size</span>
+                <span class="c1"># Draw white block</span>
+                <span class="n">cv2</span><span class="o">.</span><span class="n">rectangle</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">),</span> <span class="p">(</span><span class="n">x</span> <span class="o">+</span> <span class="n">block_size</span><span class="p">,</span> <span class="n">y</span> <span class="o">+</span> <span class="n">block_size</span><span class="p">),</span> <span class="p">(</span><span class="mi">255</span><span class="p">,</span> <span class="mi">255</span><span class="p">,</span> <span class="mi">255</span><span class="p">),</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+                
+    <span class="c1"># Add some text for human debugging</span>
+    <span class="n">cv2</span><span class="o">.</span><span class="n">putText</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;Seq: </span><span class="si">{</span><span class="n">sequence_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="n">roi_height</span> <span class="o">+</span> <span class="mi">20</span><span class="p">),</span> <span class="n">cv2</span><span class="o">.</span><span class="n">FONT_HERSHEY_SIMPLEX</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">255</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">cv2</span><span class="o">.</span><span class="n">putText</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;Ts: </span><span class="si">{</span><span class="n">timestamp_ms</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="n">roi_height</span> <span class="o">+</span> <span class="mi">40</span><span class="p">),</span> <span class="n">cv2</span><span class="o">.</span><span class="n">FONT_HERSHEY_SIMPLEX</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">255</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">frame</span></div>
+
+
+<div class="viewcode-block" id="main">
+<a class="viewcode-back" href="../../api/modules.html#avp_stream.latency_test.main">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s2">&quot;Glass-to-Glass Latency Tester&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--ip&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s2">&quot;169.254.220.107&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;IP address of the Vision Pro&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--fps&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Streaming FPS&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--resolution&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s2">&quot;640x480&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Streaming resolution (WIDTHxHEIGHT)&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--sweep&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Sweep over common resolutions&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--trials&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Number of trials per resolution in sweep mode&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--warmup&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Number of warmup frames before collecting data&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--stereo&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Enable stereo video streaming (doubles width)&quot;</span><span class="p">)</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Connecting to Vision Pro at </span><span class="si">{</span><span class="n">args</span><span class="o">.</span><span class="n">ip</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+    <span class="c1"># Enable quiet mode for benchmarks when sweeping to avoid interfering with tqdm</span>
+    <span class="n">streamer</span> <span class="o">=</span> <span class="n">VisionProStreamer</span><span class="p">(</span><span class="n">ip</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">ip</span><span class="p">,</span> <span class="n">record</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">benchmark_quiet</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    
+    <span class="c1"># State for the callback</span>
+    <span class="k">class</span><span class="w"> </span><span class="nc">LatencyState</span><span class="p">:</span>
+        <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">sequence_id</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">streamer</span> <span class="o">=</span> <span class="n">streamer</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">latencies</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">collecting</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">target_trials</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">current_resolution</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">last_frame_time</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">warmup_frames</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">in_warmup</span> <span class="o">=</span> <span class="kc">False</span>
+            
+    <span class="n">state</span> <span class="o">=</span> <span class="n">LatencyState</span><span class="p">()</span>    
+    
+    <span class="k">def</span><span class="w"> </span><span class="nf">frame_callback</span><span class="p">(</span><span class="n">frame</span><span class="p">):</span>
+        <span class="c1"># 1. Get current timestamp</span>
+        <span class="n">now</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">state</span><span class="o">.</span><span class="n">sequence_id</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">state</span><span class="o">.</span><span class="n">streamer</span><span class="o">.</span><span class="n">reset_benchmark_epoch</span><span class="p">(</span><span class="n">now</span><span class="p">)</span>
+            <span class="n">state</span><span class="o">.</span><span class="n">last_frame_time</span> <span class="o">=</span> <span class="n">now</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Sleep to maintain target FPS (30fps = 33.33ms per frame)</span>
+            <span class="n">elapsed</span> <span class="o">=</span> <span class="n">now</span> <span class="o">-</span> <span class="n">state</span><span class="o">.</span><span class="n">last_frame_time</span>
+            <span class="n">target_frame_time</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="n">args</span><span class="o">.</span><span class="n">fps</span>
+            <span class="c1"># if elapsed &lt; target_frame_time:</span>
+            <span class="c1">#     time.sleep(target_frame_time - elapsed)</span>
+            <span class="n">now</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
+            <span class="n">state</span><span class="o">.</span><span class="n">last_frame_time</span> <span class="o">=</span> <span class="n">now</span>
+            
+        <span class="n">timestamp_ms</span> <span class="o">=</span> <span class="nb">int</span><span class="p">((</span><span class="n">now</span> <span class="o">-</span> <span class="n">state</span><span class="o">.</span><span class="n">streamer</span><span class="o">.</span><span class="n">_benchmark_epoch</span><span class="p">)</span> <span class="o">*</span> <span class="mi">1000</span><span class="p">)</span>
+        
+        <span class="c1"># 2. Inject payload</span>
+        <span class="n">inject_benchmark_payload</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="n">state</span><span class="o">.</span><span class="n">sequence_id</span><span class="p">,</span> <span class="n">timestamp_ms</span><span class="p">)</span>
+        
+        <span class="c1"># 3. Increment sequence</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">sequence_id</span> <span class="o">+=</span> <span class="mi">1</span>
+        
+        <span class="k">return</span> <span class="n">frame</span>
+
+    <span class="c1"># Register the callback BEFORE starting streaming</span>
+    <span class="n">streamer</span><span class="o">.</span><span class="n">register_frame_callback</span><span class="p">(</span><span class="n">frame_callback</span><span class="p">)</span>
+    
+    <span class="c1"># Define resolutions for sweep</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">stereo</span><span class="p">:</span>
+        <span class="c1"># Double the width for stereo mode</span>
+        <span class="n">resolutions</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span><span class="s2">&quot;240p&quot;</span><span class="p">,</span> <span class="s2">&quot;852x240&quot;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">&quot;360p&quot;</span><span class="p">,</span> <span class="s2">&quot;1280x360&quot;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">&quot;720p&quot;</span><span class="p">,</span> <span class="s2">&quot;2560x720&quot;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">&quot;1080p&quot;</span><span class="p">,</span> <span class="s2">&quot;3840x1080&quot;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">&quot;2160p&quot;</span><span class="p">,</span> <span class="s2">&quot;7680x2160&quot;</span><span class="p">)</span>
+        <span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">resolutions</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span><span class="s2">&quot;240p&quot;</span><span class="p">,</span> <span class="s2">&quot;426x240&quot;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">&quot;360p&quot;</span><span class="p">,</span> <span class="s2">&quot;640x360&quot;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">&quot;720p&quot;</span><span class="p">,</span> <span class="s2">&quot;1280x720&quot;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">&quot;1080p&quot;</span><span class="p">,</span> <span class="s2">&quot;1920x1080&quot;</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">&quot;2160p&quot;</span><span class="p">,</span> <span class="s2">&quot;3840x2160&quot;</span><span class="p">)</span>
+        <span class="p">]</span>
+    
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">sweep</span><span class="p">:</span>
+        <span class="c1"># Single resolution mode</span>
+        <span class="n">resolution</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">resolution</span>
+        <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">stereo</span><span class="p">:</span>
+            <span class="c1"># Double the width for stereo</span>
+            <span class="n">width</span><span class="p">,</span> <span class="n">height</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">resolution</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;x&#39;</span><span class="p">))</span>
+            <span class="n">resolution</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">width</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">2</span><span class="si">}</span><span class="s2">x</span><span class="si">{</span><span class="n">height</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="n">streamer</span><span class="o">.</span><span class="n">start_streaming</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">resolution</span><span class="p">,</span> <span class="n">fps</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">fps</span><span class="p">,</span> <span class="n">stereo_video</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">stereo</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Streaming started. Measuring latency...&quot;</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+                <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">KeyboardInterrupt</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Stopping...&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># Sweep mode</span>
+        <span class="c1"># Start with the first resolution</span>
+        <span class="n">first_res_name</span><span class="p">,</span> <span class="n">first_res_size</span> <span class="o">=</span> <span class="n">resolutions</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">streamer</span><span class="o">.</span><span class="n">start_streaming</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">first_res_size</span><span class="p">,</span> <span class="n">fps</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">fps</span><span class="p">,</span> <span class="n">stereo_video</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">stereo</span><span class="p">)</span>
+        
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Starting sweep over </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">resolutions</span><span class="p">)</span><span class="si">}</span><span class="s2"> resolutions: </span><span class="si">{</span><span class="p">[</span><span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">r</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="n">resolutions</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        
+        <span class="c1"># Prepare results dictionary</span>
+        <span class="n">all_results</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;timestamp&quot;</span><span class="p">:</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="o">.</span><span class="n">isoformat</span><span class="p">(),</span>
+            <span class="s2">&quot;test_config&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;ip&quot;</span><span class="p">:</span> <span class="n">args</span><span class="o">.</span><span class="n">ip</span><span class="p">,</span>
+                <span class="s2">&quot;fps&quot;</span><span class="p">:</span> <span class="n">args</span><span class="o">.</span><span class="n">fps</span><span class="p">,</span>
+                <span class="s2">&quot;trials_per_resolution&quot;</span><span class="p">:</span> <span class="n">args</span><span class="o">.</span><span class="n">trials</span><span class="p">,</span>
+                <span class="s2">&quot;warmup_frames&quot;</span><span class="p">:</span> <span class="n">args</span><span class="o">.</span><span class="n">warmup</span><span class="p">,</span>
+                <span class="s2">&quot;stereo&quot;</span><span class="p">:</span> <span class="n">args</span><span class="o">.</span><span class="n">stereo</span>
+            <span class="p">},</span>
+            <span class="s2">&quot;resolutions&quot;</span><span class="p">:</span> <span class="p">{}</span>
+        <span class="p">}</span>
+        
+        <span class="k">for</span> <span class="n">res_name</span><span class="p">,</span> <span class="n">res_size</span> <span class="ow">in</span> <span class="n">resolutions</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">--- Testing </span><span class="si">{</span><span class="n">res_name</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">res_size</span><span class="si">}</span><span class="s2">) ---&quot;</span><span class="p">)</span>
+            
+            <span class="c1"># Update resolution if not the first one (already started with it)</span>
+            <span class="k">if</span> <span class="n">res_size</span> <span class="o">!=</span> <span class="n">first_res_size</span><span class="p">:</span>
+                <span class="n">streamer</span><span class="o">.</span><span class="n">update_stream_resolution</span><span class="p">(</span><span class="n">res_size</span><span class="p">)</span>
+                <span class="c1"># Give it a moment to settle</span>
+                <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+            
+            <span class="n">state</span><span class="o">.</span><span class="n">current_resolution</span> <span class="o">=</span> <span class="n">res_name</span>
+            <span class="n">state</span><span class="o">.</span><span class="n">latencies</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">state</span><span class="o">.</span><span class="n">collecting</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="n">state</span><span class="o">.</span><span class="n">target_trials</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">trials</span>
+            <span class="n">state</span><span class="o">.</span><span class="n">warmup_frames</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">warmup</span>
+            <span class="n">state</span><span class="o">.</span><span class="n">in_warmup</span> <span class="o">=</span> <span class="kc">True</span>
+            
+            <span class="c1"># Warmup phase</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;🔥 Warming up (</span><span class="si">{</span><span class="n">args</span><span class="o">.</span><span class="n">warmup</span><span class="si">}</span><span class="s2"> frames)...&quot;</span><span class="p">)</span>
+            <span class="n">warmup_start_seq</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">sequence_id</span>
+            <span class="n">warmup_pbar</span> <span class="o">=</span> <span class="n">tqdm</span><span class="p">(</span><span class="n">total</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">warmup</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;Warmup&quot;</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;frames&quot;</span><span class="p">)</span>
+            
+            <span class="n">warmup_check_seq</span> <span class="o">=</span> <span class="n">warmup_start_seq</span>
+            <span class="n">warmup_collected</span> <span class="o">=</span> <span class="mi">0</span>
+            
+            <span class="k">while</span> <span class="n">warmup_collected</span> <span class="o">&lt;</span> <span class="n">args</span><span class="o">.</span><span class="n">warmup</span><span class="p">:</span>
+                <span class="n">event</span> <span class="o">=</span> <span class="n">streamer</span><span class="o">.</span><span class="n">wait_for_benchmark_event</span><span class="p">(</span><span class="n">warmup_check_seq</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+                
+                <span class="k">if</span> <span class="n">event</span><span class="p">:</span>
+                    <span class="n">warmup_collected</span> <span class="o">+=</span> <span class="mi">1</span>
+                    <span class="n">warmup_pbar</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+                    <span class="n">warmup_check_seq</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="c1"># Check if we should skip</span>
+                    <span class="k">if</span> <span class="n">state</span><span class="o">.</span><span class="n">sequence_id</span> <span class="o">&gt;</span> <span class="n">warmup_check_seq</span> <span class="o">+</span> <span class="mi">100</span><span class="p">:</span>
+                        <span class="n">warmup_pbar</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;⚠️  Skipping missing warmup sequence </span><span class="si">{</span><span class="n">warmup_check_seq</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                        <span class="n">warmup_check_seq</span> <span class="o">+=</span> <span class="mi">1</span>
+            
+            <span class="n">warmup_pbar</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="n">state</span><span class="o">.</span><span class="n">in_warmup</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;✅ Warmup complete. Starting data collection...&quot;</span><span class="p">)</span>
+            
+            <span class="c1"># Collect samples</span>
+            <span class="c1"># We need to capture the return events.</span>
+            <span class="c1"># The streamer prints them, but we need to intercept or query them.</span>
+            <span class="c1"># streamer.wait_for_benchmark_event removes them from the dict.</span>
+            <span class="c1"># So we should actively poll for events corresponding to the sequences we sent.</span>
+            
+            <span class="n">start_seq</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">sequence_id</span>
+            <span class="n">collected_count</span> <span class="o">=</span> <span class="mi">0</span>
+            
+            <span class="c1"># Wait until we have enough samples</span>
+            <span class="c1"># We&#39;ll poll for events starting from start_seq</span>
+            <span class="n">current_check_seq</span> <span class="o">=</span> <span class="n">start_seq</span>
+            
+            <span class="c1"># Create progress bar</span>
+            <span class="n">pbar</span> <span class="o">=</span> <span class="n">tqdm</span><span class="p">(</span><span class="n">total</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">trials</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">res_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;samples&quot;</span><span class="p">,</span> 
+                       <span class="n">bar_format</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">{l_bar}{bar}</span><span class="s1">| </span><span class="si">{n_fmt}</span><span class="s1">/</span><span class="si">{total_fmt}</span><span class="s1"> [</span><span class="si">{elapsed}</span><span class="s1">&lt;</span><span class="si">{remaining}</span><span class="s1">] RT: </span><span class="si">{postfix[0]:.1f}</span><span class="s1">ms ± </span><span class="si">{postfix[1]:.1f}</span><span class="s1">ms&#39;</span><span class="p">,</span>
+                       <span class="n">postfix</span><span class="o">=</span><span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">])</span>
+            
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">while</span> <span class="n">collected_count</span> <span class="o">&lt;</span> <span class="n">args</span><span class="o">.</span><span class="n">trials</span><span class="p">:</span>
+                    <span class="c1"># Wait for the next event with a timeout</span>
+                    <span class="n">event</span> <span class="o">=</span> <span class="n">streamer</span><span class="o">.</span><span class="n">wait_for_benchmark_event</span><span class="p">(</span><span class="n">current_check_seq</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+                    
+                    <span class="k">if</span> <span class="n">event</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="n">event</span><span class="p">[</span><span class="s2">&quot;round_trip_ms&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                            <span class="n">state</span><span class="o">.</span><span class="n">latencies</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">event</span><span class="p">[</span><span class="s2">&quot;round_trip_ms&quot;</span><span class="p">])</span>
+                            <span class="n">collected_count</span> <span class="o">+=</span> <span class="mi">1</span>
+                            
+                            <span class="c1"># Update progress bar with current stats</span>
+                            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">latencies</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                                <span class="n">current_mean</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">latencies</span><span class="p">)</span>
+                                <span class="n">current_std</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">latencies</span><span class="p">)</span>
+                                <span class="n">pbar</span><span class="o">.</span><span class="n">postfix</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">current_mean</span>
+                                <span class="n">pbar</span><span class="o">.</span><span class="n">postfix</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">current_std</span>
+                            <span class="n">pbar</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+                        <span class="n">current_check_seq</span> <span class="o">+=</span> <span class="mi">1</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="c1"># Timeout - maybe packet loss or just slow?</span>
+                        <span class="c1"># Skip this sequence and try next, or just keep waiting?</span>
+                        <span class="c1"># If we skip too many, we might get stuck.</span>
+                        <span class="c1"># Let&#39;s check if the sequence_id has advanced significantly</span>
+                        <span class="k">if</span> <span class="n">state</span><span class="o">.</span><span class="n">sequence_id</span> <span class="o">&gt;</span> <span class="n">current_check_seq</span> <span class="o">+</span> <span class="mi">100</span><span class="p">:</span>
+                            <span class="n">pbar</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;⚠️  Skipping missing sequence </span><span class="si">{</span><span class="n">current_check_seq</span><span class="si">}</span><span class="s2"> (current sent: </span><span class="si">{</span><span class="n">state</span><span class="o">.</span><span class="n">sequence_id</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+                            <span class="n">current_check_seq</span> <span class="o">+=</span> <span class="mi">1</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="c1"># Just wait a bit more</span>
+                            <span class="k">pass</span>
+                            
+            <span class="k">except</span> <span class="ne">KeyboardInterrupt</span><span class="p">:</span>
+                <span class="n">pbar</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Sweep interrupted.&quot;</span><span class="p">)</span>
+                <span class="k">return</span>
+            <span class="k">finally</span><span class="p">:</span>
+                <span class="n">pbar</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+            <span class="c1"># Calculate stats</span>
+            <span class="k">if</span> <span class="n">state</span><span class="o">.</span><span class="n">latencies</span><span class="p">:</span>
+                <span class="n">mean_latency</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">latencies</span><span class="p">)</span>
+                <span class="n">jitter</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">latencies</span><span class="p">)</span>
+                <span class="n">min_lat</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">latencies</span><span class="p">)</span>
+                <span class="n">max_lat</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">latencies</span><span class="p">)</span>
+                <span class="n">p50</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">latencies</span><span class="p">,</span> <span class="mi">50</span><span class="p">)</span>
+                <span class="n">p95</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">latencies</span><span class="p">,</span> <span class="mi">95</span><span class="p">)</span>
+                <span class="n">p99</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">latencies</span><span class="p">,</span> <span class="mi">99</span><span class="p">)</span>
+                
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;📊 Results for </span><span class="si">{</span><span class="n">res_name</span><span class="si">}</span><span class="s2">:&quot;</span><span class="p">)</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   Mean:   </span><span class="si">{</span><span class="n">mean_latency</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> ms&quot;</span><span class="p">)</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   Jitter: </span><span class="si">{</span><span class="n">jitter</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> ms&quot;</span><span class="p">)</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   Min:    </span><span class="si">{</span><span class="n">min_lat</span><span class="si">}</span><span class="s2"> ms&quot;</span><span class="p">)</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   Max:    </span><span class="si">{</span><span class="n">max_lat</span><span class="si">}</span><span class="s2"> ms&quot;</span><span class="p">)</span>
+                
+                <span class="c1"># Store results</span>
+                <span class="n">all_results</span><span class="p">[</span><span class="s2">&quot;resolutions&quot;</span><span class="p">][</span><span class="n">res_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">&quot;resolution&quot;</span><span class="p">:</span> <span class="n">res_size</span><span class="p">,</span>
+                    <span class="s2">&quot;mean_ms&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">mean_latency</span><span class="p">),</span>
+                    <span class="s2">&quot;std_ms&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">jitter</span><span class="p">),</span>
+                    <span class="s2">&quot;min_ms&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">min_lat</span><span class="p">),</span>
+                    <span class="s2">&quot;max_ms&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">max_lat</span><span class="p">),</span>
+                    <span class="s2">&quot;p50_ms&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">p50</span><span class="p">),</span>
+                    <span class="s2">&quot;p95_ms&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">p95</span><span class="p">),</span>
+                    <span class="s2">&quot;p99_ms&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">p99</span><span class="p">),</span>
+                    <span class="s2">&quot;samples_collected&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">latencies</span><span class="p">),</span>
+                    <span class="s2">&quot;raw_latencies&quot;</span><span class="p">:</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">state</span><span class="o">.</span><span class="n">latencies</span><span class="p">]</span>
+                <span class="p">}</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;⚠️  No data collected for </span><span class="si">{</span><span class="n">res_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">all_results</span><span class="p">[</span><span class="s2">&quot;resolutions&quot;</span><span class="p">][</span><span class="n">res_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">&quot;resolution&quot;</span><span class="p">:</span> <span class="n">res_size</span><span class="p">,</span>
+                    <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="s2">&quot;No data collected&quot;</span>
+                <span class="p">}</span>
+
+        <span class="c1"># Save results to JSON file</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="s2">&quot;benchmarks&quot;</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">timestamp_str</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;%Y%m</span><span class="si">%d</span><span class="s2">_%H%M%S&quot;</span><span class="p">)</span>
+        <span class="n">filename</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;benchmarks/</span><span class="si">{</span><span class="n">timestamp_str</span><span class="si">}</span><span class="s2">.json&quot;</span>
+        
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">all_results</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+        
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">✅ Sweep complete. Results saved to: </span><span class="si">{</span><span class="n">filename</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Younghyo Park.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

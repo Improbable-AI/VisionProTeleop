@@ -246,7 +246,7 @@ if __name__ == "__main__":
     
     # Start video streaming with stereo enabled
     print(f"Starting stereo video stream at {args.resolution}, {args.fps} fps...")
-    streamer.start_video_streaming(
+    streamer.start_streaming(
         device=None,              # No camera - synthetic video
         format=None,
         fps=args.fps,

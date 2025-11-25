@@ -222,7 +222,7 @@ if __name__ == "__main__":
     streamer.register_audio_callback(beep_audio_generator(streamer))
     
     # Start video and audio streaming
-    streamer.start_video_streaming(
+    streamer.start_streaming(
         device=None,           # No camera - synthetic video
         format=None,           
         fps=30,                # 30fps video (reduced for better performance with audio)

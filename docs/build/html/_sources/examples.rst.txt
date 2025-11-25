@@ -28,7 +28,7 @@ This example demonstrates basic video streaming from a physical camera.
    print("Connected to Vision Pro")
    
    # Start video streaming from camera
-   streamer.start_video_streaming(
+   streamer.start_streaming(
        device="/dev/video0",
        format="v4l2",
        size="640x480",
@@ -94,7 +94,7 @@ This example shows how to process frames before streaming them to Vision Pro.
    streamer.register_frame_callback(process_frame)
    
    # Start streaming with processing
-   streamer.start_video_streaming(
+   streamer.start_streaming(
        device="/dev/video0",
        format="v4l2",
        size="640x480",
@@ -153,7 +153,7 @@ This example generates synthetic frames without a physical camera.
    streamer.register_frame_callback(generate_synthetic_frame)
    
    # Start streaming synthetic frames
-   streamer.start_video_streaming(
+   streamer.start_streaming(
        device=None,
        format=None,
        size="1280x720",
@@ -183,7 +183,7 @@ Robot Teleoperation
    robot = robot_interface.Robot()
    
    # Stream robot's camera back to Vision Pro
-   streamer.start_video_streaming(
+   streamer.start_streaming(
        device="/dev/video0",
        format="v4l2",
        size="640x480",
@@ -252,7 +252,7 @@ Bilateral Teleoperation
    robot = robot_interface.DualArmRobot()
    
    # Stream stereo camera from robot
-   streamer.start_video_streaming(
+   streamer.start_streaming(
        device="/dev/video0",
        format="v4l2",
        size="1280x480",  # Side-by-side stereo
@@ -292,7 +292,7 @@ Simulation Integration
    
    # Register simulation camera
    streamer.register_frame_callback(get_sim_camera)
-   streamer.start_video_streaming(
+   streamer.start_streaming(
        device=None,
        format=None,
        size="1280x720",

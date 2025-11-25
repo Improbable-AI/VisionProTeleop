@@ -560,7 +560,7 @@ class VideoStreamManager: ObservableObject {
                     
                     if attempt % 10 == 0 && attempt > 0 {
                         print("⏳ [DEBUG] Still waiting for WebRTC server info... (\(attempt)s elapsed)")
-                        print("💡 [DEBUG] Make sure start_video_streaming() was called in Python")
+                        print("💡 [DEBUG] Make sure start_streaming() was called in Python")
                     }
                     
                     try await Task.sleep(nanoseconds: 1_000_000_000)  // 1 second
@@ -568,7 +568,7 @@ class VideoStreamManager: ObservableObject {
                 
                 guard let info = webrtcInfo else {
                     print("❌ [DEBUG] Timeout: WebRTC server info not received")
-                    print("💡 [DEBUG] Make sure start_video_streaming() was called in Python")
+                    print("💡 [DEBUG] Make sure start_streaming() was called in Python")
                     return
                 }
                 

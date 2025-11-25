@@ -1,0 +1,735 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>avp_stream.bridge_avp &mdash; VisionProTeleop 2.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=60dbed4a"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/remove_prefix.js?v=e2af7392"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            VisionProTeleop
+              <img src="../../_static/new-logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../installation.html#python-package">Python Package</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation.html#vision-pro-app">Vision Pro App</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../installation.html#app-store-installation">App Store Installation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../installation.html#manual-installation-development">Manual Installation (Development)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation.html#network-setup">Network Setup</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../installation.html#wifi-connection">WiFi Connection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../installation.html#wired-connection">Wired Connection</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quick Start</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../quickstart.html#basic-hand-tracking">Basic Hand Tracking</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../quickstart.html#with-video-streaming">With Video Streaming</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../quickstart.html#finding-the-right-camera-configuration">Finding the Right Camera Configuration</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api/modules.html">Python API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../api/modules.html#avp_stream.streamer.VisionProStreamer"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.streamer.VisionProStreamer.__init__"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.streamer.VisionProStreamer.stream"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.stream()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.streamer.VisionProStreamer.get_latest"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.get_latest()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.streamer.VisionProStreamer.get_recording"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.get_recording()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.streamer.VisionProStreamer.get_local_ip"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.get_local_ip()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.streamer.VisionProStreamer.register_frame_callback"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.register_frame_callback()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.streamer.VisionProStreamer.register_audio_callback"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.register_audio_callback()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.streamer.VisionProStreamer.update_frame"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.update_frame()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.streamer.VisionProStreamer.reset_benchmark_epoch"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.reset_benchmark_epoch()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.streamer.VisionProStreamer.update_stream_resolution"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.update_stream_resolution()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.streamer.VisionProStreamer.wait_for_benchmark_event"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.wait_for_benchmark_event()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.streamer.VisionProStreamer.start_streaming"><code class="docutils literal notranslate"><span class="pre">VisionProStreamer.start_streaming()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/modules.html#module-avp_stream.bridge_avp">Bridge Setup</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.bridge_avp.BridgeSetupError"><code class="docutils literal notranslate"><span class="pre">BridgeSetupError</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge"><code class="docutils literal notranslate"><span class="pre">VisionProBridge</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.check_prerequisites"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.check_prerequisites()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.run_command"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.run_command()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.detect_primary_interface_macos"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.detect_primary_interface_macos()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.detect_primary_interface_linux"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.detect_primary_interface_linux()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.is_wireless_interface"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.is_wireless_interface()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.detect_configuration"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.detect_configuration()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.setup_bridge_macos"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.setup_bridge_macos()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.setup_bridge_linux"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.setup_bridge_linux()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.create_cleanup_script_macos"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.create_cleanup_script_macos()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.create_cleanup_script_linux"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.create_cleanup_script_linux()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.setup"><code class="docutils literal notranslate"><span class="pre">VisionProBridge.setup()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.bridge_avp.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/modules.html#module-avp_stream.latency_test">Latency Testing</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.latency_test.inject_benchmark_payload"><code class="docutils literal notranslate"><span class="pre">inject_benchmark_payload()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/modules.html#avp_stream.latency_test.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Additional Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../acknowledgements.html">Acknowledgements</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../acknowledgements.html#research-team">Research Team</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../acknowledgements.html#related-projects">Related Projects</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../acknowledgements.html#publications">Publications</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../acknowledgements.html#contact">Contact</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../license.html">License</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../license.html#mit-license">MIT License</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../license.html#what-this-means">What This Means</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../license.html#third-party-licenses">Third-Party Licenses</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../license.html#attribution">Attribution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../license.html#disclaimer">Disclaimer</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">VisionProTeleop</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">avp_stream.bridge_avp</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for avp_stream.bridge_avp</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Vision Pro High-Speed Bridge Setup</span>
+
+<span class="sd">This module sets up a high-speed network bridge for Vision Pro devices,</span>
+<span class="sd">providing ~10 Gbps local network speeds with full internet access.</span>
+
+<span class="sd">Platform Support:</span>
+<span class="sd">- macOS: Full support using pfctl and bridge interfaces</span>
+<span class="sd">- Linux: Support using iptables and bridge-utils</span>
+<span class="sd">- Windows: Not yet supported (requires netsh and bridge configuration)</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">subprocess</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">platform</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">shutil</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span>
+
+
+<div class="viewcode-block" id="BridgeSetupError">
+<a class="viewcode-back" href="../../api/modules.html#avp_stream.bridge_avp.BridgeSetupError">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">BridgeSetupError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exception raised for bridge setup errors.&quot;&quot;&quot;</span>
+    <span class="k">pass</span></div>
+
+
+
+<div class="viewcode-block" id="VisionProBridge">
+<a class="viewcode-back" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">VisionProBridge</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Cross-platform Vision Pro network bridge setup.&quot;&quot;&quot;</span>
+    
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">os_type</span> <span class="o">=</span> <span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">primary_interface</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ip_addr</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">network_base</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bridge_ip</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        
+<div class="viewcode-block" id="VisionProBridge.check_prerequisites">
+<a class="viewcode-back" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.check_prerequisites">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">check_prerequisites</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Check if required tools are available for the current platform.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">os_type</span> <span class="o">==</span> <span class="s2">&quot;Darwin&quot;</span><span class="p">:</span>  <span class="c1"># macOS</span>
+            <span class="n">required_commands</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;ifconfig&quot;</span><span class="p">,</span> <span class="s2">&quot;route&quot;</span><span class="p">,</span> <span class="s2">&quot;sysctl&quot;</span><span class="p">,</span> <span class="s2">&quot;pfctl&quot;</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">os_type</span> <span class="o">==</span> <span class="s2">&quot;Linux&quot;</span><span class="p">:</span>
+            <span class="n">required_commands</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;ip&quot;</span><span class="p">,</span> <span class="s2">&quot;brctl&quot;</span><span class="p">,</span> <span class="s2">&quot;sysctl&quot;</span><span class="p">,</span> <span class="s2">&quot;iptables&quot;</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+            
+        <span class="k">for</span> <span class="n">cmd</span> <span class="ow">in</span> <span class="n">required_commands</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">shutil</span><span class="o">.</span><span class="n">which</span><span class="p">(</span><span class="n">cmd</span><span class="p">):</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Error: Required command &#39;</span><span class="si">{</span><span class="n">cmd</span><span class="si">}</span><span class="s2">&#39; not found&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">os_type</span> <span class="o">==</span> <span class="s2">&quot;Linux&quot;</span> <span class="ow">and</span> <span class="n">cmd</span> <span class="o">==</span> <span class="s2">&quot;brctl&quot;</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;   Install with: sudo apt-get install bridge-utils&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+        <span class="k">return</span> <span class="kc">True</span></div>
+
+    
+<div class="viewcode-block" id="VisionProBridge.run_command">
+<a class="viewcode-back" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.run_command">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">run_command</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cmd</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">check</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">capture</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">CompletedProcess</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Run a shell command with error handling.&quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">capture</span><span class="p">:</span>
+                <span class="n">result</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">capture_output</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">check</span><span class="o">=</span><span class="n">check</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">result</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">check</span><span class="o">=</span><span class="n">check</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">result</span>
+        <span class="k">except</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">CalledProcessError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">BridgeSetupError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Command failed: </span><span class="si">{</span><span class="s1">&#39; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">cmd</span><span class="p">)</span><span class="si">}</span><span class="se">\n</span><span class="si">{</span><span class="n">e</span><span class="o">.</span><span class="n">stderr</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">capture</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;&#39;</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="VisionProBridge.detect_primary_interface_macos">
+<a class="viewcode-back" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.detect_primary_interface_macos">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">detect_primary_interface_macos</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Detect primary network interface on macOS.&quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># Get default route interface</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_command</span><span class="p">([</span><span class="s2">&quot;route&quot;</span><span class="p">,</span> <span class="s2">&quot;-n&quot;</span><span class="p">,</span> <span class="s2">&quot;get&quot;</span><span class="p">,</span> <span class="s2">&quot;default&quot;</span><span class="p">])</span>
+            <span class="n">match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;interface:\s+(\S+)&#39;</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">stdout</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">match</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">BridgeSetupError</span><span class="p">(</span><span class="s2">&quot;Could not detect primary network interface&quot;</span><span class="p">)</span>
+            
+            <span class="n">interface</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            
+            <span class="c1"># Get IP address</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_command</span><span class="p">([</span><span class="s2">&quot;ifconfig&quot;</span><span class="p">,</span> <span class="n">interface</span><span class="p">])</span>
+            <span class="n">match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;inet\s+(\d+\.\d+\.\d+\.\d+)&#39;</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">stdout</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">match</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">BridgeSetupError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No IP address found on </span><span class="si">{</span><span class="n">interface</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            
+            <span class="n">ip_addr</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">interface</span><span class="p">,</span> <span class="n">ip_addr</span>
+            
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">BridgeSetupError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to detect network configuration: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="VisionProBridge.detect_primary_interface_linux">
+<a class="viewcode-back" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.detect_primary_interface_linux">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">detect_primary_interface_linux</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Detect primary network interface on Linux.&quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># Get default route interface</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_command</span><span class="p">([</span><span class="s2">&quot;ip&quot;</span><span class="p">,</span> <span class="s2">&quot;route&quot;</span><span class="p">,</span> <span class="s2">&quot;show&quot;</span><span class="p">,</span> <span class="s2">&quot;default&quot;</span><span class="p">])</span>
+            <span class="n">match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;dev\s+(\S+)&#39;</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">stdout</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">match</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">BridgeSetupError</span><span class="p">(</span><span class="s2">&quot;Could not detect primary network interface&quot;</span><span class="p">)</span>
+            
+            <span class="n">interface</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            
+            <span class="c1"># Get IP address</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_command</span><span class="p">([</span><span class="s2">&quot;ip&quot;</span><span class="p">,</span> <span class="s2">&quot;addr&quot;</span><span class="p">,</span> <span class="s2">&quot;show&quot;</span><span class="p">,</span> <span class="n">interface</span><span class="p">])</span>
+            <span class="n">match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;inet\s+(\d+\.\d+\.\d+\.\d+)&#39;</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">stdout</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">match</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">BridgeSetupError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No IP address found on </span><span class="si">{</span><span class="n">interface</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            
+            <span class="n">ip_addr</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">interface</span><span class="p">,</span> <span class="n">ip_addr</span>
+            
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">BridgeSetupError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to detect network configuration: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="VisionProBridge.is_wireless_interface">
+<a class="viewcode-back" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.is_wireless_interface">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_wireless_interface</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">interface</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Check if an interface is wireless.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">os_type</span> <span class="o">==</span> <span class="s2">&quot;Linux&quot;</span><span class="p">:</span>
+            <span class="c1"># Check if wireless directory exists</span>
+            <span class="n">wireless_path</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;/sys/class/net/</span><span class="si">{</span><span class="n">interface</span><span class="si">}</span><span class="s2">/wireless&quot;</span>
+            <span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+            <span class="k">return</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">wireless_path</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span></div>
+
+    
+<div class="viewcode-block" id="VisionProBridge.detect_configuration">
+<a class="viewcode-back" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.detect_configuration">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">detect_configuration</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Detect network configuration for the current platform.&quot;&quot;&quot;</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Detecting configuration...&quot;</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">os_type</span> <span class="o">==</span> <span class="s2">&quot;Darwin&quot;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">primary_interface</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">ip_addr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">detect_primary_interface_macos</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">os_type</span> <span class="o">==</span> <span class="s2">&quot;Linux&quot;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">primary_interface</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">ip_addr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">detect_primary_interface_linux</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">BridgeSetupError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported platform: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">os_type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        
+        <span class="c1"># For USB connections, Vision Pro uses link-local addressing (169.254.x.x)</span>
+        <span class="c1"># We should use a compatible address on the same subnet</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">network_base</span> <span class="o">=</span> <span class="s2">&quot;169.254.220&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bridge_ip</span> <span class="o">=</span> <span class="s2">&quot;169.254.220.1&quot;</span>  <span class="c1"># Use .1 as the host IP</span></div>
+
+    
+<div class="viewcode-block" id="VisionProBridge.setup_bridge_macos">
+<a class="viewcode-back" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.setup_bridge_macos">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">setup_bridge_macos</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Set up bridge on macOS.&quot;&quot;&quot;</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Setting up bridge...&quot;</span><span class="p">)</span>
+        
+        <span class="c1"># 1. Enable IP forwarding</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  • Enabling IP forwarding...&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">run_command</span><span class="p">([</span><span class="s2">&quot;sudo&quot;</span><span class="p">,</span> <span class="s2">&quot;sysctl&quot;</span><span class="p">,</span> <span class="s2">&quot;-w&quot;</span><span class="p">,</span> <span class="s2">&quot;net.inet.ip.forwarding=1&quot;</span><span class="p">],</span> <span class="n">capture</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        
+        <span class="c1"># 2. Configure bridge0</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  • Configuring bridge0...&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">run_command</span><span class="p">([</span>
+            <span class="s2">&quot;sudo&quot;</span><span class="p">,</span> <span class="s2">&quot;ifconfig&quot;</span><span class="p">,</span> <span class="s2">&quot;bridge0&quot;</span><span class="p">,</span> <span class="s2">&quot;inet&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">bridge_ip</span><span class="p">,</span> 
+            <span class="s2">&quot;netmask&quot;</span><span class="p">,</span> <span class="s2">&quot;255.255.255.0&quot;</span>
+        <span class="p">],</span> <span class="n">capture</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">([</span><span class="s2">&quot;sleep&quot;</span><span class="p">,</span> <span class="s2">&quot;1&quot;</span><span class="p">])</span>
+        
+        <span class="c1"># 3. Add primary interface to bridge0</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  • Adding </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">primary_interface</span><span class="si">}</span><span class="s2"> to bridge0...&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">run_command</span><span class="p">([</span>
+            <span class="s2">&quot;sudo&quot;</span><span class="p">,</span> <span class="s2">&quot;ifconfig&quot;</span><span class="p">,</span> <span class="s2">&quot;bridge0&quot;</span><span class="p">,</span> <span class="s2">&quot;addm&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">primary_interface</span>
+        <span class="p">],</span> <span class="n">check</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">capture</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">([</span><span class="s2">&quot;sleep&quot;</span><span class="p">,</span> <span class="s2">&quot;2&quot;</span><span class="p">])</span>
+        
+        <span class="c1"># 4. Set up NAT</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  • Configuring NAT...&quot;</span><span class="p">)</span>
+        <span class="c1"># Enable pfctl</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">run_command</span><span class="p">([</span><span class="s2">&quot;sudo&quot;</span><span class="p">,</span> <span class="s2">&quot;pfctl&quot;</span><span class="p">,</span> <span class="s2">&quot;-e&quot;</span><span class="p">],</span> <span class="n">check</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">capture</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        
+        <span class="c1"># Create NAT rule</span>
+        <span class="n">nat_rule</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;nat on </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">primary_interface</span><span class="si">}</span><span class="s2"> inet from bridge0:network to any -&gt; (</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">primary_interface</span><span class="si">}</span><span class="s2">)&quot;</span>
+        <span class="n">proc</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">(</span>
+            <span class="p">[</span><span class="s2">&quot;sudo&quot;</span><span class="p">,</span> <span class="s2">&quot;pfctl&quot;</span><span class="p">,</span> <span class="s2">&quot;-f&quot;</span><span class="p">,</span> <span class="s2">&quot;-&quot;</span><span class="p">],</span>
+            <span class="n">stdin</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span>
+            <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">DEVNULL</span>
+        <span class="p">)</span>
+        <span class="n">proc</span><span class="o">.</span><span class="n">communicate</span><span class="p">(</span><span class="nb">input</span><span class="o">=</span><span class="n">nat_rule</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span>
+        <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">([</span><span class="s2">&quot;sleep&quot;</span><span class="p">,</span> <span class="s2">&quot;2&quot;</span><span class="p">])</span></div>
+
+    
+<div class="viewcode-block" id="VisionProBridge.setup_bridge_linux">
+<a class="viewcode-back" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.setup_bridge_linux">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">setup_bridge_linux</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Set up bridge on Linux.</span>
+<span class="sd">        </span>
+<span class="sd">        For wired interfaces: Creates a true bridge</span>
+<span class="sd">        For wireless interfaces: Uses USB network interface directly with NAT</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Setting up bridge...&quot;</span><span class="p">)</span>
+        
+        <span class="c1"># Check if primary interface is wireless</span>
+        <span class="n">is_wireless</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_wireless_interface</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">primary_interface</span><span class="p">)</span>
+        
+        <span class="c1"># 1. Enable IP forwarding</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  • Enabling IP forwarding...&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">run_command</span><span class="p">([</span><span class="s2">&quot;sudo&quot;</span><span class="p">,</span> <span class="s2">&quot;sysctl&quot;</span><span class="p">,</span> <span class="s2">&quot;-w&quot;</span><span class="p">,</span> <span class="s2">&quot;net.ipv4.ip_forward=1&quot;</span><span class="p">],</span> <span class="n">capture</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="n">is_wireless</span><span class="p">:</span>
+            <span class="c1"># For wireless: Skip bridge creation, use USB network interface directly</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  ⚠️  Detected wireless interface (</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">primary_interface</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  • Setting up direct USB network routing (wireless can&#39;t bridge)&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  • Looking for USB network interface...&quot;</span><span class="p">)</span>
+            
+            <span class="c1"># Find USB network interfaces (usually enp*, usb*)</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_command</span><span class="p">([</span><span class="s2">&quot;ip&quot;</span><span class="p">,</span> <span class="s2">&quot;link&quot;</span><span class="p">,</span> <span class="s2">&quot;show&quot;</span><span class="p">],</span> <span class="n">check</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            
+            <span class="c1"># Show all interfaces for debugging</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">  Available network interfaces:&quot;</span><span class="p">)</span>
+            <span class="n">all_interfaces</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">):</span>
+                <span class="n">match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;\d+:\s+(\S+):&#39;</span><span class="p">,</span> <span class="n">line</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">match</span> <span class="ow">and</span> <span class="s1">&#39;@&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">line</span><span class="p">:</span>  <span class="c1"># Skip VLAN interfaces</span>
+                    <span class="n">iface</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">iface</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;lo&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">primary_interface</span><span class="p">]:</span>
+                        <span class="n">all_interfaces</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">iface</span><span class="p">)</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;    - </span><span class="si">{</span><span class="n">iface</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            
+            <span class="c1"># Wait a moment for interface to appear</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">all_interfaces</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  • Waiting 3 seconds for USB interface to appear...&quot;</span><span class="p">)</span>
+                <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">([</span><span class="s2">&quot;sleep&quot;</span><span class="p">,</span> <span class="s2">&quot;3&quot;</span><span class="p">])</span>
+                <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_command</span><span class="p">([</span><span class="s2">&quot;ip&quot;</span><span class="p">,</span> <span class="s2">&quot;link&quot;</span><span class="p">,</span> <span class="s2">&quot;show&quot;</span><span class="p">],</span> <span class="n">check</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">):</span>
+                    <span class="n">match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;\d+:\s+(\S+):&#39;</span><span class="p">,</span> <span class="n">line</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">match</span> <span class="ow">and</span> <span class="s1">&#39;@&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">line</span><span class="p">:</span>
+                        <span class="n">iface</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">iface</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;lo&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">primary_interface</span><span class="p">]:</span>
+                            <span class="n">all_interfaces</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">iface</span><span class="p">)</span>
+            
+            <span class="k">if</span> <span class="n">all_interfaces</span><span class="p">:</span>
+                <span class="c1"># Prefer interfaces that look like USB/ethernet</span>
+                <span class="n">usb_iface</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="k">for</span> <span class="n">iface</span> <span class="ow">in</span> <span class="n">all_interfaces</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">pattern</span> <span class="ow">in</span> <span class="n">iface</span> <span class="k">for</span> <span class="n">pattern</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;enp&#39;</span><span class="p">,</span> <span class="s1">&#39;usb&#39;</span><span class="p">,</span> <span class="s1">&#39;eth&#39;</span><span class="p">,</span> <span class="s1">&#39;en&#39;</span><span class="p">]):</span>
+                        <span class="n">usb_iface</span> <span class="o">=</span> <span class="n">iface</span>
+                        <span class="k">break</span>
+                
+                <span class="c1"># If no specific USB pattern found, use the first available</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">usb_iface</span><span class="p">:</span>
+                    <span class="n">usb_iface</span> <span class="o">=</span> <span class="n">all_interfaces</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">  • Using interface: </span><span class="si">{</span><span class="n">usb_iface</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                
+                <span class="c1"># Configure the USB interface</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  • Configuring </span><span class="si">{</span><span class="n">usb_iface</span><span class="si">}</span><span class="s2"> with IP </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">bridge_ip</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;    (Vision Pro should be at 169.254.220.107)&quot;</span><span class="p">)</span>
+                <span class="c1"># Remove any existing IPs</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">run_command</span><span class="p">([</span><span class="s2">&quot;sudo&quot;</span><span class="p">,</span> <span class="s2">&quot;ip&quot;</span><span class="p">,</span> <span class="s2">&quot;addr&quot;</span><span class="p">,</span> <span class="s2">&quot;flush&quot;</span><span class="p">,</span> <span class="s2">&quot;dev&quot;</span><span class="p">,</span> <span class="n">usb_iface</span><span class="p">],</span> <span class="n">check</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">capture</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                <span class="c1"># Add our IP on the same link-local subnet as Vision Pro</span>
+                <span class="c1"># Use /16 for link-local addressing</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">run_command</span><span class="p">([</span>
+                    <span class="s2">&quot;sudo&quot;</span><span class="p">,</span> <span class="s2">&quot;ip&quot;</span><span class="p">,</span> <span class="s2">&quot;addr&quot;</span><span class="p">,</span> <span class="s2">&quot;add&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">bridge_ip</span><span class="si">}</span><span class="s2">/16&quot;</span><span class="p">,</span> <span class="s2">&quot;dev&quot;</span><span class="p">,</span> <span class="n">usb_iface</span>
+                <span class="p">],</span> <span class="n">check</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">capture</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                <span class="c1"># Bring it up</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">run_command</span><span class="p">([</span><span class="s2">&quot;sudo&quot;</span><span class="p">,</span> <span class="s2">&quot;ip&quot;</span><span class="p">,</span> <span class="s2">&quot;link&quot;</span><span class="p">,</span> <span class="s2">&quot;set&quot;</span><span class="p">,</span> <span class="n">usb_iface</span><span class="p">,</span> <span class="s2">&quot;up&quot;</span><span class="p">],</span> <span class="n">capture</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                
+                <span class="c1"># Add route to Vision Pro&#39;s subnet</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  • Adding route to Vision Pro...&quot;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">run_command</span><span class="p">([</span>
+                    <span class="s2">&quot;sudo&quot;</span><span class="p">,</span> <span class="s2">&quot;ip&quot;</span><span class="p">,</span> <span class="s2">&quot;route&quot;</span><span class="p">,</span> <span class="s2">&quot;add&quot;</span><span class="p">,</span> <span class="s2">&quot;169.254.220.0/24&quot;</span><span class="p">,</span> <span class="s2">&quot;dev&quot;</span><span class="p">,</span> <span class="n">usb_iface</span>
+                <span class="p">],</span> <span class="n">check</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">capture</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                
+                <span class="c1"># Set up NAT</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  • Configuring NAT...&quot;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">run_command</span><span class="p">([</span>
+                    <span class="s2">&quot;sudo&quot;</span><span class="p">,</span> <span class="s2">&quot;iptables&quot;</span><span class="p">,</span> <span class="s2">&quot;-t&quot;</span><span class="p">,</span> <span class="s2">&quot;nat&quot;</span><span class="p">,</span> <span class="s2">&quot;-A&quot;</span><span class="p">,</span> <span class="s2">&quot;POSTROUTING&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;-s&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">network_base</span><span class="si">}</span><span class="s2">.0/24&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;-o&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">primary_interface</span><span class="p">,</span> <span class="s2">&quot;-j&quot;</span><span class="p">,</span> <span class="s2">&quot;MASQUERADE&quot;</span>
+                <span class="p">],</span> <span class="n">check</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">capture</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                
+                <span class="c1"># Allow forwarding</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">run_command</span><span class="p">([</span>
+                    <span class="s2">&quot;sudo&quot;</span><span class="p">,</span> <span class="s2">&quot;iptables&quot;</span><span class="p">,</span> <span class="s2">&quot;-A&quot;</span><span class="p">,</span> <span class="s2">&quot;FORWARD&quot;</span><span class="p">,</span> <span class="s2">&quot;-i&quot;</span><span class="p">,</span> <span class="n">usb_iface</span><span class="p">,</span>
+                    <span class="s2">&quot;-o&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">primary_interface</span><span class="p">,</span> <span class="s2">&quot;-j&quot;</span><span class="p">,</span> <span class="s2">&quot;ACCEPT&quot;</span>
+                <span class="p">],</span> <span class="n">check</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">capture</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                
+                <span class="bp">self</span><span class="o">.</span><span class="n">run_command</span><span class="p">([</span>
+                    <span class="s2">&quot;sudo&quot;</span><span class="p">,</span> <span class="s2">&quot;iptables&quot;</span><span class="p">,</span> <span class="s2">&quot;-A&quot;</span><span class="p">,</span> <span class="s2">&quot;FORWARD&quot;</span><span class="p">,</span> <span class="s2">&quot;-i&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">primary_interface</span><span class="p">,</span>
+                    <span class="s2">&quot;-o&quot;</span><span class="p">,</span> <span class="n">usb_iface</span><span class="p">,</span> <span class="s2">&quot;-m&quot;</span><span class="p">,</span> <span class="s2">&quot;state&quot;</span><span class="p">,</span> <span class="s2">&quot;--state&quot;</span><span class="p">,</span> <span class="s2">&quot;RELATED,ESTABLISHED&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;-j&quot;</span><span class="p">,</span> <span class="s2">&quot;ACCEPT&quot;</span>
+                <span class="p">],</span> <span class="n">check</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">capture</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                
+                <span class="c1"># Store the USB interface for cleanup</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">usb_interface</span> <span class="o">=</span> <span class="n">usb_iface</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">  ⚠️  No additional network interfaces found!&quot;</span><span class="p">)</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  • Please ensure Vision Pro is plugged in via USB-C&quot;</span><span class="p">)</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  • Try unplugging and replugging the Vision Pro&quot;</span><span class="p">)</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  • Run &#39;ip link show&#39; to see all interfaces&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="n">BridgeSetupError</span><span class="p">(</span><span class="s2">&quot;USB network interface not detected&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># For wired: Create a proper bridge</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  • Using wired interface (</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">primary_interface</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+            
+            <span class="c1"># 2. Create bridge interface if it doesn&#39;t exist</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  • Creating bridge interface...&quot;</span><span class="p">)</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_command</span><span class="p">([</span><span class="s2">&quot;ip&quot;</span><span class="p">,</span> <span class="s2">&quot;link&quot;</span><span class="p">,</span> <span class="s2">&quot;show&quot;</span><span class="p">,</span> <span class="s2">&quot;br0&quot;</span><span class="p">],</span> <span class="n">check</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">returncode</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">run_command</span><span class="p">([</span><span class="s2">&quot;sudo&quot;</span><span class="p">,</span> <span class="s2">&quot;brctl&quot;</span><span class="p">,</span> <span class="s2">&quot;addbr&quot;</span><span class="p">,</span> <span class="s2">&quot;br0&quot;</span><span class="p">],</span> <span class="n">capture</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            
+            <span class="c1"># 3. Configure bridge IP</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  • Configuring bridge IP...&quot;</span><span class="p">)</span>
+            <span class="c1"># Flush any existing IPs</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">run_command</span><span class="p">([</span><span class="s2">&quot;sudo&quot;</span><span class="p">,</span> <span class="s2">&quot;ip&quot;</span><span class="p">,</span> <span class="s2">&quot;addr&quot;</span><span class="p">,</span> <span class="s2">&quot;flush&quot;</span><span class="p">,</span> <span class="s2">&quot;dev&quot;</span><span class="p">,</span> <span class="s2">&quot;br0&quot;</span><span class="p">],</span> <span class="n">check</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">capture</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            
+            <span class="bp">self</span><span class="o">.</span><span class="n">run_command</span><span class="p">([</span>
+                <span class="s2">&quot;sudo&quot;</span><span class="p">,</span> <span class="s2">&quot;ip&quot;</span><span class="p">,</span> <span class="s2">&quot;addr&quot;</span><span class="p">,</span> <span class="s2">&quot;add&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">bridge_ip</span><span class="si">}</span><span class="s2">/24&quot;</span><span class="p">,</span> <span class="s2">&quot;dev&quot;</span><span class="p">,</span> <span class="s2">&quot;br0&quot;</span>
+            <span class="p">],</span> <span class="n">check</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">capture</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            
+            <span class="c1"># 4. Add primary interface to bridge</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  • Adding </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">primary_interface</span><span class="si">}</span><span class="s2"> to bridge...&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">run_command</span><span class="p">([</span>
+                <span class="s2">&quot;sudo&quot;</span><span class="p">,</span> <span class="s2">&quot;brctl&quot;</span><span class="p">,</span> <span class="s2">&quot;addif&quot;</span><span class="p">,</span> <span class="s2">&quot;br0&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">primary_interface</span>
+            <span class="p">],</span> <span class="n">check</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">capture</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            
+            <span class="c1"># 5. Bring up the bridge</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  • Bringing up bridge interface...&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">run_command</span><span class="p">([</span><span class="s2">&quot;sudo&quot;</span><span class="p">,</span> <span class="s2">&quot;ip&quot;</span><span class="p">,</span> <span class="s2">&quot;link&quot;</span><span class="p">,</span> <span class="s2">&quot;set&quot;</span><span class="p">,</span> <span class="s2">&quot;br0&quot;</span><span class="p">,</span> <span class="s2">&quot;up&quot;</span><span class="p">],</span> <span class="n">capture</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            
+            <span class="c1"># 6. Set up NAT with iptables</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  • Configuring NAT...&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">run_command</span><span class="p">([</span>
+                <span class="s2">&quot;sudo&quot;</span><span class="p">,</span> <span class="s2">&quot;iptables&quot;</span><span class="p">,</span> <span class="s2">&quot;-t&quot;</span><span class="p">,</span> <span class="s2">&quot;nat&quot;</span><span class="p">,</span> <span class="s2">&quot;-A&quot;</span><span class="p">,</span> <span class="s2">&quot;POSTROUTING&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;-s&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">network_base</span><span class="si">}</span><span class="s2">.0/24&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;-o&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">primary_interface</span><span class="p">,</span> <span class="s2">&quot;-j&quot;</span><span class="p">,</span> <span class="s2">&quot;MASQUERADE&quot;</span>
+            <span class="p">],</span> <span class="n">check</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">capture</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            
+            <span class="c1"># Allow forwarding</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">run_command</span><span class="p">([</span>
+                <span class="s2">&quot;sudo&quot;</span><span class="p">,</span> <span class="s2">&quot;iptables&quot;</span><span class="p">,</span> <span class="s2">&quot;-A&quot;</span><span class="p">,</span> <span class="s2">&quot;FORWARD&quot;</span><span class="p">,</span> <span class="s2">&quot;-i&quot;</span><span class="p">,</span> <span class="s2">&quot;br0&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;-o&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">primary_interface</span><span class="p">,</span> <span class="s2">&quot;-j&quot;</span><span class="p">,</span> <span class="s2">&quot;ACCEPT&quot;</span>
+            <span class="p">],</span> <span class="n">check</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">capture</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            
+            <span class="bp">self</span><span class="o">.</span><span class="n">run_command</span><span class="p">([</span>
+                <span class="s2">&quot;sudo&quot;</span><span class="p">,</span> <span class="s2">&quot;iptables&quot;</span><span class="p">,</span> <span class="s2">&quot;-A&quot;</span><span class="p">,</span> <span class="s2">&quot;FORWARD&quot;</span><span class="p">,</span> <span class="s2">&quot;-i&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">primary_interface</span><span class="p">,</span>
+                <span class="s2">&quot;-o&quot;</span><span class="p">,</span> <span class="s2">&quot;br0&quot;</span><span class="p">,</span> <span class="s2">&quot;-m&quot;</span><span class="p">,</span> <span class="s2">&quot;state&quot;</span><span class="p">,</span> <span class="s2">&quot;--state&quot;</span><span class="p">,</span> <span class="s2">&quot;RELATED,ESTABLISHED&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;-j&quot;</span><span class="p">,</span> <span class="s2">&quot;ACCEPT&quot;</span>
+            <span class="p">],</span> <span class="n">check</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">capture</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        
+        <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">([</span><span class="s2">&quot;sleep&quot;</span><span class="p">,</span> <span class="s2">&quot;2&quot;</span><span class="p">])</span></div>
+
+    
+<div class="viewcode-block" id="VisionProBridge.create_cleanup_script_macos">
+<a class="viewcode-back" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.create_cleanup_script_macos">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_cleanup_script_macos</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create cleanup script for macOS.&quot;&quot;&quot;</span>
+        <span class="n">cleanup_script</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;#!/bin/bash</span>
+<span class="s2"># Vision Pro Bridge Cleanup Script (macOS)</span>
+
+<span class="s2">echo &quot;Cleaning up Vision Pro bridge...&quot;</span>
+
+<span class="s2"># Remove bridge interface from primary interface</span>
+<span class="s2">sudo ifconfig bridge0 deletem </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">primary_interface</span><span class="si">}</span><span class="s2"> 2&gt;/dev/null || true</span>
+
+<span class="s2"># Remove bridge IP</span>
+<span class="s2">sudo ifconfig bridge0 delete </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">bridge_ip</span><span class="si">}</span><span class="s2"> 2&gt;/dev/null || true</span>
+
+<span class="s2"># Disable IP forwarding</span>
+<span class="s2">sudo sysctl -w net.inet.ip.forwarding=0 &gt; /dev/null</span>
+
+<span class="s2"># Flush pfctl rules</span>
+<span class="s2">sudo pfctl -F all 2&gt;/dev/null || true</span>
+<span class="s2">sudo pfctl -d 2&gt;/dev/null || true</span>
+
+<span class="s2">echo &quot;✅ Cleanup complete!&quot;</span>
+<span class="s2">&quot;&quot;&quot;</span>
+        <span class="n">cleanup_path</span> <span class="o">=</span> <span class="s2">&quot;/tmp/vision-pro-cleanup.sh&quot;</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">cleanup_path</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">cleanup_script</span><span class="p">)</span>
+        <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">([</span><span class="s2">&quot;chmod&quot;</span><span class="p">,</span> <span class="s2">&quot;+x&quot;</span><span class="p">,</span> <span class="n">cleanup_path</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">cleanup_path</span></div>
+
+    
+<div class="viewcode-block" id="VisionProBridge.create_cleanup_script_linux">
+<a class="viewcode-back" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.create_cleanup_script_linux">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_cleanup_script_linux</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create cleanup script for Linux.&quot;&quot;&quot;</span>
+        <span class="n">is_wireless</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_wireless_interface</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">primary_interface</span><span class="p">)</span>
+        
+        <span class="n">cleanup_script</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;#!/bin/bash</span>
+<span class="s2"># Vision Pro Bridge Cleanup Script (Linux)</span>
+
+<span class="s2">echo &quot;Cleaning up Vision Pro bridge...&quot;</span>
+
+<span class="s2"># Remove iptables rules</span>
+<span class="s2">sudo iptables -t nat -D POSTROUTING -s </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">network_base</span><span class="si">}</span><span class="s2">.0/24 -o </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">primary_interface</span><span class="si">}</span><span class="s2"> -j MASQUERADE 2&gt;/dev/null || true</span>
+
+<span class="s2">&quot;&quot;&quot;</span>
+        
+        <span class="k">if</span> <span class="n">is_wireless</span><span class="p">:</span>
+            <span class="c1"># For wireless setup, clean up USB interface</span>
+            <span class="n">cleanup_script</span> <span class="o">+=</span> <span class="s2">&quot;&quot;&quot;# Find and clean up USB network interfaces</span>
+<span class="s2">for iface in $(ip link show | grep -E &#39;enp|usb|eth&#39; | awk -F&#39;: &#39; &#39;{print $2}&#39;); do</span>
+<span class="s2">    if [ &quot;$iface&quot; != &quot;$primary_iface&quot; ]; then</span>
+<span class="s2">        sudo iptables -D FORWARD -i $iface -o &quot;&quot;&quot;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">primary_interface</span> <span class="o">+</span> <span class="s2">&quot;&quot;&quot; -j ACCEPT 2&gt;/dev/null || true</span>
+<span class="s2">        sudo iptables -D FORWARD -i &quot;&quot;&quot;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">primary_interface</span> <span class="o">+</span> <span class="s2">&quot;&quot;&quot; -o $iface -m state --state RELATED,ESTABLISHED -j ACCEPT 2&gt;/dev/null || true</span>
+<span class="s2">        sudo ip addr flush dev $iface 2&gt;/dev/null || true</span>
+<span class="s2">        sudo ip link set $iface down 2&gt;/dev/null || true</span>
+<span class="s2">    fi</span>
+<span class="s2">done</span>
+
+<span class="s2">&quot;&quot;&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># For wired setup, clean up bridge</span>
+            <span class="n">cleanup_script</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;sudo iptables -D FORWARD -i br0 -o </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">primary_interface</span><span class="si">}</span><span class="s2"> -j ACCEPT 2&gt;/dev/null || true</span>
+<span class="s2">sudo iptables -D FORWARD -i </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">primary_interface</span><span class="si">}</span><span class="s2"> -o br0 -m state --state RELATED,ESTABLISHED -j ACCEPT 2&gt;/dev/null || true</span>
+
+<span class="s2"># Remove interface from bridge</span>
+<span class="s2">sudo brctl delif br0 </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">primary_interface</span><span class="si">}</span><span class="s2"> 2&gt;/dev/null || true</span>
+
+<span class="s2"># Bring down and delete bridge</span>
+<span class="s2">sudo ip link set br0 down 2&gt;/dev/null || true</span>
+<span class="s2">sudo brctl delbr br0 2&gt;/dev/null || true</span>
+
+<span class="s2">&quot;&quot;&quot;</span>
+        
+        <span class="n">cleanup_script</span> <span class="o">+=</span> <span class="s2">&quot;&quot;&quot;# Disable IP forwarding</span>
+<span class="s2">sudo sysctl -w net.ipv4.ip_forward=0 &gt; /dev/null</span>
+
+<span class="s2">echo &quot;✅ Cleanup complete!&quot;</span>
+<span class="s2">&quot;&quot;&quot;</span>
+        <span class="n">cleanup_path</span> <span class="o">=</span> <span class="s2">&quot;/tmp/vision-pro-cleanup.sh&quot;</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">cleanup_path</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">cleanup_script</span><span class="p">)</span>
+        <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">([</span><span class="s2">&quot;chmod&quot;</span><span class="p">,</span> <span class="s2">&quot;+x&quot;</span><span class="p">,</span> <span class="n">cleanup_path</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">cleanup_path</span></div>
+
+    
+<div class="viewcode-block" id="VisionProBridge.setup">
+<a class="viewcode-back" href="../../api/modules.html#avp_stream.bridge_avp.VisionProBridge.setup">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">setup</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Main setup flow.&quot;&quot;&quot;</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;🔧 Vision Pro High-Speed Bridge Setup&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">38</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+        
+        <span class="c1"># Check platform support</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">os_type</span> <span class="o">==</span> <span class="s2">&quot;Windows&quot;</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;❌ Windows is not yet supported&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;   This tool currently supports macOS and Linux only.&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">os_type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;Darwin&quot;</span><span class="p">,</span> <span class="s2">&quot;Linux&quot;</span><span class="p">]:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Unsupported platform: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">os_type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        
+        <span class="c1"># Check prerequisites</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_prerequisites</span><span class="p">():</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        
+        <span class="c1"># Warn about Vision Pro</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;⚠️  IMPORTANT: Plug in your Vision Pro BEFORE running this script!&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="nb">input</span><span class="p">(</span><span class="s2">&quot;Is your Vision Pro plugged in? (y/n) &quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">response</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;y&#39;</span><span class="p">,</span> <span class="s1">&#39;yes&#39;</span><span class="p">]:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Please plug in your Vision Pro, wait 5 seconds, then run this script again.&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+        
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># Detect configuration</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">detect_configuration</span><span class="p">()</span>
+            
+            <span class="c1"># Show configuration</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Configuration:&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Platform: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">os_type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Primary interface: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">primary_interface</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Your machine&#39;s IP: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">ip_addr</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Network: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">network_base</span><span class="si">}</span><span class="s2">.0/24&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Bridge IP: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">bridge_ip</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+            
+            <span class="n">response</span> <span class="o">=</span> <span class="nb">input</span><span class="p">(</span><span class="s2">&quot;Continue? (y/n) &quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">response</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;y&#39;</span><span class="p">,</span> <span class="s1">&#39;yes&#39;</span><span class="p">]:</span>
+                <span class="k">return</span> <span class="kc">False</span>
+            
+            <span class="c1"># Set up bridge based on platform</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">os_type</span> <span class="o">==</span> <span class="s2">&quot;Darwin&quot;</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">setup_bridge_macos</span><span class="p">()</span>
+                <span class="n">cleanup_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_cleanup_script_macos</span><span class="p">()</span>
+            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">os_type</span> <span class="o">==</span> <span class="s2">&quot;Linux&quot;</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">setup_bridge_linux</span><span class="p">()</span>
+                <span class="n">cleanup_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_cleanup_script_linux</span><span class="p">()</span>
+            
+            <span class="c1"># Success message</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;✅ Setup complete!&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;⏳ Network should be active in ~5 seconds...&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Your Vision Pro should now have:&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  • ~10 Gbps local network speeds (test with iperf)&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  • Full internet access&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;🧪 To test internet: Try loading a webpage on Vision Pro&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;🧹 To cleanup when done: Run </span><span class="si">{</span><span class="n">cleanup_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            
+            <span class="k">return</span> <span class="kc">True</span>
+            
+        <span class="k">except</span> <span class="n">BridgeSetupError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">❌ Error: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="k">except</span> <span class="ne">KeyboardInterrupt</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n\n</span><span class="s2">⚠️  Setup cancelled by user&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">❌ Unexpected error: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="kn">import</span><span class="w"> </span><span class="nn">traceback</span>
+            <span class="n">traceback</span><span class="o">.</span><span class="n">print_exc</span><span class="p">()</span>
+            <span class="k">return</span> <span class="kc">False</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="main">
+<a class="viewcode-back" href="../../api/modules.html#avp_stream.bridge_avp.main">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Main entry point for the bridge setup utility.&quot;&quot;&quot;</span>
+    <span class="n">bridge</span> <span class="o">=</span> <span class="n">VisionProBridge</span><span class="p">()</span>
+    <span class="n">success</span> <span class="o">=</span> <span class="n">bridge</span><span class="o">.</span><span class="n">setup</span><span class="p">()</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">0</span> <span class="k">if</span> <span class="n">success</span> <span class="k">else</span> <span class="mi">1</span><span class="p">)</span></div>
+
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Younghyo Park.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

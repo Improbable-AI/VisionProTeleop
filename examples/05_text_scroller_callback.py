@@ -118,7 +118,7 @@ if __name__ == "__main__":
     streamer.register_frame_callback(callback)
     
     # Start video streaming without device (synthetic mode)
-    streamer.start_video_streaming(
+    streamer.start_streaming(
         device=None,        
         format=None,       
         fps=60,            

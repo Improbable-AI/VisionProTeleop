@@ -110,7 +110,7 @@ if __name__ == "__main__":
     
     
     streamer.register_frame_callback(hand_tracking_visualizer(streamer))
-    streamer.start_video_streaming(
+    streamer.start_streaming(
         device=None,        
         format=None,       
         fps=60,            

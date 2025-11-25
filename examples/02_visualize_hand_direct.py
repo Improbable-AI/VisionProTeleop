@@ -97,7 +97,7 @@ if __name__ == "__main__":
     # Create streamer
     streamer = VisionProStreamer(ip=args.ip)
     
-    streamer.start_video_streaming(
+    streamer.start_streaming(
         device=None,        
         format=None,       
         fps=60,            

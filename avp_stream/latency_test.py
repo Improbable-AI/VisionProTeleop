@@ -159,7 +159,7 @@ def main():
             # Double the width for stereo
             width, height = map(int, resolution.split('x'))
             resolution = f"{width * 2}x{height}"
-        streamer.start_video_streaming(device=None, size=resolution, fps=args.fps, stereo_video=args.stereo)
+        streamer.start_streaming(device=None, size=resolution, fps=args.fps, stereo_video=args.stereo)
         print("Streaming started. Measuring latency...")
         try:
             while True:
@@ -170,7 +170,7 @@ def main():
         # Sweep mode
         # Start with the first resolution
         first_res_name, first_res_size = resolutions[0]
-        streamer.start_video_streaming(device=None, size=first_res_size, fps=args.fps, stereo_video=args.stereo)
+        streamer.start_streaming(device=None, size=first_res_size, fps=args.fps, stereo_video=args.stereo)
         
         print(f"Starting sweep over {len(resolutions)} resolutions: {[r[0] for r in resolutions]}")
         

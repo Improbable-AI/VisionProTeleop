@@ -18,24 +18,6 @@ Research Team
 
 Improbable AI Lab, Massachusetts Institute of Technology
 
-Contributing
-------------
-
-Contributions to VisionProTeleop are welcome! Please visit the `GitHub repository <https://github.com/Improbable-AI/VisionProTeleop>`_ to:
-
-- Report issues
-- Submit pull requests
-- Suggest features
-- Share your use cases
-
-Community
----------
-
-Join the community:
-
-- GitHub Discussions: Share your projects and ask questions
-- Issues: Report bugs or request features
-- Pull Requests: Contribute improvements
 
 Related Projects
 ----------------
