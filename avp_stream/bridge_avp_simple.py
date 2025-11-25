@@ -80,6 +80,16 @@ class VisionProUSBNetwork:
     
     def find_usb_interface_linux(self) -> Optional[str]:
         """Find USB network interface on Linux."""
+        # Get primary interface first
+        primary_iface = None
+        try:
+            result = self.run_command(["ip", "route", "show", "default"], check=False)
+            match = re.search(r'dev\s+(\S+)', result.stdout)
+            if match:
+                primary_iface = match.group(1)
+        except:
+            pass
+        
         result = self.run_command(["ip", "link", "show"], check=False)
         
         # Look for USB/Ethernet interfaces
@@ -88,13 +98,12 @@ class VisionProUSBNetwork:
             match = re.search(r'\d+:\s+(\S+):', line)
             if match and '@' not in line:  # Skip VLAN interfaces
                 iface = match.group(1)
-                # Look for typical USB network interface names
-                if any(pattern in iface for pattern in ['enp', 'usb', 'eth']) and iface != 'lo':
-                    # Check if it's not the primary network interface
-                    addr_result = self.run_command(["ip", "addr", "show", iface], check=False)
-                    # Prefer interfaces without IP or with link-local
-                    if 'inet ' not in addr_result.stdout or '169.254.' in addr_result.stdout:
-                        interfaces.append(iface)
+                # Skip lo and primary interface
+                if iface == 'lo' or iface == primary_iface:
+                    continue
+                # Look for typical USB/Ethernet network interface names
+                if any(pattern in iface for pattern in ['enp', 'usb', 'eth', 'en']):
+                    interfaces.append(iface)
         
         # Return the first suitable interface
         return interfaces[0] if interfaces else None
@@ -134,7 +143,10 @@ class VisionProUSBNetwork:
         # Bring interface up
         self.run_command(["sudo", "ip", "link", "set", interface, "up"], capture=False)
         
-        # Add route to Vision Pro's subnet
+        # Add route to Vision Pro's subnet (delete first if exists)
+        self.run_command([
+            "sudo", "ip", "route", "del", "169.254.220.0/24"
+        ], check=False, capture=False)
         self.run_command([
             "sudo", "ip", "route", "add", "169.254.220.0/24", "dev", interface
         ], check=False, capture=False)
@@ -226,11 +238,29 @@ echo "✅ Cleanup complete!"
         time.sleep(2)
         
         try:
-            # Find USB interface
+            # Find USB interface with retry logic
             if self.os_type == "Darwin":
                 self.usb_interface = self.find_usb_interface_macos()
             elif self.os_type == "Linux":
                 self.usb_interface = self.find_usb_interface_linux()
+                
+                # If not found, wait and try again
+                if not self.usb_interface:
+                    print("  • Interface not found, waiting 3 seconds...")
+                    time.sleep(3)
+                    self.usb_interface = self.find_usb_interface_linux()
+                
+                # Show available interfaces for debugging
+                if not self.usb_interface:
+                    print("")
+                    print("  Available network interfaces:")
+                    result = self.run_command(["ip", "link", "show"], check=False)
+                    for line in result.stdout.split('\n'):
+                        match = re.search(r'\d+:\s+(\S+):', line)
+                        if match and '@' not in line:
+                            iface = match.group(1)
+                            if iface != 'lo':
+                                print(f"    - {iface}")
             
             if not self.usb_interface:
                 print("")
@@ -241,7 +271,8 @@ echo "✅ Cleanup complete!"
                 print("  2. Try unplugging and replugging")
                 print("  3. Wait a few seconds for the interface to appear")
                 if self.os_type == "Linux":
-                    print("  4. Run 'ip link show' to see all interfaces")
+                    print("  4. Check if the interface appears in 'ip link show'")
+                    print("  5. Look for interfaces like enp*, eth*, or usb*")
                 else:
                     print("  4. Run 'ifconfig -l' to see all interfaces")
                 return False
