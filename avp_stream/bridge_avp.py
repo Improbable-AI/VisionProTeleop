@@ -1,20 +1,14 @@
 #!/usr/bin/env python3
 """
-Vision Pro Static IP Network Setup
+Vision Pro High-Speed Bridge Setup
 
-This module sets up a simple point-to-point network connection for Vision Pro devices
-using static IP addresses over USB-C connection.
-
-Network Configuration:
-- Vision Pro (host): 169.254.1.1/16
-- Computer: 169.254.1.2/16
-- Subnet mask: 255.255.0.0
-- Optional: NAT for internet sharing
+This module sets up a high-speed network bridge for Vision Pro devices,
+providing ~10 Gbps local network speeds with full internet access.
 
 Platform Support:
-- macOS: Full support using ifconfig
-- Linux: Full support using ip commands
-- Windows: Not yet supported
+- macOS: Full support using pfctl and bridge interfaces
+- Linux: Support using iptables and bridge-utils
+- Windows: Not yet supported (requires netsh and bridge configuration)
 """
 
 import subprocess
@@ -43,15 +37,17 @@ class VisionProBridge:
     def check_prerequisites(self) -> bool:
         """Check if required tools are available for the current platform."""
         if self.os_type == "Darwin":  # macOS
-            required_commands = ["ifconfig", "route", "sysctl"]
+            required_commands = ["ifconfig", "route", "sysctl", "pfctl"]
         elif self.os_type == "Linux":
-            required_commands = ["ip", "sysctl"]
+            required_commands = ["ip", "brctl", "sysctl", "iptables"]
         else:
             return False
             
         for cmd in required_commands:
             if not shutil.which(cmd):
                 print(f"❌ Error: Required command '{cmd}' not found")
+                if self.os_type == "Linux" and cmd == "brctl":
+                    print("   Install with: sudo apt-get install bridge-utils")
                 return False
         return True
     
@@ -132,203 +128,228 @@ class VisionProBridge:
         else:
             raise BridgeSetupError(f"Unsupported platform: {self.os_type}")
         
-        # Simple static IP setup: Vision Pro is host at 169.254.1.1
-        # This computer gets 169.254.1.2 for direct point-to-point connection
-        self.network_base = "169.254.1"
-        self.bridge_ip = "169.254.1.2"  # Computer's IP (Vision Pro is .1)
+        # For USB connections, Vision Pro uses link-local addressing (169.254.x.x)
+        # We should use a compatible address on the same subnet
+        self.network_base = "169.254.220"
+        self.bridge_ip = "169.254.220.1"  # Use .1 as the host IP
     
     def setup_bridge_macos(self):
-        """Set up simple static IP configuration on macOS."""
-        print("\nSetting up static IP configuration...")
+        """Set up bridge on macOS."""
+        print("\nSetting up bridge...")
         
-        # 1. Find USB network interface
-        print("  • Looking for USB network interface...")
-        result = self.run_command(["ifconfig", "-a"])
+        # 1. Enable IP forwarding
+        print("  • Enabling IP forwarding...")
+        self.run_command(["sudo", "sysctl", "-w", "net.inet.ip.forwarding=1"], capture=False)
         
-        # Look for interfaces that aren't the primary one and aren't loopback
-        usb_interface = None
-        for line in result.stdout.split('\n'):
-            match = re.search(r'^(en\d+):', line)
-            if match:
-                iface = match.group(1)
-                if iface != self.primary_interface and iface != 'lo0':
-                    # Check if it has a 169.254 address or no address (new connection)
-                    iface_info = self.run_command(["ifconfig", iface])
-                    if '169.254' in iface_info.stdout or 'inet ' not in iface_info.stdout:
-                        usb_interface = iface
-                        break
-        
-        if not usb_interface:
-            print("\n  ⚠️  No USB network interface detected!")
-            print("  • Please ensure Vision Pro is plugged in via USB-C")
-            print("  • Wait 5 seconds after plugging in, then run this script again")
-            print("  • Run 'ifconfig -a' to see all interfaces")
-            raise BridgeSetupError("USB network interface not detected")
-        
-        print(f"  • Found USB interface: {usb_interface}")
-        
-        # 2. Configure static IP on USB interface
-        print(f"  • Configuring {usb_interface} with IP {self.bridge_ip}...")
-        print(f"    (Vision Pro should be at 169.254.1.1)")
-        
-        # Remove any existing IP addresses
+        # 2. Configure bridge0
+        print("  • Configuring bridge0...")
         self.run_command([
-            "sudo", "ifconfig", usb_interface, "inet", "0.0.0.0", "delete"
-        ], check=False, capture=False)
-        
-        # Set static IP with /16 subnet mask (255.255.0.0)
-        self.run_command([
-            "sudo", "ifconfig", usb_interface, "inet", self.bridge_ip,
-            "netmask", "255.255.0.0"
+            "sudo", "ifconfig", "bridge0", "inet", self.bridge_ip, 
+            "netmask", "255.255.255.0"
         ], capture=False)
-        
         subprocess.run(["sleep", "1"])
         
-        # 3. Optional: Enable IP forwarding and NAT for internet access
-        response = input("\n  Enable internet sharing for Vision Pro? (y/n) ").strip().lower()
-        if response in ['y', 'yes']:
-            print("  • Enabling IP forwarding...")
-            self.run_command(["sudo", "sysctl", "-w", "net.inet.ip.forwarding=1"], capture=False)
-            
-            print("  • Configuring NAT...")
-            self.run_command(["sudo", "pfctl", "-e"], check=False, capture=False)
-            
-            nat_rule = f"nat on {self.primary_interface} from 169.254.0.0/16 to any -> ({self.primary_interface})"
-            proc = subprocess.Popen(
-                ["sudo", "pfctl", "-f", "-"],
-                stdin=subprocess.PIPE,
-                stderr=subprocess.DEVNULL
-            )
-            proc.communicate(input=nat_rule.encode())
-            self.nat_enabled = True
-        else:
-            self.nat_enabled = False
+        # 3. Add primary interface to bridge0
+        print(f"  • Adding {self.primary_interface} to bridge0...")
+        self.run_command([
+            "sudo", "ifconfig", "bridge0", "addm", self.primary_interface
+        ], check=False, capture=False)
+        subprocess.run(["sleep", "2"])
         
-        # Store USB interface for cleanup
-        self.usb_interface = usb_interface
-        subprocess.run(["sleep", "1"])
+        # 4. Set up NAT
+        print("  • Configuring NAT...")
+        # Enable pfctl
+        self.run_command(["sudo", "pfctl", "-e"], check=False, capture=False)
+        
+        # Create NAT rule
+        nat_rule = f"nat on {self.primary_interface} inet from bridge0:network to any -> ({self.primary_interface})"
+        proc = subprocess.Popen(
+            ["sudo", "pfctl", "-f", "-"],
+            stdin=subprocess.PIPE,
+            stderr=subprocess.DEVNULL
+        )
+        proc.communicate(input=nat_rule.encode())
+        subprocess.run(["sleep", "2"])
     
     def setup_bridge_linux(self):
-        """Set up simple static IP configuration on Linux."""
-        print("\nSetting up static IP configuration...")
+        """Set up bridge on Linux.
         
-        # 1. Find USB network interface
-        print("  • Looking for USB network interface...")
-        result = self.run_command(["ip", "link", "show"], check=False)
+        For wired interfaces: Creates a true bridge
+        For wireless interfaces: Uses USB network interface directly with NAT
+        """
+        print("\nSetting up bridge...")
         
-        # Show all interfaces for debugging
-        print("\n  Available network interfaces:")
-        all_interfaces = []
-        for line in result.stdout.split('\n'):
-            match = re.search(r'\d+:\s+(\S+):', line)
-            if match and '@' not in line:  # Skip VLAN interfaces
-                iface = match.group(1)
-                if iface not in ['lo', self.primary_interface]:
-                    all_interfaces.append(iface)
-                    print(f"    - {iface}")
+        # Check if primary interface is wireless
+        is_wireless = self.is_wireless_interface(self.primary_interface)
         
-        # Wait a moment for interface to appear if none found
-        if not all_interfaces:
-            print("  • Waiting 3 seconds for USB interface to appear...")
-            subprocess.run(["sleep", "3"])
+        # 1. Enable IP forwarding
+        print("  • Enabling IP forwarding...")
+        self.run_command(["sudo", "sysctl", "-w", "net.ipv4.ip_forward=1"], capture=False)
+        
+        if is_wireless:
+            # For wireless: Skip bridge creation, use USB network interface directly
+            print(f"  ⚠️  Detected wireless interface ({self.primary_interface})")
+            print("  • Setting up direct USB network routing (wireless can't bridge)")
+            print("  • Looking for USB network interface...")
+            
+            # Find USB network interfaces (usually enp*, usb*)
             result = self.run_command(["ip", "link", "show"], check=False)
+            
+            # Show all interfaces for debugging
+            print("\n  Available network interfaces:")
+            all_interfaces = []
             for line in result.stdout.split('\n'):
                 match = re.search(r'\d+:\s+(\S+):', line)
-                if match and '@' not in line:
+                if match and '@' not in line:  # Skip VLAN interfaces
                     iface = match.group(1)
                     if iface not in ['lo', self.primary_interface]:
                         all_interfaces.append(iface)
-        
-        if not all_interfaces:
-            print("\n  ⚠️  No USB network interface detected!")
-            print("  • Please ensure Vision Pro is plugged in via USB-C")
-            print("  • Wait 5 seconds after plugging in, then run this script again")
-            print("  • Run 'ip link show' to see all interfaces")
-            raise BridgeSetupError("USB network interface not detected")
-        
-        # Prefer interfaces that look like USB/ethernet
-        usb_interface = None
-        for iface in all_interfaces:
-            if any(pattern in iface for pattern in ['enp', 'usb', 'eth', 'en']):
-                usb_interface = iface
-                break
-        
-        # If no specific USB pattern found, use the first available
-        if not usb_interface:
-            usb_interface = all_interfaces[0]
-        
-        print(f"\n  • Using interface: {usb_interface}")
-        
-        # 2. Configure static IP on USB interface
-        print(f"  • Configuring {usb_interface} with IP {self.bridge_ip}...")
-        print(f"    (Vision Pro should be at 169.254.1.1)")
-        
-        # Remove any existing IPs
-        self.run_command(["sudo", "ip", "addr", "flush", "dev", usb_interface], check=False, capture=False)
-        
-        # Add our IP with /16 subnet mask (255.255.0.0)
-        self.run_command([
-            "sudo", "ip", "addr", "add", f"{self.bridge_ip}/16", "dev", usb_interface
-        ], check=False, capture=False)
-        
-        # Bring interface up
-        self.run_command(["sudo", "ip", "link", "set", usb_interface, "up"], capture=False)
-        
-        subprocess.run(["sleep", "1"])
-        
-        # 3. Optional: Enable IP forwarding and NAT for internet access
-        response = input("\n  Enable internet sharing for Vision Pro? (y/n) ").strip().lower()
-        if response in ['y', 'yes']:
-            print("  • Enabling IP forwarding...")
-            self.run_command(["sudo", "sysctl", "-w", "net.ipv4.ip_forward=1"], capture=False)
+                        print(f"    - {iface}")
             
+            # Wait a moment for interface to appear
+            if not all_interfaces:
+                print("  • Waiting 3 seconds for USB interface to appear...")
+                subprocess.run(["sleep", "3"])
+                result = self.run_command(["ip", "link", "show"], check=False)
+                for line in result.stdout.split('\n'):
+                    match = re.search(r'\d+:\s+(\S+):', line)
+                    if match and '@' not in line:
+                        iface = match.group(1)
+                        if iface not in ['lo', self.primary_interface]:
+                            all_interfaces.append(iface)
+            
+            if all_interfaces:
+                # Prefer interfaces that look like USB/ethernet
+                usb_iface = None
+                for iface in all_interfaces:
+                    if any(pattern in iface for pattern in ['enp', 'usb', 'eth', 'en']):
+                        usb_iface = iface
+                        break
+                
+                # If no specific USB pattern found, use the first available
+                if not usb_iface:
+                    usb_iface = all_interfaces[0]
+                
+                print(f"\n  • Using interface: {usb_iface}")
+                
+                # Configure the USB interface
+                print(f"  • Configuring {usb_iface} with IP {self.bridge_ip}...")
+                print(f"    (Vision Pro should be at 169.254.220.107)")
+                # Remove any existing IPs
+                self.run_command(["sudo", "ip", "addr", "flush", "dev", usb_iface], check=False, capture=False)
+                # Add our IP on the same link-local subnet as Vision Pro
+                # Use /16 for link-local addressing
+                self.run_command([
+                    "sudo", "ip", "addr", "add", f"{self.bridge_ip}/16", "dev", usb_iface
+                ], check=False, capture=False)
+                # Bring it up
+                self.run_command(["sudo", "ip", "link", "set", usb_iface, "up"], capture=False)
+                
+                # Add route to Vision Pro's subnet
+                print("  • Adding route to Vision Pro...")
+                self.run_command([
+                    "sudo", "ip", "route", "add", "169.254.220.0/24", "dev", usb_iface
+                ], check=False, capture=False)
+                
+                # Set up NAT
+                print("  • Configuring NAT...")
+                self.run_command([
+                    "sudo", "iptables", "-t", "nat", "-A", "POSTROUTING",
+                    "-s", f"{self.network_base}.0/24",
+                    "-o", self.primary_interface, "-j", "MASQUERADE"
+                ], check=False, capture=False)
+                
+                # Allow forwarding
+                self.run_command([
+                    "sudo", "iptables", "-A", "FORWARD", "-i", usb_iface,
+                    "-o", self.primary_interface, "-j", "ACCEPT"
+                ], check=False, capture=False)
+                
+                self.run_command([
+                    "sudo", "iptables", "-A", "FORWARD", "-i", self.primary_interface,
+                    "-o", usb_iface, "-m", "state", "--state", "RELATED,ESTABLISHED",
+                    "-j", "ACCEPT"
+                ], check=False, capture=False)
+                
+                # Store the USB interface for cleanup
+                self.usb_interface = usb_iface
+            else:
+                print("\n  ⚠️  No additional network interfaces found!")
+                print("  • Please ensure Vision Pro is plugged in via USB-C")
+                print("  • Try unplugging and replugging the Vision Pro")
+                print("  • Run 'ip link show' to see all interfaces")
+                raise BridgeSetupError("USB network interface not detected")
+        else:
+            # For wired: Create a proper bridge
+            print(f"  • Using wired interface ({self.primary_interface})")
+            
+            # 2. Create bridge interface if it doesn't exist
+            print("  • Creating bridge interface...")
+            result = self.run_command(["ip", "link", "show", "br0"], check=False)
+            if result.returncode != 0:
+                self.run_command(["sudo", "brctl", "addbr", "br0"], capture=False)
+            
+            # 3. Configure bridge IP
+            print("  • Configuring bridge IP...")
+            # Flush any existing IPs
+            self.run_command(["sudo", "ip", "addr", "flush", "dev", "br0"], check=False, capture=False)
+            
+            self.run_command([
+                "sudo", "ip", "addr", "add", f"{self.bridge_ip}/24", "dev", "br0"
+            ], check=False, capture=False)
+            
+            # 4. Add primary interface to bridge
+            print(f"  • Adding {self.primary_interface} to bridge...")
+            self.run_command([
+                "sudo", "brctl", "addif", "br0", self.primary_interface
+            ], check=False, capture=False)
+            
+            # 5. Bring up the bridge
+            print("  • Bringing up bridge interface...")
+            self.run_command(["sudo", "ip", "link", "set", "br0", "up"], capture=False)
+            
+            # 6. Set up NAT with iptables
             print("  • Configuring NAT...")
             self.run_command([
                 "sudo", "iptables", "-t", "nat", "-A", "POSTROUTING",
-                "-s", "169.254.0.0/16",
+                "-s", f"{self.network_base}.0/24",
                 "-o", self.primary_interface, "-j", "MASQUERADE"
             ], check=False, capture=False)
             
             # Allow forwarding
             self.run_command([
-                "sudo", "iptables", "-A", "FORWARD", "-i", usb_interface,
+                "sudo", "iptables", "-A", "FORWARD", "-i", "br0",
                 "-o", self.primary_interface, "-j", "ACCEPT"
             ], check=False, capture=False)
             
             self.run_command([
                 "sudo", "iptables", "-A", "FORWARD", "-i", self.primary_interface,
-                "-o", usb_interface, "-m", "state", "--state", "RELATED,ESTABLISHED",
+                "-o", "br0", "-m", "state", "--state", "RELATED,ESTABLISHED",
                 "-j", "ACCEPT"
             ], check=False, capture=False)
-            self.nat_enabled = True
-        else:
-            self.nat_enabled = False
         
-        # Store USB interface for cleanup
-        self.usb_interface = usb_interface
-        subprocess.run(["sleep", "1"])
+        subprocess.run(["sleep", "2"])
     
     def create_cleanup_script_macos(self):
         """Create cleanup script for macOS."""
-        nat_cleanup = ""
-        if hasattr(self, 'nat_enabled') and self.nat_enabled:
-            nat_cleanup = f"""
+        cleanup_script = f"""#!/bin/bash
+# Vision Pro Bridge Cleanup Script (macOS)
+
+echo "Cleaning up Vision Pro bridge..."
+
+# Remove bridge interface from primary interface
+sudo ifconfig bridge0 deletem {self.primary_interface} 2>/dev/null || true
+
+# Remove bridge IP
+sudo ifconfig bridge0 delete {self.bridge_ip} 2>/dev/null || true
+
 # Disable IP forwarding
 sudo sysctl -w net.inet.ip.forwarding=0 > /dev/null
 
 # Flush pfctl rules
 sudo pfctl -F all 2>/dev/null || true
 sudo pfctl -d 2>/dev/null || true
-"""
-        
-        cleanup_script = f"""#!/bin/bash
-# Vision Pro Static IP Cleanup Script (macOS)
 
-echo "Cleaning up Vision Pro static IP configuration..."
-
-# Remove static IP from USB interface
-sudo ifconfig {self.usb_interface} inet {self.bridge_ip} delete 2>/dev/null || true
-{nat_cleanup}
 echo "✅ Cleanup complete!"
 """
         cleanup_path = "/tmp/vision-pro-cleanup.sh"
@@ -339,27 +360,48 @@ echo "✅ Cleanup complete!"
     
     def create_cleanup_script_linux(self):
         """Create cleanup script for Linux."""
-        nat_cleanup = ""
-        if hasattr(self, 'nat_enabled') and self.nat_enabled:
-            nat_cleanup = f"""
-# Remove iptables rules
-sudo iptables -t nat -D POSTROUTING -s 169.254.0.0/16 -o {self.primary_interface} -j MASQUERADE 2>/dev/null || true
-sudo iptables -D FORWARD -i {self.usb_interface} -o {self.primary_interface} -j ACCEPT 2>/dev/null || true
-sudo iptables -D FORWARD -i {self.primary_interface} -o {self.usb_interface} -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
-
-# Disable IP forwarding
-sudo sysctl -w net.ipv4.ip_forward=0 > /dev/null
-"""
+        is_wireless = self.is_wireless_interface(self.primary_interface)
         
         cleanup_script = f"""#!/bin/bash
-# Vision Pro Static IP Cleanup Script (Linux)
+# Vision Pro Bridge Cleanup Script (Linux)
 
-echo "Cleaning up Vision Pro static IP configuration..."
+echo "Cleaning up Vision Pro bridge..."
 
-# Remove static IP from USB interface
-sudo ip addr flush dev {self.usb_interface} 2>/dev/null || true
-sudo ip link set {self.usb_interface} down 2>/dev/null || true
-{nat_cleanup}
+# Remove iptables rules
+sudo iptables -t nat -D POSTROUTING -s {self.network_base}.0/24 -o {self.primary_interface} -j MASQUERADE 2>/dev/null || true
+
+"""
+        
+        if is_wireless:
+            # For wireless setup, clean up USB interface
+            cleanup_script += """# Find and clean up USB network interfaces
+for iface in $(ip link show | grep -E 'enp|usb|eth' | awk -F': ' '{print $2}'); do
+    if [ "$iface" != "$primary_iface" ]; then
+        sudo iptables -D FORWARD -i $iface -o """ + self.primary_interface + """ -j ACCEPT 2>/dev/null || true
+        sudo iptables -D FORWARD -i """ + self.primary_interface + """ -o $iface -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
+        sudo ip addr flush dev $iface 2>/dev/null || true
+        sudo ip link set $iface down 2>/dev/null || true
+    fi
+done
+
+"""
+        else:
+            # For wired setup, clean up bridge
+            cleanup_script += f"""sudo iptables -D FORWARD -i br0 -o {self.primary_interface} -j ACCEPT 2>/dev/null || true
+sudo iptables -D FORWARD -i {self.primary_interface} -o br0 -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
+
+# Remove interface from bridge
+sudo brctl delif br0 {self.primary_interface} 2>/dev/null || true
+
+# Bring down and delete bridge
+sudo ip link set br0 down 2>/dev/null || true
+sudo brctl delbr br0 2>/dev/null || true
+
+"""
+        
+        cleanup_script += """# Disable IP forwarding
+sudo sysctl -w net.ipv4.ip_forward=0 > /dev/null
+
 echo "✅ Cleanup complete!"
 """
         cleanup_path = "/tmp/vision-pro-cleanup.sh"
@@ -370,7 +412,7 @@ echo "✅ Cleanup complete!"
     
     def setup(self):
         """Main setup flow."""
-        print("🔧 Vision Pro Static IP Network Setup")
+        print("🔧 Vision Pro High-Speed Bridge Setup")
         print("=" * 38)
         print("")
         
@@ -389,17 +431,12 @@ echo "✅ Cleanup complete!"
             return False
         
         # Warn about Vision Pro
-        print("⚠️  IMPORTANT:")
-        print("   1. Plug in your Vision Pro via USB-C BEFORE running this script")
-        print("   2. Configure Vision Pro with static IP: 169.254.1.1, subnet: 255.255.0.0")
+        print("⚠️  IMPORTANT: Plug in your Vision Pro BEFORE running this script!")
         print("")
-        response = input("Is your Vision Pro plugged in and configured? (y/n) ").strip().lower()
+        response = input("Is your Vision Pro plugged in? (y/n) ").strip().lower()
         if response not in ['y', 'yes']:
             print("")
-            print("Please:")
-            print("  • Plug in your Vision Pro via USB-C")
-            print("  • Set static IP to 169.254.1.1 with subnet mask 255.255.0.0")
-            print("  • Wait 5 seconds, then run this script again")
+            print("Please plug in your Vision Pro, wait 5 seconds, then run this script again.")
             return False
         
         print("")
@@ -434,22 +471,14 @@ echo "✅ Cleanup complete!"
             print("")
             print("✅ Setup complete!")
             print("")
-            print("⏳ Connection should be active in ~3 seconds...")
+            print("⏳ Network should be active in ~5 seconds...")
             print("")
-            print("Network Configuration:")
-            print(f"  • Vision Pro IP: 169.254.1.1 (host)")
-            print(f"  • Your computer IP: {self.bridge_ip}")
-            print(f"  • Subnet mask: 255.255.0.0 (/16)")
+            print("Your Vision Pro should now have:")
+            print("  • ~10 Gbps local network speeds (test with iperf)")
+            print("  • Full internet access")
             print("")
-            if hasattr(self, 'nat_enabled') and self.nat_enabled:
-                print("  • Internet sharing: ENABLED")
-                print("  • Vision Pro has internet access through your computer")
-            else:
-                print("  • Internet sharing: DISABLED")
-                print("  • Direct point-to-point connection only")
-            print("")
-            print("🧪 To test connection: ping 169.254.1.1")
-            print(f"🧹 To cleanup when done: {cleanup_path}")
+            print("🧪 To test internet: Try loading a webpage on Vision Pro")
+            print(f"🧹 To cleanup when done: Run {cleanup_path}")
             
             return True
             
