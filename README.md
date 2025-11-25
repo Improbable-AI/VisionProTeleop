@@ -29,7 +29,7 @@ This VisionOS app and python library streams your Head + Wrist + Hand Tracking r
 
 
 
-## Benchmark Results
+## Latency Benchmark Results
 
 We performed comprehensive round-trip latency measurements to benchmark our video streaming system. The measurement captures the full cycle: 
 1. Python encodes a timestamp into a video frame as a marker

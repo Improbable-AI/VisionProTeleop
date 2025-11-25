@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='avp_stream',
-    version='2.0',
+    version='2.1',
     description='This python package streams diverse tracking data available from AVP to any devices that can communicate with gRPC.',
     author='Younghyo Park',
     author_email='younghyo@mit.edu',
