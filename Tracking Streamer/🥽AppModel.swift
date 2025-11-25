@@ -103,6 +103,11 @@ class DataManager: ObservableObject {
     @Published var stereoAudioEnabled: Bool = false  // Whether stereo audio mode is enabled
     @Published var audioEnabled: Bool = false  // Whether audio track is present at all
     
+    // Stream stats
+    @Published var videoResolution: String = "Waiting..."
+    @Published var videoFPS: Int = 0
+    @Published var audioSampleRate: Int = 0
+    
     @Published var connectionStatus: String = "Initializing..."
     
     // Video plane z-distance setting (persistent via UserDefaults)
@@ -141,6 +146,8 @@ class DataManager: ObservableObject {
             UserDefaults.standard.set(statusMinimizedYPosition, forKey: "statusMinimizedYPosition")
         }
     }
+    
+    @Published var showExitConfirmation: Bool = false
     
     private init() {
         // Load saved z-distance or use default of -10.0

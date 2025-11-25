@@ -65,8 +65,8 @@ class VisionProStreamer:
         self._benchmark_condition = Condition()
         self._benchmark_events = {}
 
-        self.start_streaming()
         self._start_info_server()  # Start HTTP endpoint immediately
+        self._start_hand_tracking()  # Start hand tracking stream
 
     def _process_hand_update(self, hand_update, source="grpc"):
         if getattr(hand_update.Head, "m00", 0.0) == 777.0:
@@ -167,8 +167,8 @@ class VisionProStreamer:
         def _on_message(message):
             self._handle_webrtc_hand_message(message)
 
-    def start_streaming(self): 
-
+    def _start_hand_tracking(self): 
+        """Start the hand tracking gRPC stream in a background thread."""
         stream_thread = Thread(target = self.stream, daemon=True)
         stream_thread.start() 
         
@@ -510,10 +510,11 @@ class VisionProStreamer:
             try:
                 server = ReusableHTTPServer(('0.0.0.0', port), InfoHandler)
                 self.info_server = server
-                print(f"Info server started on port {port}")
+                # print(f"Info server started on port {port}")
                 server.serve_forever()
             except Exception as e:
-                print(f"Could not start info server: {e}")
+                # print(f"Could not start info server: {e}")
+                pass 
         
         info_thread = Thread(target=run_http_server, daemon=True)
         info_thread.start()
@@ -1018,7 +1019,8 @@ class VisionProStreamer:
                     await writer.wait_closed()
             
             async def run_server():
-                server = await asyncio.start_server(run_peer_custom, "0.0.0.0", port)
+                server = await asyncio.start_server(run_peer_custom, "0.0.0.0", port,     start_serving=True, reuse_address=True, reuse_port=True)
+
                 print(f"WebRTC server listening on 0.0.0.0:{port}")
                 async with server:
                     await server.serve_forever()

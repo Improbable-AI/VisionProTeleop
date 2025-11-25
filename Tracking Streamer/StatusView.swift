@@ -45,7 +45,7 @@ struct StatusOverlay: View {
     @State private var webrtcConnected: Bool = false
     @State private var hidePreviewTask: Task<Void, Never>?
     @State private var showStatusPositionControls: Bool = false
-    @State private var showExitConfirmation: Bool = false
+    @State private var showLocalExitConfirmation: Bool = false
     
     init(hasFrames: Binding<Bool> = .constant(false), showVideoStatus: Bool = true, isMinimized: Binding<Bool> = .constant(false), showViewControls: Binding<Bool> = .constant(false), previewZDistance: Binding<Float?> = .constant(nil), previewActive: Binding<Bool> = .constant(false), userInteracted: Binding<Bool> = .constant(false), videoMinimized: Binding<Bool> = .constant(false), videoFixed: Binding<Bool> = .constant(false), previewStatusPosition: Binding<(x: Float, y: Float)?> = .constant(nil), previewStatusActive: Binding<Bool> = .constant(false)) {
         self._hasFrames = hasFrames
@@ -101,247 +101,356 @@ struct StatusOverlay: View {
                         hasFrames = false  // Clear frames flag
                     }
                 }
+                
+                // Detect connection and minimize status view
+                if (!wasPythonConnected && pythonConnected) {
+                     // Only minimize on Python connection if NOT in video mode (hand tracking only)
+                     // In video mode, we wait for frames to arrive (handled in ImmersiveView)
+                     if !showVideoStatus {
+                         print("🔌 [StatusView] Connection established - minimizing status view")
+                         if !userInteracted {
+                             withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                                 isMinimized = true
+                             }
+                         }
+                     }
+                }
             }
         }
     }
     
     private var minimizedView: some View {
         HStack(spacing: 16) {
-            // Expand button
-            Button {
-                withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
-                    isMinimized = false
-                    userInteracted = true  // Mark that user has interacted
-                }
-            } label: {
-                ZStack {
-                    Circle()
-                        .fill(Color.white.opacity(0.3))
-                        .frame(width: 42, height: 42)
-                    Image(systemName: "arrow.up.left.and.arrow.down.right")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(.white)
-                }
-            }
-            .buttonStyle(.plain)
-            
-            // Video minimize/maximize button (only show if video streaming mode is enabled)
-            if showVideoStatus {
+            if showLocalExitConfirmation {
+                // Confirmation mode
+                Text("Exit?")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                
                 Button {
-                    withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
-                        videoMinimized.toggle()
-                    }
+                    print("❌ [StatusView] Exiting app now")
+                    exit(0)
                 } label: {
                     ZStack {
                         Circle()
-                            .fill(Color.blue.opacity(0.8))
-                            .frame(width: 42, height: 42)
-                        Image(systemName: videoMinimized ? "video.fill" : "video.slash.fill")
-                            .font(.system(size: 18, weight: .bold))
+                            .fill(Color.red)
+                            .frame(width: 60, height: 60)
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 24, weight: .bold))
                             .foregroundColor(.white)
                     }
                 }
                 .buttonStyle(.plain)
-            }
-
-            // Toggle world-fixed mode for the video panel
-            Button {
-                withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
-                    videoFixed.toggle()
+                
+                Button {
+                    withAnimation {
+                        showLocalExitConfirmation = false
+                    }
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(Color.gray.opacity(0.5))
+                            .frame(width: 60, height: 60)
+                        Image(systemName: "xmark")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(.white)
+                    }
                 }
-            } label: {
-                ZStack {
-                    Circle()
-                        .fill(videoFixed ? Color.orange.opacity(0.8) : Color.white.opacity(0.3))
-                        .frame(width: 42, height: 42)
-                    Image(systemName: videoFixed ? "lock.fill" : "lock.open.fill")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(.white)
-                }
-            }
-            .buttonStyle(.plain)
-            
-            Button {
-                showExitConfirmation = true
-            } label: {
-                ZStack {
-                    Circle()
-                        .fill(Color.red)
-                        .frame(width: 42, height: 42)
-                    Text("✕")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(.white)
-                }
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(20)
-        .background(Color.black.opacity(0.6))
-        .cornerRadius(25)
-        .fixedSize()
-        .confirmationDialog("Are you sure you want to exit?", isPresented: $showExitConfirmation, titleVisibility: .visible) {
-            Button("Exit", role: .destructive) {
-                exit(0)
-            }
-            Button("Cancel", role: .cancel) {}
-        }
-    }
-    
-    private var expandedView: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                // Minimize button
+                .buttonStyle(.plain)
+            } else {
+                // Normal mode
+                // Expand button
                 Button {
                     withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
-                        isMinimized = true
+                        isMinimized = false
                         userInteracted = true  // Mark that user has interacted
                     }
                 } label: {
                     ZStack {
                         Circle()
                             .fill(Color.white.opacity(0.3))
-                            .frame(width: 30, height: 30)
-                        Image(systemName: "arrow.down.right.and.arrow.up.left")
-                            .font(.system(size: 12, weight: .bold))
+                            .frame(width: 60, height: 60)
+                        Image(systemName: "arrow.up.left.and.arrow.down.right")
+                            .font(.system(size: 24, weight: .bold))
                             .foregroundColor(.white)
                     }
                 }
                 .buttonStyle(.plain)
                 
-                Text("Network Status")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                Spacer()
+                // Video minimize/maximize button (only show if video streaming mode is enabled)
+                if showVideoStatus {
+                    Button {
+                        withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                            videoMinimized.toggle()
+                        }
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(Color.blue.opacity(0.8))
+                                .frame(width: 60, height: 60)
+                            Image(systemName: videoMinimized ? "video.fill" : "video.slash.fill")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundColor(.white)
+                        }
+                    }
+                    .buttonStyle(.plain)
+
+                    // Toggle world-fixed mode for the video panel
+                    Button {
+                        videoFixed.toggle()
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(videoFixed ? Color.orange.opacity(0.8) : Color.white.opacity(0.3))
+                                .frame(width: 60, height: 60)
+                            Image(systemName: videoFixed ? "lock.fill" : "lock.open.fill")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundColor(.white)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
                 
+                // Exit button
                 Button {
-                    showExitConfirmation = true
+                    print("🔴 [StatusView] Exit button tapped (minimized)")
+                    withAnimation {
+                        showLocalExitConfirmation = true
+                    }
                 } label: {
                     ZStack {
                         Circle()
                             .fill(Color.red)
-                            .frame(width: 30, height: 30)
+                            .frame(width: 60, height: 60)
                         Text("✕")
-                            .font(.body.bold())
+                            .font(.system(size: 27, weight: .bold))
                             .foregroundColor(.white)
                     }
                 }
                 .buttonStyle(.plain)
-                .confirmationDialog("Are you sure you want to exit?", isPresented: $showExitConfirmation, titleVisibility: .visible) {
-                    Button("Exit", role: .destructive) {
-                        exit(0)
-                    }
-                    Button("Cancel", role: .cancel) {}
+            }
+        }
+        .padding(30)
+        .background(Color.black.opacity(0.6))
+        .cornerRadius(36)
+        .fixedSize()
+    }
+
+    private var headerSection: some View {
+        HStack {
+            // Minimize button
+            Button {
+                withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                    isMinimized = true
+                    userInteracted = true  // Mark that user has interacted
+                }
+            } label: {
+                ZStack {
+                    Circle()
+                        .fill(Color.white.opacity(0.3))
+                        .frame(width: 60, height: 60)
+                    Image(systemName: "arrow.down.right.and.arrow.up.left")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundColor(.white)
                 }
             }
+            .buttonStyle(.plain)
             
-            Divider()
-                .background(Color.white.opacity(0.3))
+            Spacer()
             
-            VStack(alignment: .leading, spacing: 4) {
+            Text("VisionProTeleop")
+                .font(.title3)
+                .fontWeight(.bold)
+                .foregroundColor(.white)
+            
+            Spacer()
+            
+            Button {
+                print("🔴 [StatusView] Exit button tapped (expanded)")
+                withAnimation {
+                    showLocalExitConfirmation = true
+                }
+            } label: {
+                ZStack {
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 60, height: 60)
+                    Text("✕")
+                        .font(.system(size: 27, weight: .bold))
+                        .foregroundColor(.white)
+                }
+            }
+            .buttonStyle(.plain)
+            .contentShape(Circle())
+        }
+    }
+
+    private var networkInfoSection: some View {
+        Group {
+            VStack(alignment: .leading, spacing: 6) {
                 ForEach(ipAddresses, id: \.address) { ip in
                     HStack {
                         Circle()
                             .fill(Color.green)
-                            .frame(width: 10, height: 10)
+                            .frame(width: 12, height: 12)
                         Text("\(ip.name):")
                             .foregroundColor(.white.opacity(0.8))
                         Text(ip.address)
                             .foregroundColor(.white)
                             .fontWeight(.medium)
                     }
-                    .font(.subheadline)
+                    .font(.body)
                 }
             }
             
             HStack {
                 Circle()
                     .fill(pythonConnected ? Color.green : Color.red)
-                    .frame(width: 10, height: 10)
+                    .frame(width: 12, height: 12)
                 Text("Python Client:")
                     .foregroundColor(.white.opacity(0.8))
                 Text(pythonIP)
                     .foregroundColor(.white)
                     .fontWeight(.medium)
             }
-            .font(.subheadline)
+            .font(.body)
             
             // Only show WebRTC status if video streaming is enabled
             if showVideoStatus {
                 HStack {
                     Circle()
                         .fill(webrtcConnected ? Color.green : Color.orange)
-                        .frame(width: 10, height: 10)
+                        .frame(width: 12, height: 12)
                     Text("WebRTC:")
                         .foregroundColor(.white.opacity(0.8))
                     Text(webrtcConnected ? "Connected" : "Waiting...")
                         .foregroundColor(.white)
                         .fontWeight(.medium)
                 }
+                .font(.body)
+            }
+        }
+    }
+
+    private var streamDetailsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Stream Details")
                 .font(.subheadline)
+                .foregroundColor(.white.opacity(0.6))
+                .fontWeight(.semibold)
+            
+            // Video track info
+            HStack(spacing: 8) {
+                Image(systemName: "video.fill")
+                .font(.system(size: 12))
+                .foregroundColor(.blue)
+                Text("Video:")
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.7))
+                if dataManager.stereoEnabled {
+                    Text("Stereo")
+                        .font(.subheadline)
+                        .foregroundColor(.cyan)
+                        .fontWeight(.medium)
+                } else {
+                    Text("Mono")
+                        .font(.subheadline)
+                        .foregroundColor(.white)
+                        .fontWeight(.medium)
+                }
+            }
+            
+            // Video Stats
+            if !dataManager.videoResolution.isEmpty || dataManager.videoFPS > 0 {
+                HStack(spacing: 12) {
+                    if !dataManager.videoResolution.isEmpty {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                .font(.caption2)
+                                .foregroundColor(.white.opacity(0.5))
+                            Text(dataManager.videoResolution)
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.9))
+                                .monospacedDigit()
+                        }
+                    }
+                    
+                    if dataManager.videoFPS > 0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: "speedometer")
+                                .font(.caption2)
+                                .foregroundColor(.white.opacity(0.5))
+                            Text("\(dataManager.videoFPS) FPS")
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.9))
+                                .monospacedDigit()
+                        }
+                    }
+                }
+                .padding(.leading, 20)
+            }
+            
+            // Audio track info (optional - may not be present)
+            HStack(spacing: 8) {
+                Image(systemName: "waveform")
+                    .font(.system(size: 12))
+                    .foregroundColor(dataManager.audioEnabled ? .green : .gray)
+                Text("Audio:")
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.7))
+                if dataManager.audioEnabled {
+                    if dataManager.stereoAudioEnabled {
+                        Text("Stereo")
+                            .font(.subheadline)
+                            .foregroundColor(.green)
+                            .fontWeight(.medium)
+                    } else {
+                        Text("Mono")
+                            .font(.subheadline)
+                            .foregroundColor(.white)
+                            .fontWeight(.medium)
+                    }
+                } else {
+                    Text("N/A")
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.5))
+                        .fontWeight(.medium)
+                }
+            }
+            
+            // Audio Stats
+            if dataManager.audioEnabled && dataManager.audioSampleRate > 0 {
+                HStack(spacing: 4) {
+                    Image(systemName: "waveform.path.ecg")
+                        .font(.caption2)
+                        .foregroundColor(.white.opacity(0.5))
+                    Text("\(dataManager.audioSampleRate) Hz")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.9))
+                        .monospacedDigit()
+                }
+                .padding(.leading, 20)
+            }
+        }
+        .padding(.vertical, 5)
+    }
+
+    private var expandedView: some View {
+            VStack(alignment: .leading, spacing: 15) {
+                headerSection
+                
+                Divider()
+                .background(Color.white.opacity(0.3))
+            
+                networkInfoSection
                 
                 // Show detailed track information when connected
-                if webrtcConnected {
+                if showVideoStatus && webrtcConnected {
                     Divider()
                         .background(Color.white.opacity(0.2))
                     
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Stream Details")
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.6))
-                            .fontWeight(.semibold)
-                        
-                        // Video track info
-                        HStack(spacing: 6) {
-                            Image(systemName: "video.fill")
-                                .font(.system(size: 10))
-                                .foregroundColor(.blue)
-                            Text("Video:")
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.7))
-                            if dataManager.stereoEnabled {
-                                Text("Stereo")
-                                    .font(.caption)
-                                    .foregroundColor(.cyan)
-                                    .fontWeight(.medium)
-                            } else {
-                                Text("Mono")
-                                    .font(.caption)
-                                    .foregroundColor(.white)
-                                    .fontWeight(.medium)
-                            }
-                        }
-                        
-                        // Audio track info (optional - may not be present)
-                        HStack(spacing: 6) {
-                            Image(systemName: "waveform")
-                                .font(.system(size: 10))
-                                .foregroundColor(dataManager.audioEnabled ? .green : .gray)
-                            Text("Audio:")
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.7))
-                            if dataManager.audioEnabled {
-                                if dataManager.stereoAudioEnabled {
-                                    Text("Stereo")
-                                        .font(.caption)
-                                        .foregroundColor(.green)
-                                        .fontWeight(.medium)
-                                } else {
-                                    Text("Mono")
-                                        .font(.caption)
-                                        .foregroundColor(.white)
-                                        .fontWeight(.medium)
-                                }
-                            } else {
-                                Text("N/A")
-                                    .font(.caption)
-                                    .foregroundColor(.white.opacity(0.5))
-                                    .fontWeight(.medium)
-                            }
-                        }
-                    }
-                    .padding(.vertical, 4)
+                    streamDetailsSection
                 }
-            }
             
             // Show waiting message when no frames are available (only for video mode)
             if showVideoStatus && !hasFrames {
@@ -351,45 +460,47 @@ struct StatusOverlay: View {
                 HStack {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        .scaleEffect(0.8)
+                        .scaleEffect(1.0)
                     Text(dataManager.connectionStatus)
                         .foregroundColor(.white.opacity(0.9))
-                        .font(.subheadline)
+                        .font(.body)
                         .fontWeight(.medium)
                         .lineLimit(2)
                 }
             }
             
             // View controls section (expandable)
-            if showViewControls {
-                Divider()
-                    .background(Color.white.opacity(0.3))
-                
-                viewControlsSection
-            } else {
-                // Show expand button when collapsed
-                Divider()
-                    .background(Color.white.opacity(0.3))
-                
-                Button {
-                    withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
-                        showViewControls = true
+            if showVideoStatus {
+                if showViewControls {
+                    Divider()
+                        .background(Color.white.opacity(0.3))
+                    
+                    viewControlsSection
+                } else {
+                    // Show expand button when collapsed
+                    Divider()
+                        .background(Color.white.opacity(0.3))
+                    
+                    Button {
+                        withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                            showViewControls = true
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: "slider.horizontal.3")
+                                .font(.system(size: 17, weight: .medium))
+                            Text("Modify Video View")
+                                .font(.body)
+                                .fontWeight(.medium)
+                            Spacer()
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 14, weight: .bold))
+                        }
+                        .foregroundColor(.white.opacity(0.9))
+                        .padding(.vertical, 10)
                     }
-                } label: {
-                    HStack {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 14, weight: .medium))
-                        Text("Modify Video View")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                        Spacer()
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 12, weight: .bold))
-                    }
-                    .foregroundColor(.white.opacity(0.9))
-                    .padding(.vertical, 8)
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
             
             // Status position controls section (collapsible, separate from video controls)
@@ -407,27 +518,74 @@ struct StatusOverlay: View {
                 } label: {
                     HStack {
                         Image(systemName: "move.3d")
-                            .font(.system(size: 14, weight: .medium))
+                            .font(.system(size: 17, weight: .medium))
                         Text("Modify Controller Position")
-                            .font(.subheadline)
+                            .font(.body)
                             .fontWeight(.medium)
                         Spacer()
                         Image(systemName: "chevron.down")
-                            .font(.system(size: 12, weight: .bold))
+                            .font(.system(size: 14, weight: .bold))
                     }
                     .foregroundColor(.white.opacity(0.9))
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 10)
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(20)
+        .padding(24)
+        .frame(width: 360)
+        .overlay(
+            Group {
+                if showLocalExitConfirmation {
+                    ZStack {
+                        Color.black.opacity(0.9)
+                        
+                        VStack(spacing: 20) {
+                            Text("Are you sure you want to exit?")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                            
+                            HStack(spacing: 20) {
+                                Button {
+                                    withAnimation {
+                                        showLocalExitConfirmation = false
+                                    }
+                                } label: {
+                                    Text("Cancel")
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 20)
+                                        .padding(.vertical, 10)
+                                        .background(Color.gray.opacity(0.5))
+                                        .cornerRadius(8)
+                                }
+                                .buttonStyle(.plain)
+                                
+                                Button {
+                                    print("❌ [StatusView] Exiting app now")
+                                    exit(0)
+                                } label: {
+                                    Text("Exit")
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 20)
+                                        .padding(.vertical, 10)
+                                        .background(Color.red)
+                                        .cornerRadius(8)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+            }
+        )
         .background(Color.black.opacity(0.7))
         .cornerRadius(16)
     }
     
     private var viewControlsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 15) {
             Button {
                 withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
                     showViewControls = false
@@ -438,30 +596,30 @@ struct StatusOverlay: View {
             } label: {
                 HStack {
                     Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.system(size: 17, weight: .medium))
                     Text("Modify Video View")
-                        .font(.subheadline)
+                        .font(.body)
                         .fontWeight(.medium)
                     Spacer()
                     Image(systemName: "chevron.up")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 14, weight: .bold))
                 }
                 .foregroundColor(.white.opacity(0.9))
             }
             .buttonStyle(.plain)
             
             // Distance control
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 Text("Distance (Z-axis)")
-                    .font(.caption)
+                    .font(.subheadline)
                     .foregroundColor(.white.opacity(0.7))
                 
                 HStack {
                     Text("\(String(format: "%.1f", -dataManager.videoPlaneZDistance))m")
-                        .font(.system(size: 13, weight: .medium, design: .monospaced))
+                        .font(.system(size: 15, weight: .medium, design: .monospaced))
                         .foregroundColor(.white)
-                        .frame(width: 45, alignment: .leading)
-                    
+                        .frame(width: 50, alignment: .leading)
+                     
                     Slider(value: Binding(
                         get: { -dataManager.videoPlaneZDistance },
                         set: { positiveValue in
@@ -486,11 +644,11 @@ struct StatusOverlay: View {
                 
                 HStack {
                     Text("Near (2m)")
-                        .font(.caption2)
+                        .font(.caption)
                         .foregroundColor(.white.opacity(0.5))
                     Spacer()
                     Text("Far (20m)")
-                        .font(.caption2)
+                        .font(.caption)
                         .foregroundColor(.white.opacity(0.5))
                 }
             }
@@ -499,16 +657,16 @@ struct StatusOverlay: View {
                 .background(Color.white.opacity(0.2))
             
             // Height control
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 Text("Height (Y-axis)")
-                    .font(.caption)
+                    .font(.subheadline)
                     .foregroundColor(.white.opacity(0.7))
                 
                 HStack {
                     Text("\(String(format: "%.2f", dataManager.videoPlaneYPosition))m")
-                        .font(.system(size: 13, weight: .medium, design: .monospaced))
+                        .font(.system(size: 15, weight: .medium, design: .monospaced))
                         .foregroundColor(.white)
-                        .frame(width: 45, alignment: .leading)
+                        .frame(width: 50, alignment: .leading)
                     
                     Slider(value: Binding(
                         get: { dataManager.videoPlaneYPosition },
@@ -534,71 +692,35 @@ struct StatusOverlay: View {
                 
                 HStack {
                     Text("Down (2m)")
-                        .font(.caption2)
+                        .font(.caption)
                         .foregroundColor(.white.opacity(0.5))
                     Spacer()
                     Text("Up (2m)")
-                        .font(.caption2)
-                        .foregroundColor(.white.opacity(0.5))
-                }
-            }
-            
-            Divider()
-                .background(Color.white.opacity(0.2))
-            
-            // Auto-perpendicular toggle
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Auto-Perpendicular")
                         .font(.caption)
-                        .foregroundColor(.white.opacity(0.7))
-                    Text("Tilt plane to face head")
-                        .font(.caption2)
                         .foregroundColor(.white.opacity(0.5))
                 }
-                Spacer()
-                Toggle("", isOn: Binding(
-                    get: { dataManager.videoPlaneAutoPerpendicular },
-                    set: { newValue in
-                        dataManager.videoPlaneAutoPerpendicular = newValue
-                        // Show preview when toggling
-                        previewActive = true
-                        
-                        // Cancel any existing hide task
-                        hidePreviewTask?.cancel()
-                        
-                        // Schedule hiding the preview after 3 seconds
-                        hidePreviewTask = Task { @MainActor in
-                            try? await Task.sleep(nanoseconds: 3_000_000_000)
-                            if !Task.isCancelled {
-                                previewActive = false
-                            }
-                        }
-                    }
-                ))
-                .labelsHidden()
-                .tint(.blue)
             }
-
+            
             Divider()
                 .background(Color.white.opacity(0.2))
             
             HStack {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text("Lock To World")
-                        .font(.caption)
+                        .font(.subheadline)
                         .foregroundColor(.white.opacity(0.7))
                     Text("Keep panel stationary")
-                        .font(.caption2)
+                        .font(.caption)
                         .foregroundColor(.white.opacity(0.5))
                 }
                 Spacer()
                 Toggle("", isOn: $videoFixed)
                     .labelsHidden()
                     .tint(.orange)
+                    .scaleEffect(1.2)
             }
             
-            HStack(spacing: 12) {
+            HStack(spacing: 15) {
                 Spacer()
                 
                 // Video minimize/maximize button
@@ -607,17 +729,17 @@ struct StatusOverlay: View {
                         videoMinimized.toggle()
                     }
                 } label: {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Image(systemName: videoMinimized ? "eye.fill" : "eye.slash.fill")
-                            .font(.system(size: 11, weight: .bold))
+                            .font(.system(size: 14, weight: .bold))
                         Text(videoMinimized ? "Show Video" : "Hide Video")
-                            .font(.caption)
+                            .font(.subheadline)
                     }
                     .foregroundColor(.blue)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
                     .background(Color.white.opacity(0.15))
-                    .cornerRadius(6)
+                    .cornerRadius(8)
                 }
                 .buttonStyle(.plain)
                 
@@ -638,26 +760,26 @@ struct StatusOverlay: View {
                     }
                 } label: {
                     Text("Reset All")
-                        .font(.caption)
+                        .font(.subheadline)
                         .foregroundColor(.blue)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
                         .background(Color.white.opacity(0.15))
-                        .cornerRadius(6)
+                        .cornerRadius(8)
                 }
                 .buttonStyle(.plain)
                 Spacer()
             }
             
             Text("💡 Adjust position and orientation of the video plane")
-                .font(.caption2)
+                .font(.caption)
                 .foregroundColor(.white.opacity(0.5))
                 .multilineTextAlignment(.leading)
         }
     }
     
     private var statusPositionControlsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 15) {
             Button {
                 withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
                     showStatusPositionControls = false
@@ -668,29 +790,29 @@ struct StatusOverlay: View {
             } label: {
                 HStack {
                     Image(systemName: "move.3d")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.system(size: 17, weight: .medium))
                     Text("Modify Controller Position")
-                        .font(.subheadline)
+                        .font(.body)
                         .fontWeight(.medium)
                     Spacer()
                     Image(systemName: "chevron.up")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 14, weight: .bold))
                 }
                 .foregroundColor(.white.opacity(0.9))
             }
             .buttonStyle(.plain)
             
             // X position control
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 Text("X Position (Left-Right)")
-                    .font(.caption)
+                    .font(.subheadline)
                     .foregroundColor(.white.opacity(0.7))
                 
                 HStack {
                     Text("\(String(format: "%.2f", dataManager.statusMinimizedXPosition))m")
-                        .font(.system(size: 13, weight: .medium, design: .monospaced))
+                        .font(.system(size: 15, weight: .medium, design: .monospaced))
                         .foregroundColor(.white)
-                        .frame(width: 45, alignment: .leading)
+                        .frame(width: 50, alignment: .leading)
                     
                     Slider(value: Binding(
                         get: { dataManager.statusMinimizedXPosition },
@@ -719,11 +841,11 @@ struct StatusOverlay: View {
                 
                 HStack {
                     Text("Left (0.5m)")
-                        .font(.caption2)
+                        .font(.caption)
                         .foregroundColor(.white.opacity(0.5))
                     Spacer()
                     Text("Right (0.5m)")
-                        .font(.caption2)
+                        .font(.caption)
                         .foregroundColor(.white.opacity(0.5))
                 }
             }
@@ -732,16 +854,16 @@ struct StatusOverlay: View {
                 .background(Color.white.opacity(0.2))
             
             // Y position control
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 Text("Y Position (Up-Down)")
-                    .font(.caption)
+                    .font(.subheadline)
                     .foregroundColor(.white.opacity(0.7))
                 
                 HStack {
                     Text("\(String(format: "%.2f", dataManager.statusMinimizedYPosition))m")
-                        .font(.system(size: 13, weight: .medium, design: .monospaced))
+                        .font(.system(size: 15, weight: .medium, design: .monospaced))
                         .foregroundColor(.white)
-                        .frame(width: 45, alignment: .leading)
+                        .frame(width: 50, alignment: .leading)
                     
                     Slider(value: Binding(
                         get: { dataManager.statusMinimizedYPosition },
@@ -770,11 +892,11 @@ struct StatusOverlay: View {
                 
                 HStack {
                     Text("Down (0.5m)")
-                        .font(.caption2)
+                        .font(.caption)
                         .foregroundColor(.white.opacity(0.5))
                     Spacer()
                     Text("Up (0.5m)")
-                        .font(.caption2)
+                        .font(.caption)
                         .foregroundColor(.white.opacity(0.5))
                 }
             }
@@ -797,19 +919,19 @@ struct StatusOverlay: View {
                     }
                 } label: {
                     Text("Reset Position")
-                        .font(.caption)
+                        .font(.subheadline)
                         .foregroundColor(.purple)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
                         .background(Color.white.opacity(0.15))
-                        .cornerRadius(6)
+                        .cornerRadius(8)
                 }
                 .buttonStyle(.plain)
                 Spacer()
             }
             
             Text("💡 Preview will show where the minimized status will appear")
-                .font(.caption2)
+                .font(.caption)
                 .foregroundColor(.white.opacity(0.5))
                 .multilineTextAlignment(.leading)
         }
@@ -827,9 +949,9 @@ struct StatusPreviewView: View {
             ZStack {
                 Circle()
                     .fill(Color.white.opacity(0.3))
-                    .frame(width: 42, height: 42)
+                    .frame(width: 60, height: 60)
                 Image(systemName: "arrow.up.left.and.arrow.down.right")
-                    .font(.system(size: 18, weight: .bold))
+                    .font(.system(size: 24, weight: .bold))
                     .foregroundColor(.white)
             }
             
@@ -838,35 +960,35 @@ struct StatusPreviewView: View {
                 ZStack {
                     Circle()
                         .fill(Color.blue.opacity(0.8))
-                        .frame(width: 42, height: 42)
+                        .frame(width: 60, height: 60)
                     Image(systemName: "video.fill")
-                        .font(.system(size: 18, weight: .bold))
+                        .font(.system(size: 24, weight: .bold))
                         .foregroundColor(.white)
                 }
-            }
             
-            ZStack {
-                Circle()
-                    .fill(videoFixed ? Color.orange.opacity(0.8) : Color.white.opacity(0.3))
-                    .frame(width: 42, height: 42)
-                Image(systemName: videoFixed ? "lock.fill" : "lock.open.fill")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.white)
+                ZStack {
+                    Circle()
+                        .fill(videoFixed ? Color.orange.opacity(0.8) : Color.white.opacity(0.3))
+                        .frame(width: 60, height: 60)
+                    Image(systemName: videoFixed ? "lock.fill" : "lock.open.fill")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundColor(.white)
+                }
             }
             
             // Close button (non-functional in preview)
             ZStack {
                 Circle()
                     .fill(Color.red)
-                    .frame(width: 42, height: 42)
+                    .frame(width: 60, height: 60)
                 Text("✕")
-                    .font(.system(size: 20, weight: .bold))
+                    .font(.system(size: 27, weight: .bold))
                     .foregroundColor(.white)
             }
         }
-        .padding(20)
+        .padding(30)
         .background(Color.black.opacity(0.6))
-        .cornerRadius(25)
+        .cornerRadius(36)
         .fixedSize()
         .opacity(0.5)  // 50% transparent
     }

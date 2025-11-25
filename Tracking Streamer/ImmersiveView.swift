@@ -357,7 +357,6 @@ struct ImmersiveView: View {
                     previewStatusPosition: $previewStatusPosition,
                     previewStatusActive: $previewStatusActive
                 )
-                .frame(maxWidth: 300)
             }
             
             Attachment(id: "statusPreview") {
@@ -658,6 +657,10 @@ class VideoFrameRenderer: NSObject, LKRTCVideoRenderer {
     private var lastBenchmarkSequence: UInt32?
     private let benchmarkThreshold = 127
     
+    // Stats tracking
+    private var frameCount: Int = 0
+    private var lastFpsUpdateTime: TimeInterval = 0
+    
     init(imageData: ImageData) {
         self.imageData = imageData
         super.init()
@@ -669,6 +672,27 @@ class VideoFrameRenderer: NSObject, LKRTCVideoRenderer {
     
     func renderFrame(_ frame: LKRTCVideoFrame?) {
         guard let frame = frame else { return }
+        
+        // Update stats (FPS and Resolution)
+        let currentTime = CACurrentMediaTime()
+        frameCount += 1
+        
+        if currentTime - lastFpsUpdateTime >= 1.0 {
+            let fps = frameCount
+            let width = Int(frame.width)
+            let height = Int(frame.height)
+            let resolutionString = "\(width)x\(height)"
+            
+            DispatchQueue.main.async {
+                DataManager.shared.videoFPS = fps
+                if DataManager.shared.videoResolution != resolutionString {
+                    DataManager.shared.videoResolution = resolutionString
+                }
+            }
+            
+            frameCount = 0
+            lastFpsUpdateTime = currentTime
+        }
         
         // Extract or convert to CVPixelBuffer
         let pixelBuffer = extractPixelBuffer(from: frame)
@@ -978,6 +1002,11 @@ class AudioFrameRenderer: NSObject, LKRTCAudioRenderer {
         print("🔊 Setting up audio engine with format:")
         print("   - Sample rate: \(format.sampleRate) Hz")
         print("   - Channels: \(format.channelCount) [\(channelMode)]")
+        
+        // Update DataManager with sample rate
+        DispatchQueue.main.async {
+            DataManager.shared.audioSampleRate = Int(format.sampleRate)
+        }
         
         audioEngine = AVAudioEngine()
         playerNode = AVAudioPlayerNode()

@@ -9,6 +9,9 @@ struct 🌐RealityView: View {
     @State private var previewZDistance: Float? = nil
     @State private var previewActive = false
     @State private var userInteracted = false
+    @State private var previewStatusPosition: (x: Float, y: Float)? = nil
+    @State private var previewStatusActive = false
+    @ObservedObject private var dataManager = DataManager.shared
     
     var body: some View {
         RealityView { content, attachments in
@@ -38,22 +41,71 @@ struct 🌐RealityView: View {
             } else {
                 print("🔴 [🌐RealityView] Status attachment NOT found!")
             }
+            
+            // Create preview status container entity (initially hidden)
+            let statusPreviewContainer = Entity()
+            statusPreviewContainer.name = "statusPreviewContainer"
+            statusPreviewContainer.setParent(statusAnchor)
+            
+            // Initialize at the correct Z position
+            statusPreviewContainer.transform.translation = SIMD3<Float>(
+                dataManager.statusMinimizedXPosition,
+                dataManager.statusMinimizedYPosition,
+                -1.0
+            )
+            
+            // Attach the status preview UI to the preview container
+            if let statusPreviewAttachment = attachments.entity(for: "statusPreview") {
+                print("🟢 [🌐RealityView] Status preview attachment found and attached")
+                statusPreviewAttachment.setParent(statusPreviewContainer)
+                statusPreviewContainer.isEnabled = false
+            }
         } update: { updateContent, attachments in
-            // Explicitly depend on isMinimized to trigger updates
+            // Explicitly depend on state to trigger updates
             let _ = isMinimized
             let _ = showViewControls
+            let _ = previewStatusPosition
+            let _ = previewStatusActive
+            let _ = dataManager.statusMinimizedXPosition
+            let _ = dataManager.statusMinimizedYPosition
             
             // Update status container position based on minimized state
             if let statusAnchor = updateContent.entities.first(where: { $0.name == "statusHeadAnchor" }) as? AnchorEntity {
                 if let statusContainer = statusAnchor.children.first(where: { $0.name == "statusContainer" }) {
-                    // Move to y=0.5 when minimized
-                    let yPosition: Float = isMinimized ? 0.3 : 0.0
-                    let targetTranslation = SIMD3<Float>(0.0, yPosition, -1.0)
+                    // When minimized, use custom position; when maximized, use (0, 0, -1.0)
+                    let targetTranslation: SIMD3<Float>
+                    if isMinimized {
+                        targetTranslation = SIMD3<Float>(
+                            dataManager.statusMinimizedXPosition,
+                            dataManager.statusMinimizedYPosition,
+                            -1.0
+                        )
+                    } else {
+                        // Maximized stays at (0, 0, -1.0)
+                        targetTranslation = SIMD3<Float>(0.0, 0.0, -1.0)
+                    }
                     
                     // Animate the position change
                     var transform = statusContainer.transform
                     transform.translation = targetTranslation
                     statusContainer.move(to: transform, relativeTo: statusContainer.parent, duration: 0.5, timingFunction: .easeInOut)
+                }
+                
+                // Handle status preview
+                if let statusPreviewContainer = statusAnchor.children.first(where: { $0.name == "statusPreviewContainer" }) {
+                    let shouldShowPreview = previewStatusPosition != nil || previewStatusActive
+                    
+                    if shouldShowPreview {
+                        let xPos = previewStatusPosition?.x ?? dataManager.statusMinimizedXPosition
+                        let yPos = previewStatusPosition?.y ?? dataManager.statusMinimizedYPosition
+                        
+                        statusPreviewContainer.isEnabled = true
+                        var previewTransform = statusPreviewContainer.transform
+                        previewTransform.translation = SIMD3<Float>(xPos, yPos, -1.0)
+                        statusPreviewContainer.move(to: previewTransform, relativeTo: statusPreviewContainer.parent, duration: 0.1, timingFunction: .linear)
+                    } else {
+                        statusPreviewContainer.isEnabled = false
+                    }
                 }
             }
         } attachments: {
@@ -68,9 +120,17 @@ struct 🌐RealityView: View {
                     previewZDistance: $previewZDistance,
                     previewActive: $previewActive,
                     userInteracted: $userInteracted,
-                    videoFixed: .constant(false)
+                    videoFixed: .constant(false),
+                    previewStatusPosition: $previewStatusPosition,
+                    previewStatusActive: $previewStatusActive
                 )
-                .frame(maxWidth: 300)
+            }
+            
+            Attachment(id: "statusPreview") {
+                StatusPreviewView(
+                    showVideoStatus: false,
+                    videoFixed: false
+                )
             }
         }
         .gesture(
