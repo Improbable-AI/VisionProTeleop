@@ -3,8 +3,12 @@ import RealityKit
 import LiveKitWebRTC
 import CoreImage
 import Accelerate
-import AVFAudio
+import CoreGraphics
+import RealityKit
 import RealityKitContent
+// import Draco // Not needed, using Bridging Header
+
+
 
 struct ImmersiveView: View {
     @EnvironmentObject var imageData: ImageData
@@ -25,6 +29,8 @@ struct ImmersiveView: View {
     @State private var previewStatusActive = false  // Track if status preview should be shown
     @State private var stereoMaterialEntity: Entity? = nil  // Store reference to RealityKit stereo material entity
     @State private var fixedWorldTransform: Transform? = nil  // Preserve world transform when locked
+    @StateObject private var pointCloudRenderer = PointCloudRenderer()
+
     
     var body: some View {
         RealityView { content, attachments in
@@ -99,6 +105,13 @@ struct ImmersiveView: View {
             } else {
                 print("🔴 [ImmersiveView] Status preview attachment NOT found!")
             }
+
+            // Create point cloud root
+            let pcRoot = Entity()
+            pcRoot.name = "pcRoot"
+            pcRoot.setParent(worldAnchor)
+            pointCloudRenderer.setup(root: pcRoot)
+
         } update: { updateContent, attachments in
             // This will be triggered when updateTrigger changes (i.e., when new frames arrive)
             let _ = updateTrigger  // Explicitly depend on updateTrigger
@@ -386,9 +399,10 @@ struct ImmersiveView: View {
         .task(priority: .low) { await appModel.processReconstructionUpdates() }
         .onAppear {
             print("DEBUG: ImmersiveView appeared, starting video stream")
-            videoStreamManager.start(imageData: imageData)
+            videoStreamManager.start(imageData: imageData, pointCloudRenderer: pointCloudRenderer)
             
             // Load the stereo material from RealityKitContent
+
             Task {
                 if let scene = try? await Entity(named: "Immersive", in: realityKitContentBundle) {
                     // Find the sphere with stereo material
@@ -436,9 +450,10 @@ struct ImmersiveView: View {
                 videoStreamManager.stop()
                 // Give it a moment to cleanup
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    videoStreamManager.start(imageData: imageData)
+                    videoStreamManager.start(imageData: imageData, pointCloudRenderer: pointCloudRenderer)
                 }
             }
+
         }
         .onChange(of: dataManager.videoPlaneFixedToWorld) { oldValue, isFixed in
             if isFixed {
@@ -513,8 +528,9 @@ class VideoStreamManager: ObservableObject {
     private var audioRenderer: AudioFrameRenderer?
     private var isRunning = false
     
-    func start(imageData: ImageData) {
+    func start(imageData: ImageData, pointCloudRenderer: PointCloudRenderer? = nil) {
         // If already running, we might want to restart if called explicitly, 
+
         // but for now let's respect the flag unless stop() was called.
         if isRunning {
             print("⚠️ [DEBUG] VideoStreamManager.start() called but already running. Ignoring.")
@@ -588,6 +604,9 @@ class VideoStreamManager: ObservableObject {
                 let client = WebRTCClient()
                 self.webrtcClient = client
                 
+                // Inject client into PointCloudRenderer
+                pointCloudRenderer?.webRTCClient = client
+                
                 let videoRenderer = VideoFrameRenderer(imageData: imageData)
                 self.videoRenderer = videoRenderer
                 
@@ -601,6 +620,20 @@ class VideoStreamManager: ObservableObject {
                 print("📊 [DEBUG] Stereo modes - Video: \(stereoVideo), Audio: \(stereoAudio)")
                 client.addVideoRenderer(videoRenderer)
                 client.addAudioRenderer(audioRenderer)
+
+                // Hook up point cloud callback
+                client.onPointCloudReceived = { [weak pointCloudRenderer] data in
+                    // print("DEBUG: [ImmersiveView] Callback triggered with \(data.count) bytes")
+                    Task { @MainActor in
+                        if pointCloudRenderer == nil {
+                            print("⚠️ [ImmersiveView] pointCloudRenderer is NIL!")
+                        }
+                        pointCloudRenderer?.processData(data)
+                    }
+                }
+
+
+
             } catch {
                 print("❌ [DEBUG] Failed to connect to WebRTC server: \(error)")
             }
@@ -1080,5 +1113,525 @@ class AudioFrameRenderer: NSObject, LKRTCAudioRenderer {
             print("🔊 Audio streaming started")
         }
         bufferCount += 1
+    }
+}
+
+class PointCloudBuffers {
+    var positions: [SIMD3<Float>] = []
+    var indices: [UInt32] = []
+    var uvs: [SIMD2<Float>] = []
+    var colors: [UInt8] = [] // RGBA bytes
+    
+    func reserve(numPoints: Int) {
+        let numVertices = numPoints * 3
+        if positions.capacity < numVertices {
+            positions.reserveCapacity(numVertices)
+        }
+        if indices.capacity < numVertices {
+            indices.reserveCapacity(numVertices)
+        }
+        if uvs.capacity < numVertices {
+            uvs.reserveCapacity(numVertices)
+        }
+        if colors.capacity < numPoints * 4 {
+            colors.reserveCapacity(numPoints * 4)
+        }
+    }
+    
+    func clear() {
+        positions.removeAll(keepingCapacity: true)
+        indices.removeAll(keepingCapacity: true)
+        uvs.removeAll(keepingCapacity: true)
+        colors.removeAll(keepingCapacity: true)
+    }
+}
+
+class PointCloudRenderer: ObservableObject {
+    private var root: Entity?
+    private var meshEntityA: ModelEntity?
+    private var meshEntityB: ModelEntity?
+    private var activeBufferIndex = 0 // 0 for A, 1 for B
+    private var localTransform: Transform = .identity
+    var webRTCClient: WebRTCClient?
+    private let buffers = PointCloudBuffers()
+    
+    func setup(root: Entity) {
+        self.root = root
+        
+        // Create two entities for double buffering
+        let entityA = ModelEntity()
+        entityA.name = "pointCloudMeshA"
+        entityA.setParent(root)
+        
+        let entityB = ModelEntity()
+        entityB.name = "pointCloudMeshB"
+        entityB.setParent(root)
+        
+        self.meshEntityA = entityA
+        self.meshEntityB = entityB
+        
+        // Default material
+        var material = UnlitMaterial()
+        material.color = .init(tint: .cyan)
+        
+        let placeholderMesh = MeshResource.generateBox(size: 0.1)
+        
+        entityA.model = ModelComponent(mesh: placeholderMesh, materials: [material])
+        entityA.isEnabled = false
+        
+        entityB.model = ModelComponent(mesh: placeholderMesh, materials: [material])
+        entityB.isEnabled = false
+    }
+    
+    func processData(_ data: Data) {
+        let startTime = Date() // Capture start time
+        // print("DEBUG: [PointCloudRenderer] processData called with \(data.count) bytes") 
+        if data.count < 1 { return }
+        
+        var header = data[0]
+        var payload = data.dropFirst()
+        var benchmarkEchoData: Data? = nil
+        
+        if header == 0x04 || header == 0x07 || header == 0x09 {
+            // Benchmark: [SeqID (4)] + [Timestamp (8)] + [Point Cloud Data]
+            if payload.count >= 12 {
+                let seqIdData = payload.prefix(4)
+                let tsData = payload.dropFirst(4).prefix(8)
+                
+                var echoData = Data()
+                echoData.append(seqIdData)
+                echoData.append(tsData)
+                
+                if self.webRTCClient == nil {
+                    print("⚠️ [PointCloud] webRTCClient is NIL! Cannot echo benchmark.")
+                }
+                
+                // Defer echo until after mesh update
+                benchmarkEchoData = echoData
+                
+                // Treat the rest as point cloud data
+                payload = payload.dropFirst(12)
+                
+                // Map benchmark headers to data headers
+                if header == 0x04 { header = 0x03 } // Float32 + Colors (assumed)
+                else if header == 0x07 { header = 0x06 } // Float16 + Colors (assumed)
+                else if header == 0x09 { header = 0x08 } // Draco
+            }
+        }
+        
+        if header == 0x01 {
+            // ...
+        } else if header == 0x08 {
+            // Draco Compressed Data
+            print("DEBUG: [PointCloud] Received Draco header (0x08), payload size: \(payload.count)")
+            // Use DracoWrapper to decode
+            if let decoded = DracoWrapper.decode(payload) {
+                let numPoints = decoded.pointCount
+                print("DEBUG: [PointCloud] Decoded \(numPoints) points from Draco")
+                if numPoints == 0 { 
+                    print("⚠️ [PointCloud] Decoded 0 points!")
+                    return 
+                }
+                
+                // 1. Prepare Buffers
+                self.buffers.clear()
+                self.buffers.reserve(numPoints: numPoints)
+                
+                let positionsData = decoded.positions
+                let colorsData = decoded.colors
+                let hasColors = (colorsData.count > 0)
+                
+                // 1. Prepare Buffers
+                self.buffers.clear()
+                self.buffers.reserve(numPoints: numPoints)
+                
+                // 2. Expand Data
+                // Resize arrays first
+                self.buffers.positions.append(contentsOf: repeatElement(.zero, count: numPoints * 3))
+                self.buffers.indices.append(contentsOf: repeatElement(0, count: numPoints * 3))
+                self.buffers.uvs.append(contentsOf: repeatElement(.zero, count: numPoints * 3))
+                
+                // OPTIMIZATION: Direct Color Copy
+                // DracoWrapper now outputs RGBA (4 bytes per point).
+                // We need to populate self.buffers.colors which is [UInt8] (4 bytes per point).
+                // Since we are using 1 texture pixel per point, we just need to copy the buffer.
+                if hasColors {
+                    self.buffers.colors = Array(colorsData)
+                } else {
+                    self.buffers.colors = Array(repeating: 255, count: numPoints * 4)
+                }
+                
+                let size: Float = 0.005 // 5mm points
+                let halfSize = size * 0.5
+                let height = size * 0.866
+                
+                positionsData.withUnsafeBytes { (pointsRaw: UnsafeRawBufferPointer) in
+                    guard let inputPoints = pointsRaw.bindMemory(to: Float.self).baseAddress else { return }
+                    
+                    self.buffers.positions.withUnsafeMutableBufferPointer { positionsPtr in
+                        self.buffers.indices.withUnsafeMutableBufferPointer { indicesPtr in
+                            self.buffers.uvs.withUnsafeMutableBufferPointer { uvsPtr in
+                                // Note: We don't need to touch colorsPtr in the loop anymore!
+                                
+                                // Parallel Loop
+                                DispatchQueue.concurrentPerform(iterations: numPoints) { i in
+                                    // 1. Vertices
+                                    let x = inputPoints[i * 3]
+                                    let y = inputPoints[i * 3 + 1]
+                                    let z = inputPoints[i * 3 + 2]
+                                    let center = SIMD3<Float>(x, y, z)
+                                    
+                                    let v0 = center + SIMD3<Float>(0, size, 0)
+                                    let v1 = center + SIMD3<Float>(-height, -halfSize, 0)
+                                    let v2 = center + SIMD3<Float>(height, -halfSize, 0)
+                                    
+                                    let baseIdx = i * 3
+                                    positionsPtr[baseIdx] = v0
+                                    positionsPtr[baseIdx + 1] = v1
+                                    positionsPtr[baseIdx + 2] = v2
+                                    
+                                    let vertexIdx = UInt32(baseIdx)
+                                    indicesPtr[baseIdx] = vertexIdx
+                                    indicesPtr[baseIdx + 1] = vertexIdx + 1
+                                    indicesPtr[baseIdx + 2] = vertexIdx + 2
+                                    
+                                    // 2. UVs
+                                    // Map each triangle to a single pixel in the texture
+                                    // U = (i + 0.5) / numPoints
+                                    let u = (Float(i) + 0.5) / Float(numPoints)
+                                    let uv = SIMD2<Float>(u, 0.5)
+                                    uvsPtr[baseIdx] = uv
+                                    uvsPtr[baseIdx + 1] = uv
+                                    uvsPtr[baseIdx + 2] = uv
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // 4. Create Mesh Descriptor
+                var descriptor = MeshDescriptor(name: "pointCloudDraco")
+                descriptor.positions = MeshBuffers.Positions(self.buffers.positions)
+                descriptor.primitives = .triangles(self.buffers.indices)
+                descriptor.textureCoordinates = MeshBuffers.TextureCoordinates(self.buffers.uvs)
+                
+                // DOUBLE BUFFERING LOGIC
+                let backEntity = (activeBufferIndex == 0) ? meshEntityB : meshEntityA
+                let frontEntity = (activeBufferIndex == 0) ? meshEntityA : meshEntityB
+                
+                guard let targetEntity = backEntity else { 
+                    print("❌ [PointCloud] targetEntity is NIL")
+                    return 
+                }
+                
+                // 5. Update Mesh
+                if let existingMesh = targetEntity.model?.mesh {
+                    do {
+                        let tempMesh = try MeshResource.generate(from: [descriptor])
+                        try existingMesh.replace(with: tempMesh.contents)
+                    } catch {
+                        print("⚠️ [PointCloud] Failed to replace mesh: \(error)")
+                        if let meshResource = try? MeshResource.generate(from: [descriptor]) {
+                            targetEntity.model?.mesh = meshResource
+                        }
+                    }
+                } else {
+                    if let meshResource = try? MeshResource.generate(from: [descriptor]) {
+                        targetEntity.model?.mesh = meshResource
+                    }
+                }
+                
+                // 6. Update Material/Texture
+                var mat = UnlitMaterial()
+                if hasColors {
+                    if let texture = createTextureFromBuffer(width: numPoints) {
+                         mat.color = .init(texture: .init(texture))
+                    } else {
+                         mat.color = .init(tint: .cyan)
+                    }
+                } else {
+                    mat.color = .init(tint: .cyan)
+                }
+                
+                targetEntity.model?.materials = [mat]
+                
+                // 7. Swap visibility
+                targetEntity.isEnabled = true
+                frontEntity?.isEnabled = false
+                
+                // 8. Toggle index
+                activeBufferIndex = (activeBufferIndex == 0) ? 1 : 0
+                
+                // 9. Echo benchmark if needed
+                if var echo = benchmarkEchoData {
+                    let endTime = Date()
+                    let processingTime = endTime.timeIntervalSince(startTime)
+                    var procTime = processingTime
+                    let procTimeData = Data(bytes: &procTime, count: MemoryLayout<Double>.size)
+                    echo.append(procTimeData)
+                    self.webRTCClient?.sendPointCloudData(echo)
+                }
+                
+                // Force position if needed
+                if self.root?.position.z == 0 && self.root?.position.y == 0 {
+                     self.root?.position = SIMD3<Float>(0, 1.5, -1.0) 
+                     print("⚠️ [PointCloud] Forced root position to (0, 1.5, -1.0)")
+                }
+            } else {
+                print("❌ [PointCloud] DracoWrapper.decode returned NIL")
+            }
+            
+        } else if header == 0x02 || header == 0x03 || header == 0x05 || header == 0x06 {
+            // Point Cloud Data
+            // 0x02: Float32 Points
+            // 0x03: Float32 Points + Colors
+            // 0x05: Float16 Points
+            // 0x06: Float16 Points + Colors
+            
+            let isFloat16 = (header == 0x05 || header == 0x06)
+            let hasColors = (header == 0x03 || header == 0x06)
+            
+            var numPoints = 0
+            
+            if isFloat16 {
+                // Float16 = 2 bytes per coord -> 6 bytes per point
+                if hasColors {
+                    // 6 bytes + 3 bytes (RGB) = 9 bytes
+                    numPoints = payload.count / 9
+                } else {
+                    numPoints = payload.count / 6
+                }
+            } else {
+                // Float32 = 4 bytes per coord -> 12 bytes per point
+                if hasColors {
+                    // 12 bytes + 3 bytes (RGB) = 15 bytes
+                    numPoints = payload.count / 15
+                } else {
+                    numPoints = payload.count / 12
+                }
+            }
+            
+            if numPoints == 0 { return }
+            
+            // 1. Prepare Buffers
+            self.buffers.clear()
+            self.buffers.reserve(numPoints: numPoints)
+            
+            // 2. Parse Data & Parallel Expansion
+            let pointsByteSize = numPoints * (isFloat16 ? 6 : 12)
+            let pointsData = payload.prefix(pointsByteSize)
+            let colorsData = hasColors ? payload.suffix(from: pointsByteSize) : Data()
+            
+            // Resize arrays first
+            self.buffers.positions.append(contentsOf: repeatElement(.zero, count: numPoints * 3))
+            self.buffers.indices.append(contentsOf: repeatElement(0, count: numPoints * 3))
+            if hasColors {
+                self.buffers.uvs.append(contentsOf: repeatElement(.zero, count: numPoints * 3))
+                self.buffers.colors.append(contentsOf: repeatElement(255, count: numPoints * 4)) // Alpha=255
+            }
+            
+            let size: Float = 0.005 // 5mm points
+            let halfSize = size * 0.5
+            let height = size * 0.866
+            
+            pointsData.withUnsafeBytes { (pointsRaw: UnsafeRawBufferPointer) in
+                // For Float16, we bind to Float16. For Float32, we bind to Float.
+                // But UnsafeRawBufferPointer doesn't support generic binding easily in one block.
+                // We'll handle it inside.
+                
+                let float32Base = !isFloat16 ? pointsRaw.bindMemory(to: Float.self).baseAddress : nil
+                // Swift doesn't have a built-in Float16 type in standard library before recent versions,
+                // but it is available in SwiftUI/Accelerate context usually.
+                // Assuming Float16 is available (iOS 14+ / macOS 11+).
+                let float16Base = isFloat16 ? pointsRaw.bindMemory(to: Float16.self).baseAddress : nil
+                
+                // Use unsafeBytes for colors to avoid copying
+                colorsData.withUnsafeBytes { (colorsRaw: UnsafeRawBufferPointer) in
+                    let inputColors = colorsRaw.bindMemory(to: UInt8.self).baseAddress
+                    
+                    self.buffers.positions.withUnsafeMutableBufferPointer { positionsPtr in
+                        self.buffers.indices.withUnsafeMutableBufferPointer { indicesPtr in
+                            self.buffers.uvs.withUnsafeMutableBufferPointer { uvsPtr in
+                                self.buffers.colors.withUnsafeMutableBufferPointer { colorsPtr in
+                                    
+                                    // Parallel Loop
+                                    DispatchQueue.concurrentPerform(iterations: numPoints) { i in
+                                        // 1. Vertices
+                                        var x: Float = 0
+                                        var y: Float = 0
+                                        var z: Float = 0
+                                        
+                                        if isFloat16 {
+                                            if let base = float16Base {
+                                                x = Float(base[i * 3])
+                                                y = Float(base[i * 3 + 1])
+                                                z = Float(base[i * 3 + 2])
+                                            }
+                                        } else {
+                                            if let base = float32Base {
+                                                x = base[i * 3]
+                                                y = base[i * 3 + 1]
+                                                z = base[i * 3 + 2]
+                                            }
+                                        }
+                                        
+                                        let center = SIMD3<Float>(x, y, z)
+                                        
+                                        let v0 = center + SIMD3<Float>(0, size, 0)
+                                        let v1 = center + SIMD3<Float>(-height, -halfSize, 0)
+                                        let v2 = center + SIMD3<Float>(height, -halfSize, 0)
+                                        
+                                        let baseIdx = i * 3
+                                        positionsPtr[baseIdx] = v0
+                                        positionsPtr[baseIdx + 1] = v1
+                                        positionsPtr[baseIdx + 2] = v2
+                                        
+                                        let vertexIdx = UInt32(baseIdx)
+                                        indicesPtr[baseIdx] = vertexIdx
+                                        indicesPtr[baseIdx + 1] = vertexIdx + 1
+                                        indicesPtr[baseIdx + 2] = vertexIdx + 2
+                                        
+                                        if hasColors {
+                                            // 2. UVs
+                                            let u = (Float(i) + 0.5) / Float(numPoints)
+                                            let uv = SIMD2<Float>(u, 0.5)
+                                            uvsPtr[baseIdx] = uv
+                                            uvsPtr[baseIdx + 1] = uv
+                                            uvsPtr[baseIdx + 2] = uv
+                                            
+                                            // 3. Colors (RGB -> RGBA)
+                                            if let inputColors = inputColors {
+                                                let r = inputColors[i * 3]
+                                                let g = inputColors[i * 3 + 1]
+                                                let b = inputColors[i * 3 + 2]
+                                                
+                                                let colorIdx = i * 4
+                                                colorsPtr[colorIdx] = r
+                                                colorsPtr[colorIdx + 1] = g
+                                                colorsPtr[colorIdx + 2] = b
+                                                // Alpha is already 255 from initialization
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // 4. Create Mesh Descriptor
+            var descriptor = MeshDescriptor(name: "pointCloudRaw")
+            descriptor.positions = MeshBuffers.Positions(self.buffers.positions)
+            descriptor.primitives = .triangles(self.buffers.indices)
+            
+            if hasColors {
+                descriptor.textureCoordinates = MeshBuffers.TextureCoordinates(self.buffers.uvs)
+            }
+            
+            // DOUBLE BUFFERING LOGIC
+            let backEntity = (activeBufferIndex == 0) ? meshEntityB : meshEntityA
+            let frontEntity = (activeBufferIndex == 0) ? meshEntityA : meshEntityB
+            
+            guard let targetEntity = backEntity else { return }
+            
+            // 5. Update Mesh
+            if let existingMesh = targetEntity.model?.mesh {
+                do {
+                    let tempMesh = try MeshResource.generate(from: [descriptor])
+                    try existingMesh.replace(with: tempMesh.contents)
+                } catch {
+                    print("⚠️ [PointCloud] Failed to replace mesh: \(error)")
+                    if let meshResource = try? MeshResource.generate(from: [descriptor]) {
+                        targetEntity.model?.mesh = meshResource
+                    }
+                }
+            } else {
+                if let meshResource = try? MeshResource.generate(from: [descriptor]) {
+                    targetEntity.model?.mesh = meshResource
+                }
+            }
+            
+            // 6. Update Material/Texture
+            var mat = UnlitMaterial()
+            
+            if hasColors {
+                if let texture = createTextureFromBuffer(width: numPoints) {
+                     mat.color = .init(texture: .init(texture))
+                } else {
+                     mat.color = .init(tint: .cyan)
+                }
+            } else {
+                mat.color = .init(tint: .cyan)
+            }
+            
+            targetEntity.model?.materials = [mat]
+            
+            // 7. Swap visibility
+            targetEntity.isEnabled = true
+            frontEntity?.isEnabled = false
+            
+            // 8. Toggle index
+            activeBufferIndex = (activeBufferIndex == 0) ? 1 : 0
+            
+            // 9. Echo benchmark if needed (now that mesh is updated)
+            if var echo = benchmarkEchoData {
+                let endTime = Date()
+                let processingTime = endTime.timeIntervalSince(startTime)
+                
+                // Append processing time (Double = 8 bytes)
+                var procTime = processingTime
+                let procTimeData = Data(bytes: &procTime, count: MemoryLayout<Double>.size)
+                echo.append(procTimeData)
+                
+                self.webRTCClient?.sendPointCloudData(echo)
+            }
+            
+            // Force position if needed
+            if self.root?.position.z == 0 && self.root?.position.y == 0 {
+                 self.root?.position = SIMD3<Float>(0, 1.5, -1.0) 
+                 print("⚠️ [PointCloud] Forced root position to (0, 1.5, -1.0)")
+            }
+        }
+    }
+
+    
+    private func createTextureFromBuffer(width: Int) -> TextureResource? {
+        let height = 1
+        let bytesPerRow = width * 4
+        
+        // Create Data provider from our reusable buffer
+        // Note: We are creating a copy here because CGDataProvider takes ownership or needs a copy.
+        // To avoid copy, we'd need to use a release callback, but keeping it simple for now.
+        // Actually, Data(bytes:count:) copies.
+        // Optimization: Use `Data(bytesNoCopy:...)` if we can guarantee buffer validity.
+        // But `buffers.colors` might change next frame.
+        // However, the texture creation consumes the data immediately to create the CGImage?
+        // Let's stick to copy for safety for now, it's a linear copy of bytes, much faster than the loop we had.
+        
+        let data = Data(self.buffers.colors)
+        guard let dataProvider = CGDataProvider(data: data as CFData) else { return nil }
+        
+        guard let cgImage = CGImage(
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bitsPerPixel: 32,
+            bytesPerRow: bytesPerRow,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+            provider: dataProvider,
+            decode: nil,
+            shouldInterpolate: false,
+            intent: .defaultIntent
+        ) else { return nil }
+        
+        do {
+            let texture = try TextureResource.generate(from: cgImage, options: .init(semantic: .color))
+            return texture
+        } catch {
+            print("⚠️ [PointCloud] Failed to create texture: \(error)")
+            return nil
+        }
     }
 }

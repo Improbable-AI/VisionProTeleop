@@ -36,6 +36,8 @@
 		C1E05F7C2ECD850B0018C506 /* ImmersiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E05F7A2ECD850B0018C506 /* ImmersiveView.swift */; };
 		C1E05F7D2ECD850B0018C506 /* ImageData.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E05F792ECD850B0018C506 /* ImageData.swift */; };
 		C1E05F7E2ECD850B0018C506 /* WebRTCClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E05F7B2ECD850B0018C506 /* WebRTCClient.swift */; };
+		C1EAF9602ED7926D00549580 /* DracoSwift in Frameworks */ = {isa = PBXBuildFile; productRef = C1EAF95F2ED7926D00549580 /* DracoSwift */; };
+		C1EAF9642ED7942000549580 /* DracoWrapper.mm in Sources */ = {isa = PBXBuildFile; fileRef = C1EAF9622ED7942000549580 /* DracoWrapper.mm */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -74,6 +76,8 @@
 		C1E05F792ECD850B0018C506 /* ImageData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageData.swift; sourceTree = "<group>"; };
 		C1E05F7A2ECD850B0018C506 /* ImmersiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImmersiveView.swift; sourceTree = "<group>"; };
 		C1E05F7B2ECD850B0018C506 /* WebRTCClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebRTCClient.swift; sourceTree = "<group>"; };
+		C1EAF9612ED7942000549580 /* DracoWrapper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DracoWrapper.h; sourceTree = "<group>"; };
+		C1EAF9622ED7942000549580 /* DracoWrapper.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = DracoWrapper.mm; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -85,6 +89,7 @@
 				C14DAF532B7C375D00A7333E /* GRPC in Frameworks */,
 				C1DA80DC2ED0F61D00B55CC2 /* RealityKitContent in Frameworks */,
 				C1E05F782ECD84DF0018C506 /* LiveKitWebRTC in Frameworks */,
+				C1EAF9602ED7926D00549580 /* DracoSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -133,6 +138,7 @@
 			children = (
 				16267B532B57D387000CA8AD /* README.md */,
 				165ADB492B4B71B0008A756F /* Tracking Streamer */,
+				C1EAF9512ED6D38A00549580 /* Frameworks */,
 				165ADB482B4B71B0008A756F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -148,6 +154,7 @@
 		165ADB492B4B71B0008A756F /* Tracking Streamer */ = {
 			isa = PBXGroup;
 			children = (
+				C1EAF9632ED7942000549580 /* DracoWrapper */,
 				C1DA80C52ECE821800B55CC2 /* VisionProTeleop.entitlements */,
 				C1893C742B93C1AC00F2269D /* handtracking.grpc.swift */,
 				C1893C752B93C1AC00F2269D /* handtracking.pb.swift */,
@@ -180,6 +187,22 @@
 			path = "🛠️Menu";
 			sourceTree = "<group>";
 		};
+		C1EAF9512ED6D38A00549580 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		C1EAF9632ED7942000549580 /* DracoWrapper */ = {
+			isa = PBXGroup;
+			children = (
+				C1EAF9612ED7942000549580 /* DracoWrapper.h */,
+				C1EAF9622ED7942000549580 /* DracoWrapper.mm */,
+			);
+			path = DracoWrapper;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -201,6 +224,7 @@
 				C14DAF542B7C375D00A7333E /* protoc-gen-grpc-swift */,
 				C1E05F772ECD84DF0018C506 /* LiveKitWebRTC */,
 				C1DA80DB2ED0F61D00B55CC2 /* RealityKitContent */,
+				C1EAF95F2ED7926D00549580 /* DracoSwift */,
 			);
 			productName = HandsWidth;
 			productReference = 165ADB472B4B71B0008A756F /* Tracking Streamer.app */;
@@ -235,6 +259,7 @@
 				C14DAF512B7C375D00A7333E /* XCRemoteSwiftPackageReference "grpc-swift" */,
 				C1E05F762ECD84DF0018C506 /* XCRemoteSwiftPackageReference "webrtc-xcframework" */,
 				C1DA80DA2ED0F61D00B55CC2 /* XCLocalSwiftPackageReference "Tracking Streamer/Supporting files/RealityKitContent" */,
+				C1EAF95C2ED7925C00549580 /* XCRemoteSwiftPackageReference "DracoSwift" */,
 			);
 			productRefGroup = 165ADB482B4B71B0008A756F /* Products */;
 			projectDirPath = "";
@@ -276,6 +301,7 @@
 				165ADB512B4B71B0008A756F /* ContentView.swift in Sources */,
 				16EE5E9B2B576DB000D354ED /* 🧩Model.swift in Sources */,
 				16688DE62B59F35F004CE12B /* 🥽AppModel.swift in Sources */,
+				C1EAF9642ED7942000549580 /* DracoWrapper.mm in Sources */,
 				165ADB4F2B4B71B0008A756F /* App.swift in Sources */,
 				16C95AE52B5E762400CF0FED /* 🛠️MenuTop.swift in Sources */,
 				C1E05F7C2ECD850B0018C506 /* ImmersiveView.swift in Sources */,
@@ -444,6 +470,7 @@
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SUPPORTED_PLATFORMS = "xros xrsimulator";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "Tracking Streamer/VisionProTeleop-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
 			};
@@ -481,6 +508,7 @@
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SUPPORTED_PLATFORMS = "xros xrsimulator";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "Tracking Streamer/VisionProTeleop-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
 			};
@@ -533,6 +561,14 @@
 				minimumVersion = 137.7151.10;
 			};
 		};
+		C1EAF95C2ED7925C00549580 /* XCRemoteSwiftPackageReference "DracoSwift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "git@github.com:warrenm/DracoSwift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.5.7;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -554,6 +590,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = C1E05F762ECD84DF0018C506 /* XCRemoteSwiftPackageReference "webrtc-xcframework" */;
 			productName = LiveKitWebRTC;
+		};
+		C1EAF95F2ED7926D00549580 /* DracoSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C1EAF95C2ED7925C00549580 /* XCRemoteSwiftPackageReference "DracoSwift" */;
+			productName = DracoSwift;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

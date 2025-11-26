@@ -1,6 +1,15 @@
 {
   "pins" : [
     {
+      "identity" : "dracoswift",
+      "kind" : "remoteSourceControl",
+      "location" : "git@github.com:warrenm/DracoSwift.git",
+      "state" : {
+        "revision" : "3f85e64b4e62b070871dfdc1e26c058aaa1de63e",
+        "version" : "1.5.7"
+      }
+    },
+    {
       "identity" : "grpc-swift",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/grpc/grpc-swift.git",

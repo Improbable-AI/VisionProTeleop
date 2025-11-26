@@ -1,0 +1,19 @@
+{
+  "timestamp": "2025-11-26T10:54:35.716891",
+  "test_config": {
+    "ip": "10.31.175.239",
+    "trials_per_count": 1000,
+    "warmup_frames": 100
+  },
+  "point_counts": {
+    "10000": {
+      "mean_ms": 146.0687250996016,
+      "std_ms": 169.5981959388286,
+      "min_ms": 58.0,
+      "max_ms": 1607.0,
+      "p50_ms": 87.0,
+      "p95_ms": 406.24999999999955,
+      "samples_collected": 1004
+    }
+  }
+}

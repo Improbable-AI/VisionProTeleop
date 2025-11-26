@@ -1,0 +1,23 @@
+{
+  "timestamp": "2025-11-26T15:28:16.105787",
+  "test_config": {
+    "ip": "169.254.194.132",
+    "trials_per_count": 1000,
+    "warmup_frames": 100,
+    "quantize": false,
+    "draco": true
+  },
+  "point_counts": {
+    "10000": {
+      "mean_rtt_ms": 99.52136261305714,
+      "std_rtt_ms": 35.52195288992791,
+      "min_rtt_ms": 58.10425000527175,
+      "max_rtt_ms": 185.92424999951618,
+      "p50_rtt_ms": 88.6248334973061,
+      "p95_rtt_ms": 161.6418681511277,
+      "mean_processing_ms": 26.59750759601593,
+      "mean_network_ms": 64.1994446810495,
+      "samples_collected": 1000
+    }
+  }
+}

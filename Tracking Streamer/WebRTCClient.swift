@@ -10,10 +10,12 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
     private var videoTrack: LKRTCVideoTrack?
     private var audioTrack: LKRTCAudioTrack?
     private var handDataChannel: LKRTCDataChannel?
+    private var pointCloudDataChannel: LKRTCDataChannel?
     private var handStreamTask: Task<Void, Never>?
     private let handStreamIntervalNanoseconds: UInt64 = 2_000_000
     
     var onFrameReceived: ((CVPixelBuffer) -> Void)?
+    var onPointCloudReceived: ((Data) -> Void)?
     
     private let stunServer = "stun:stun.l.google.com:19302"
     
@@ -337,17 +339,40 @@ extension WebRTCClient {
         print("DEBUG: ICE candidate generated - \(candidate.sdp) [\(candidate.sdpMid ?? "no-mid")] type: \(candidate.sdp.contains("host") ? "host" : candidate.sdp.contains("srflx") ? "srflx" : "relay")")
     }
     
+
+    
     func peerConnection(_ peerConnection: LKRTCPeerConnection, didRemove candidates: [LKRTCIceCandidate]) {
+
         print("DEBUG: ICE candidates removed")
     }
     
     func peerConnection(_ peerConnection: LKRTCPeerConnection, didOpen dataChannel: LKRTCDataChannel) {
         print("DEBUG: Data channel opened (label=\(dataChannel.label), state=\(dataChannel.readyState.rawValue))")
-        handDataChannel = dataChannel
-        dataChannel.delegate = self
-        startHandTrackingStream(on: dataChannel)
-        Task { @MainActor in
-            DataManager.shared.connectionStatus = "Hand data channel open"
+        
+        if dataChannel.label == "hand-tracking" || dataChannel.label == "hand-data" { // Handle potential label variations
+             handDataChannel = dataChannel
+             dataChannel.delegate = self
+             startHandTrackingStream(on: dataChannel)
+             Task { @MainActor in
+                 DataManager.shared.connectionStatus = "Hand data channel open"
+             }
+        } else if dataChannel.label == "pointCloud" {
+            print("DEBUG: Point cloud data channel opened")
+            pointCloudDataChannel = dataChannel
+            dataChannel.delegate = self
+        } else {
+             // Fallback for legacy behavior or unknown channels
+             print("DEBUG: Unknown data channel label: \(dataChannel.label), assuming hand tracking for backward compatibility if needed")
+             // For safety, let's only assign if it looks like hand tracking or if we want a default
+             // Original code just assigned it. Let's keep it safe.
+             if handDataChannel == nil {
+                 handDataChannel = dataChannel
+                 dataChannel.delegate = self
+                 startHandTrackingStream(on: dataChannel)
+                 Task { @MainActor in
+                     DataManager.shared.connectionStatus = "Hand data channel open (default)"
+                 }
+             }
         }
     }
 }
@@ -366,7 +391,35 @@ extension WebRTCClient: LKRTCDataChannelDelegate {
     }
 
     func dataChannel(_ dataChannel: LKRTCDataChannel, didReceiveMessageWith buffer: LKRTCDataBuffer) {
-        print("DEBUG: Received \(buffer.data.count) bytes on data channel (ignored)")
+        if dataChannel.label == "pointCloud" {
+            // print("DEBUG: [WebRTCClient] Received \(buffer.data.count) bytes on pointCloud channel")
+            // Forward the data to the callback
+            if onPointCloudReceived == nil {
+                print("⚠️ [WebRTCClient] onPointCloudReceived is NIL!")
+            }
+            onPointCloudReceived?(buffer.data)
+        } else {
+            print("DEBUG: Received \(buffer.data.count) bytes on data channel (ignored)")
+        }
+    }
+    
+    func sendPointCloudData(_ data: Data) {
+        guard let channel = pointCloudDataChannel else {
+            print("⚠️ [WebRTCClient] Cannot send point cloud data - channel not open")
+            return
+        }
+        
+        if channel.readyState != .open {
+            print("⚠️ [WebRTCClient] Cannot send point cloud data - channel state is \(channel.readyState.rawValue)")
+            return
+        }
+        
+        let buffer = LKRTCDataBuffer(data: data, isBinary: true)
+        if !channel.sendData(buffer) {
+            print("⚠️ [WebRTCClient] Failed to send point cloud data (buffer full?)")
+        } else {
+            // print("DEBUG: [WebRTCClient] Sent \(data.count) bytes on pointCloud channel")
+        }
     }
 }
 
