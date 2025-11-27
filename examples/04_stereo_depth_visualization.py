@@ -244,37 +244,15 @@ if __name__ == "__main__":
     # Register stereo frame callback with custom disparity scale
     streamer.register_frame_callback(create_stereo_depth_visualizer(streamer, disparity_scale=args.disparity))
     
-    # Start video streaming with stereo enabled
+    # Configure video streaming with stereo enabled
     print(f"Starting stereo video stream at {args.resolution}, {args.fps} fps...")
-    streamer.start_streaming(
-        device=None,              # No camera - synthetic video
-        format=None,
+    streamer.configure_video(
         fps=args.fps,
         size=args.resolution,     # Side-by-side stereo resolution
-        port=9999,
-        stereo_video=True,        # Enable stereo video mode
+        stereo=True,              # Enable stereo video mode
     )
+    streamer.serve(port=9999)
     
-    print("✓ Stereo video streaming started!")
-    print()
-    print("=" * 70)
-    print("HOW IT WORKS:")
-    print("=" * 70)
-    print("• Each hand is drawn twice (once for each eye)")
-    print("• Closer objects have MORE separation between left/right views")
-    print("• Farther objects have LESS separation between left/right views")
-    print("• Your brain fuses these images to perceive depth!")
-    print()
-    print(f"DISPARITY SCALE: {args.disparity}")
-    print("  - Higher values = stronger 3D effect (try 150-200)")
-    print("  - Lower values = subtle effect (try 50-75)")
-    print("  - Default = 100")
-    print()
-    print("TIP: Enable stereo mode in the VisionOS app to see the 3D effect")
-    print()
-    print("Press Ctrl+C to stop")
-    print("=" * 70)
-    print()
     
     try:
         while True:

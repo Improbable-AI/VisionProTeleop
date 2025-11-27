@@ -1,0 +1,116 @@
+
+
+<mujoco model="arena">
+  <visual>
+    <quality shadowsize="8192" />
+  </visual>
+  <!-- <compiler angle="radian"/>
+  <default>
+    <default class="visual">
+      <geom group="2" type="mesh" contype="0" conaffinity="0"/>
+    </default>
+    <default class="collision">
+      <geom group="3" type="mesh" solimp="0.9 0.95 0.001 0.5 2" solref="0.02 1" condim="6" />
+    </default>
+  </default> -->
+  <asset>
+    <material name="None" specular="0.8000000000000002" shininess="0.5" rgba="0.8 0.8 0.8 1"/>
+    <material name="Peg" specular="0.8000000000000002" shininess="0.5" rgba="0.8 0.4 0.4 1"/>
+    <mesh file="peg_visual.obj"/>
+    <mesh file="peg_collision_0.obj"/>
+    <mesh file="peg_collision_1.obj"/>
+    <mesh file="peg_collision_2.obj"/>
+    <mesh file="peg_collision_3.obj"/>
+    <mesh file="peg_collision_4.obj"/>
+    <mesh file="peg_collision_5.obj"/>
+    <mesh file="peg_collision_6.obj"/>
+    <mesh file="peg_collision_7.obj"/>
+    <mesh file="peg_collision_8.obj"/>
+    <mesh file="hole_visual.obj"/>
+    <mesh file="hole_collision_0.obj"/>
+    <mesh file="hole_collision_1.obj"/>
+    <mesh file="hole_collision_2.obj"/>
+    <mesh file="hole_collision_3.obj"/>
+    <mesh file="hole_collision_4.obj"/>
+    <mesh file="hole_collision_5.obj"/>
+    <mesh file="hole_collision_6.obj"/>
+    <mesh file="hole_collision_7.obj"/>
+    <mesh file="hole_collision_8.obj"/>
+    <mesh file="hole_collision_9.obj"/>
+    <mesh file="hole_collision_10.obj"/>
+    <texture type='skybox' builtin='gradient' rgb1='.4 .6 .8' rgb2='0 0 0' width='100' height='100'/>
+    <texture name='groundplane' type='2d' builtin='checker' rgb1='.2 .3 .4' rgb2='.1 .2 .3' width='300' height='300' mark='edge' markrgb='.8 .8 .8'/>
+    <material name='groundplane' texture='groundplane' texrepeat='5 5' texuniform='true' reflectance='.2'/>
+  </asset>
+
+  <!-- Always initialize the free camera to point at the origin. -->
+  <statistic center='0 0 0'/>
+  <worldbody>
+
+    <body name="hole" pos="0.5 0 0.015" euler="0 0 0">
+      <geom material="None" mesh="hole_visual" class="visual"/>
+      <geom mesh="hole_collision_0" class="collision" density="10"/>
+      <geom mesh="hole_collision_1" class="collision" density="10"/>
+      <geom mesh="hole_collision_2" class="collision" density="10"/>
+      <geom mesh="hole_collision_3" class="collision" density="10"/>
+      <geom mesh="hole_collision_4" class="collision" density="10"/>
+      <geom mesh="hole_collision_5" class="collision" density="10"/>
+      <geom mesh="hole_collision_6" class="collision" density="10"/>
+      <geom mesh="hole_collision_7" class="collision" density="10"/>
+      <geom mesh="hole_collision_8" class="collision" density="10"/>
+      <geom mesh="hole_collision_9" class="collision" density="10"/>
+      <geom mesh="hole_collision_10" class="collision" density="10"/>
+
+      <body name="hole_target" pos="0 0 0.06" euler="3.1416 0 0">
+        <!-- geoms for x,y,z axis as cylinder, with RGB color -->
+        <geom type="cylinder" size="0.003 0.02" pos="0.02 0 0" rgba="1 0 0 1" euler="0 1.5708 0" class="visual"/>
+        <geom type="cylinder" size="0.003 0.02" pos="0 0.02 0" rgba="0 1 0 1"  euler="1.5708 0 0" class="visual"/>
+        <geom type="cylinder" size="0.003 0.02" pos="0 0 0.02" rgba="0 0 1 1" euler="0 0 0" class="visual"/>
+      </body>  
+
+
+    </body>
+
+    <body name="peg" euler="0 0 0" pos="0 0 0.1">
+      <freejoint />
+      <geom material="Peg" mesh="peg_visual" class="visual"/>
+      <geom mesh="peg_collision_0" class="collision" density="100"/>
+      <geom mesh="peg_collision_1" class="collision" density="100"/>
+      <geom mesh="peg_collision_2" class="collision" density="100"/>
+      <geom mesh="peg_collision_3" class="collision" density="100"/>
+      <geom mesh="peg_collision_4" class="collision" density="100"/>
+      <geom mesh="peg_collision_5" class="collision" density="100"/>
+      <geom mesh="peg_collision_6" class="collision" density="100"/>
+      <geom mesh="peg_collision_7" class="collision" density="100"/>
+      <geom mesh="peg_collision_8" class="collision" density="100"/>
+
+      <body name="grasp" pos="0 0 0.1" euler="3.1416 0 0">
+        <!-- geoms for x,y,z axis as cylinder, with RGB color -->
+        <geom type="cylinder" size="0.003 0.02" pos="0.02 0 0" rgba="1 0 0 1" euler="0 1.5708 0" class="visual"/>
+        <geom type="cylinder" size="0.003 0.02" pos="0 0.02 0" rgba="0 1 0 1"  euler="1.5708 0 0" class="visual"/>
+        <geom type="cylinder" size="0.003 0.02" pos="0 0 0.02" rgba="0 0 1 1" euler="0 0 0" class="visual"/>
+      </body>  
+
+
+    </body>
+
+    <body name="holder" pos="0.4 0.2 0">
+      <geom type="box" size="0.02 0.001 0.01" pos="-0.0 -0.02 0.01" rgba="0.8 0.6 0.4 1" density="100" class="visual"/>
+      <geom type="box" size="0.02 0.001 0.01" pos="-0.0 0.02 0.01" rgba="0.8 0.6 0.4 1" density="100" class="visual"/>
+      <geom type="box" size="0.001 0.02 0.01" pos="-0.02 0.0 0.01" rgba="0.8 0.6 0.4 1" density="100" class="visual"/>
+      <geom type="box" size="0.001 0.02 0.01" pos="0.02 0.0 0.01" rgba="0.8 0.6 0.4 1" density="100" class="visual"/>
+
+      <geom type="box" size="0.02 0.001 0.01" pos="-0.0 -0.02 0.01" rgba="0.8 0.6 0.4 1" density="100" class="collision"/>
+      <geom type="box" size="0.02 0.001 0.01" pos="-0.0 0.02 0.01" rgba="0.8 0.6 0.4 1" density="100" class="collision"/>
+      <geom type="box" size="0.001 0.02 0.01" pos="-0.02 0.0 0.01" rgba="0.8 0.6 0.4 1" density="100" class="collision"/>
+      <geom type="box" size="0.001 0.02 0.01" pos="0.02 0.0 0.01" rgba="0.8 0.6 0.4 1" density="100" class="collision"/>
+    </body>
+
+    <!-- View of the person sitting behind computer operating the robot. -->
+    <camera name='fixed_viewer' pos='0 -1.5 0.5' quat='0.7 0.7 0 0'/>
+    <!-- <geom name='ground' type='plane' size='2 2 2' material='groundplane'
+        friction='0.4'/>
+    <light directional='false' diffuse='.7 .7 .7' pos='0 0 1.5' dir='0 0 -1' specular='.3 .3 .3' castshadow='true'/> -->
+  </worldbody>
+</mujoco>
+

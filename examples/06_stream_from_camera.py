@@ -15,13 +15,13 @@ import time
 def main(args):
     streamer = VisionProStreamer(ip=args.ip, record=True)
     
-    streamer.start_streaming(
+    streamer.configure_video(
         device="0:none",
         format="avfoundation",
-        size = "640x480",
-        fps = 30, 
-        port=9999
+        size="640x480",
+        fps=30,
     )
+    streamer.serve(port=9999)
     
     try:
         # Keep the script running and show hand tracking data

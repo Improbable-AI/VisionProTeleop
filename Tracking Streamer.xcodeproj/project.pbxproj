@@ -25,8 +25,9 @@
 		16EA6A632B68629200A3A740 /* screenshot1280w2.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 16EA6A602B68629100A3A740 /* screenshot1280w2.jpg */; };
 		16EE5E992B576DA800D354ED /* 🧩Name.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16EE5E982B576DA800D354ED /* 🧩Name.swift */; };
 		16EE5E9B2B576DB000D354ED /* 🧩Model.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16EE5E9A2B576DB000D354ED /* 🧩Model.swift */; };
-		C14DAF532B7C375D00A7333E /* GRPC in Frameworks */ = {isa = PBXBuildFile; productRef = C14DAF522B7C375D00A7333E /* GRPC */; };
-		C14DAF552B7C375D00A7333E /* protoc-gen-grpc-swift in Frameworks */ = {isa = PBXBuildFile; productRef = C14DAF542B7C375D00A7333E /* protoc-gen-grpc-swift */; };
+		C14DAF532B7C375D00A7333E /* GRPCCore in Frameworks */ = {isa = PBXBuildFile; productRef = C14DAF522B7C375D00A7333E /* GRPCCore */; };
+		C14DAF632B7C375D00A7333E /* GRPCNIOTransportHTTP2 in Frameworks */ = {isa = PBXBuildFile; productRef = C14DAF622B7C375D00A7333E /* GRPCNIOTransportHTTP2 */; };
+		C14DAF732B7C375D00A7333E /* GRPCProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = C14DAF722B7C375D00A7333E /* GRPCProtobuf */; };
 		C1893C762B93C1AC00F2269D /* handtracking.grpc.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1893C742B93C1AC00F2269D /* handtracking.grpc.swift */; };
 		C1893C772B93C1AC00F2269D /* handtracking.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1893C752B93C1AC00F2269D /* handtracking.pb.swift */; };
 		C1DA80C42ECE377600B55CC2 /* StatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1DA80C32ECE377600B55CC2 /* StatusView.swift */; };
@@ -36,6 +37,12 @@
 		C1E05F7C2ECD850B0018C506 /* ImmersiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E05F7A2ECD850B0018C506 /* ImmersiveView.swift */; };
 		C1E05F7D2ECD850B0018C506 /* ImageData.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E05F792ECD850B0018C506 /* ImageData.swift */; };
 		C1E05F7E2ECD850B0018C506 /* WebRTCClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E05F7B2ECD850B0018C506 /* WebRTCClient.swift */; };
+		C1EAF96C2ED7E13400549580 /* GRPCServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EAF96B2ED7E13400549580 /* GRPCServer.swift */; };
+		C1EAF9722ED7E66600549580 /* MuJoCoStreamingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EAF9702ED7E66600549580 /* MuJoCoStreamingView.swift */; };
+		C1EAF9732ED7E66600549580 /* MuJoCoGRPCServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EAF96F2ED7E66600549580 /* MuJoCoGRPCServer.swift */; };
+		C1EAF9742ED7E66600549580 /* mujoco_ar.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EAF96E2ED7E66600549580 /* mujoco_ar.pb.swift */; };
+		C1EAF9752ED7E66600549580 /* mujoco_ar.grpc.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EAF96D2ED7E66600549580 /* mujoco_ar.grpc.swift */; };
+		C1EAF9772ED7EC9000549580 /* CombinedStreamingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EAF9762ED7EC9000549580 /* CombinedStreamingView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -65,8 +72,8 @@
 		16EE5E962B576B9F00D354ED /* HandToGround.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = HandToGround.md; sourceTree = "<group>"; };
 		16EE5E982B576DA800D354ED /* 🧩Name.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "🧩Name.swift"; sourceTree = "<group>"; };
 		16EE5E9A2B576DB000D354ED /* 🧩Model.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "🧩Model.swift"; sourceTree = "<group>"; };
-		C1893C742B93C1AC00F2269D /* handtracking.grpc.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = handtracking.grpc.swift; path = avp_stream/grpc_msg/handtracking.grpc.swift; sourceTree = SOURCE_ROOT; };
-		C1893C752B93C1AC00F2269D /* handtracking.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = handtracking.pb.swift; path = avp_stream/grpc_msg/handtracking.pb.swift; sourceTree = SOURCE_ROOT; };
+		C1893C742B93C1AC00F2269D /* handtracking.grpc.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = handtracking.grpc.swift; sourceTree = "<group>"; };
+		C1893C752B93C1AC00F2269D /* handtracking.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = handtracking.pb.swift; sourceTree = "<group>"; };
 		C1DA80C32ECE377600B55CC2 /* StatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusView.swift; sourceTree = "<group>"; };
 		C1DA80C52ECE821800B55CC2 /* VisionProTeleop.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VisionProTeleop.entitlements; sourceTree = "<group>"; };
 		C1DA80C62ECE8C6F00B55CC2 /* ViewControlSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewControlSettings.swift; sourceTree = "<group>"; };
@@ -74,6 +81,12 @@
 		C1E05F792ECD850B0018C506 /* ImageData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageData.swift; sourceTree = "<group>"; };
 		C1E05F7A2ECD850B0018C506 /* ImmersiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImmersiveView.swift; sourceTree = "<group>"; };
 		C1E05F7B2ECD850B0018C506 /* WebRTCClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebRTCClient.swift; sourceTree = "<group>"; };
+		C1EAF96B2ED7E13400549580 /* GRPCServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GRPCServer.swift; sourceTree = "<group>"; };
+		C1EAF96D2ED7E66600549580 /* mujoco_ar.grpc.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = mujoco_ar.grpc.swift; sourceTree = "<group>"; };
+		C1EAF96E2ED7E66600549580 /* mujoco_ar.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = mujoco_ar.pb.swift; sourceTree = "<group>"; };
+		C1EAF96F2ED7E66600549580 /* MuJoCoGRPCServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MuJoCoGRPCServer.swift; sourceTree = "<group>"; };
+		C1EAF9702ED7E66600549580 /* MuJoCoStreamingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MuJoCoStreamingView.swift; sourceTree = "<group>"; };
+		C1EAF9762ED7EC9000549580 /* CombinedStreamingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CombinedStreamingView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -81,8 +94,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C14DAF552B7C375D00A7333E /* protoc-gen-grpc-swift in Frameworks */,
-				C14DAF532B7C375D00A7333E /* GRPC in Frameworks */,
+				C14DAF532B7C375D00A7333E /* GRPCCore in Frameworks */,
+				C14DAF632B7C375D00A7333E /* GRPCNIOTransportHTTP2 in Frameworks */,
+				C14DAF732B7C375D00A7333E /* GRPCProtobuf in Frameworks */,
 				C1DA80DC2ED0F61D00B55CC2 /* RealityKitContent in Frameworks */,
 				C1E05F782ECD84DF0018C506 /* LiveKitWebRTC in Frameworks */,
 			);
@@ -149,13 +163,15 @@
 			isa = PBXGroup;
 			children = (
 				C1DA80C52ECE821800B55CC2 /* VisionProTeleop.entitlements */,
-				C1893C742B93C1AC00F2269D /* handtracking.grpc.swift */,
-				C1893C752B93C1AC00F2269D /* handtracking.pb.swift */,
+				C1GRPC032B93C1AC00F2269D /* Proto */,
 				165ADB4E2B4B71B0008A756F /* App.swift */,
 				165ADB502B4B71B0008A756F /* ContentView.swift */,
+				C1EAF9712ED7E66600549580 /* MuJoCo */,
 				C1E05F792ECD850B0018C506 /* ImageData.swift */,
+				C1EAF9762ED7EC9000549580 /* CombinedStreamingView.swift */,
 				C1E05F7A2ECD850B0018C506 /* ImmersiveView.swift */,
 				C1E05F7B2ECD850B0018C506 /* WebRTCClient.swift */,
+				C1EAF96B2ED7E13400549580 /* GRPCServer.swift */,
 				16688DE52B59F35F004CE12B /* 🥽AppModel.swift */,
 				1642FAB82B4D6CAA0084F9ED /* 🌐RealityView.swift */,
 				C1DA80C32ECE377600B55CC2 /* StatusView.swift */,
@@ -180,6 +196,26 @@
 			path = "🛠️Menu";
 			sourceTree = "<group>";
 		};
+		C1EAF9712ED7E66600549580 /* MuJoCo */ = {
+			isa = PBXGroup;
+			children = (
+				C1EAF96D2ED7E66600549580 /* mujoco_ar.grpc.swift */,
+				C1EAF96E2ED7E66600549580 /* mujoco_ar.pb.swift */,
+				C1EAF96F2ED7E66600549580 /* MuJoCoGRPCServer.swift */,
+				C1EAF9702ED7E66600549580 /* MuJoCoStreamingView.swift */,
+			);
+			path = MuJoCo;
+			sourceTree = "<group>";
+		};
+		C1GRPC032B93C1AC00F2269D /* Proto */ = {
+			isa = PBXGroup;
+			children = (
+				C1893C742B93C1AC00F2269D /* handtracking.grpc.swift */,
+				C1893C752B93C1AC00F2269D /* handtracking.pb.swift */,
+			);
+			path = Proto;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -197,8 +233,9 @@
 			);
 			name = "Tracking Streamer";
 			packageProductDependencies = (
-				C14DAF522B7C375D00A7333E /* GRPC */,
-				C14DAF542B7C375D00A7333E /* protoc-gen-grpc-swift */,
+				C14DAF522B7C375D00A7333E /* GRPCCore */,
+				C14DAF622B7C375D00A7333E /* GRPCNIOTransportHTTP2 */,
+				C14DAF722B7C375D00A7333E /* GRPCProtobuf */,
 				C1E05F772ECD84DF0018C506 /* LiveKitWebRTC */,
 				C1DA80DB2ED0F61D00B55CC2 /* RealityKitContent */,
 			);
@@ -232,7 +269,9 @@
 			);
 			mainGroup = 165ADB3E2B4B71B0008A756F;
 			packageReferences = (
-				C14DAF512B7C375D00A7333E /* XCRemoteSwiftPackageReference "grpc-swift" */,
+				C14DAF512B7C375D00A7333E /* XCRemoteSwiftPackageReference "grpc-swift-2" */,
+				C14DAF612B7C375D00A7333E /* XCRemoteSwiftPackageReference "grpc-swift-nio-transport" */,
+				C14DAF712B7C375D00A7333E /* XCRemoteSwiftPackageReference "grpc-swift-protobuf" */,
 				C1E05F762ECD84DF0018C506 /* XCRemoteSwiftPackageReference "webrtc-xcframework" */,
 				C1DA80DA2ED0F61D00B55CC2 /* XCLocalSwiftPackageReference "Tracking Streamer/Supporting files/RealityKitContent" */,
 			);
@@ -277,10 +316,16 @@
 				16EE5E9B2B576DB000D354ED /* 🧩Model.swift in Sources */,
 				16688DE62B59F35F004CE12B /* 🥽AppModel.swift in Sources */,
 				165ADB4F2B4B71B0008A756F /* App.swift in Sources */,
+				C1EAF96C2ED7E13400549580 /* GRPCServer.swift in Sources */,
 				16C95AE52B5E762400CF0FED /* 🛠️MenuTop.swift in Sources */,
+				C1EAF9772ED7EC9000549580 /* CombinedStreamingView.swift in Sources */,
 				C1E05F7C2ECD850B0018C506 /* ImmersiveView.swift in Sources */,
 				C1E05F7D2ECD850B0018C506 /* ImageData.swift in Sources */,
 				C1DA80C42ECE377600B55CC2 /* StatusView.swift in Sources */,
+				C1EAF9722ED7E66600549580 /* MuJoCoStreamingView.swift in Sources */,
+				C1EAF9732ED7E66600549580 /* MuJoCoGRPCServer.swift in Sources */,
+				C1EAF9742ED7E66600549580 /* mujoco_ar.pb.swift in Sources */,
+				C1EAF9752ED7E66600549580 /* mujoco_ar.grpc.swift in Sources */,
 				C1E05F7E2ECD850B0018C506 /* WebRTCClient.swift in Sources */,
 				C1893C762B93C1AC00F2269D /* handtracking.grpc.swift in Sources */,
 				C1893C772B93C1AC00F2269D /* handtracking.pb.swift in Sources */,
@@ -351,7 +396,7 @@
 				SDKROOT = xros;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-				XROS_DEPLOYMENT_TARGET = 1.0;
+				XROS_DEPLOYMENT_TARGET = 2.0;
 			};
 			name = Debug;
 		};
@@ -408,7 +453,7 @@
 				SDKROOT = xros;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
-				XROS_DEPLOYMENT_TARGET = 1.0;
+				XROS_DEPLOYMENT_TARGET = 2.0;
 			};
 			name = Release;
 		};
@@ -517,12 +562,28 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		C14DAF512B7C375D00A7333E /* XCRemoteSwiftPackageReference "grpc-swift" */ = {
+		C14DAF512B7C375D00A7333E /* XCRemoteSwiftPackageReference "grpc-swift-2" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/grpc/grpc-swift.git";
+			repositoryURL = "https://github.com/grpc/grpc-swift-2.git";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 1.21.1;
+				minimumVersion = 2.0.0;
+			};
+		};
+		C14DAF612B7C375D00A7333E /* XCRemoteSwiftPackageReference "grpc-swift-nio-transport" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/grpc/grpc-swift-nio-transport.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
+		C14DAF712B7C375D00A7333E /* XCRemoteSwiftPackageReference "grpc-swift-protobuf" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/grpc/grpc-swift-protobuf.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
 			};
 		};
 		C1E05F762ECD84DF0018C506 /* XCRemoteSwiftPackageReference "webrtc-xcframework" */ = {
@@ -536,15 +597,20 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		C14DAF522B7C375D00A7333E /* GRPC */ = {
+		C14DAF522B7C375D00A7333E /* GRPCCore */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = C14DAF512B7C375D00A7333E /* XCRemoteSwiftPackageReference "grpc-swift" */;
-			productName = GRPC;
+			package = C14DAF512B7C375D00A7333E /* XCRemoteSwiftPackageReference "grpc-swift-2" */;
+			productName = GRPCCore;
 		};
-		C14DAF542B7C375D00A7333E /* protoc-gen-grpc-swift */ = {
+		C14DAF622B7C375D00A7333E /* GRPCNIOTransportHTTP2 */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = C14DAF512B7C375D00A7333E /* XCRemoteSwiftPackageReference "grpc-swift" */;
-			productName = "protoc-gen-grpc-swift";
+			package = C14DAF612B7C375D00A7333E /* XCRemoteSwiftPackageReference "grpc-swift-nio-transport" */;
+			productName = GRPCNIOTransportHTTP2;
+		};
+		C14DAF722B7C375D00A7333E /* GRPCProtobuf */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C14DAF712B7C375D00A7333E /* XCRemoteSwiftPackageReference "grpc-swift-protobuf" */;
+			productName = GRPCProtobuf;
 		};
 		C1DA80DB2ED0F61D00B55CC2 /* RealityKitContent */ = {
 			isa = XCSwiftPackageProductDependency;

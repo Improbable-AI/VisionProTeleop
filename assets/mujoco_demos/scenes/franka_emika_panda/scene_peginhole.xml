@@ -1,0 +1,42 @@
+<mujoco model="panda scene">
+
+  <include file="panda.xml"/>
+  <include file="peg_in_hole.xml"/>
+
+  <!-- <option o_solref="0.00001 1" o_solimp="0.01 1" impratio="10000" noslip_iterations="1">
+    <flag override="enable" />
+  </option> -->
+
+  <statistic center="0.3 0 0.35" extent="0.8" meansize="0.05"/>
+
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.1 0.1 0.1" specular="0 0 0"/>
+    <global azimuth="120" elevation="-20"/>
+  </visual>
+
+  <asset>
+    <texture name="grid" type="2d" builtin="checker" rgb1=".2 .3 .4" rgb2=".1 0.15 0.2" width="512" height="512"
+      mark="cross" markrgb=".8 .8 .8"/>
+    <material name="grid" texture="grid" texrepeat="1 1" texuniform="true"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 1.5" dir="0 0 -1" directional="true"/>
+    <geom name="floor" size="1 1 0.01" type="plane" material="grid"/>
+    <body name="target" pos="0.5 0 .5" quat="0 1 0 0" mocap="true">
+      <geom type="box" size=".01 .01 .01" contype="0" conaffinity="0" rgba=".6 .3 .3 .5"/>
+      <site type="sphere" size="0.01" rgba="0 0 1 1" group="1"/>
+    </body>
+
+
+
+
+  </worldbody>
+
+
+  <keyframe>
+    <key name="home" qpos="0 0 0 -1.57079 0 1.57079 0.7853 0.04 0.04 0.4 0.2 0.01 1 0 0 0" ctrl="0 0 0 -1.57079 0 1.57079 -0.7853 255"/>
+    <!-- <key name="home" qpos="0.492 0.3 -0.0579 -2.31 0.0579 2.3 0.608 0.04 0.04 0.4 0.2 0.01 1 0 0 0" ctrl="0 0 0 -1.57079 0 1.57079 -0.7853 255"/> -->
+  </keyframe>
+
+</mujoco>

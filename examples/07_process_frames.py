@@ -9,9 +9,6 @@ from avp_stream.streamer import VisionProStreamer
 import cv2
 import numpy as np
 
-# Replace with your Vision Pro's IP address
-VISION_PRO_IP = '10.29.249.251'
-
 
 # Example 1: Simple text overlay
 def add_text_overlay(frame):
@@ -52,8 +49,15 @@ def fancy_overlay(frame):
 
 
 if __name__ == "__main__":
+
+
+    import argparse
+    parser = argparse.ArgumentParser(description="Custom Frame Processing with VisionProStreamer")
+    parser.add_argument("--ip", type=str, required = True, help="IP address of the Vision Pro device")
+    args = parser.parse_args()
+
     # Create streamer
-    streamer = VisionProStreamer(ip=VISION_PRO_IP)
+    streamer = VisionProStreamer(ip=args.ip)
     
     # Choose one of the examples:
     
@@ -71,14 +75,14 @@ if __name__ == "__main__":
     #     lambda frame: cv2.flip(frame, 1)  # Horizontal flip
     # )
     
-    # Start video streaming with the registered callback
-    streamer.start_streaming(
+    # Configure video streaming with the registered callback
+    streamer.configure_video(
         device="0:none",
         format="avfoundation",
-        size = "640x480",
-        fps = 30, 
-        port=9999
+        size="640x480",
+        fps=30,
     )
+    streamer.serve(port=9999)
     
     # Keep running
     print("Streaming with custom frame processing...")

@@ -1,0 +1,145 @@
+syntax = "proto3";
+
+package mujoco_ar;
+
+// Service definition for MuJoCo AR communication
+service MuJoCoARService {
+  // Send USDZ URL to VR device
+  rpc SendUsdzUrl(UsdzUrlRequest) returns (UsdzUrlResponse);
+  
+  // Send USDZ file data directly
+  rpc SendUsdzData(UsdzDataRequest) returns (UsdzDataResponse);
+  
+  // Send USDZ file data in chunks (for large files)
+  rpc SendUsdzDataChunked(stream UsdzChunkRequest) returns (UsdzDataResponse);
+  
+  // Stream body pose updates to VR device
+  rpc StreamPoses(stream PoseUpdateRequest) returns (stream PoseUpdateResponse);
+  
+  // Single pose update (alternative to streaming)
+  rpc UpdatePoses(PoseUpdateRequest) returns (PoseUpdateResponse);
+  
+  // Stream hand tracking data from Vision Pro
+  rpc StreamHandTracking(HandTrackingRequest) returns (stream HandTrackingUpdate);
+}
+
+// Request to send USDZ URL
+message UsdzUrlRequest {
+  string usdz_url = 1;
+  string session_id = 2;
+}
+
+// Response for USDZ URL
+message UsdzUrlResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// Request to send USDZ file data
+message UsdzDataRequest {
+  bytes usdz_data = 1;
+  string filename = 2;
+  string session_id = 3;
+  Vector3 attach_to_position = 4;
+  Quaternion attach_to_rotation = 5;
+}
+
+// Request for chunked USDZ file transfer
+message UsdzChunkRequest {
+  bytes chunk_data = 1;
+  string filename = 2;
+  string session_id = 3;
+  int32 chunk_index = 4;
+  int32 total_chunks = 5;
+  int64 total_size = 6;
+  bool is_last_chunk = 7;
+  Vector3 attach_to_position = 8;
+  Quaternion attach_to_rotation = 9;
+}
+
+// Response for USDZ data
+message UsdzDataResponse {
+  bool success = 1;
+  string message = 2;
+  string local_file_path = 3;
+}
+
+// 3D Vector for position
+message Vector3 {
+  float x = 1;
+  float y = 2;
+  float z = 3;
+}
+
+// Quaternion for rotation
+message Quaternion {
+  float x = 1;
+  float y = 2;
+  float z = 3;
+  float w = 4;
+}
+
+// Body pose containing position and rotation
+message BodyPose {
+  Vector3 position = 1;
+  Quaternion rotation = 2;
+  string body_name = 3;
+}
+
+// Request containing multiple body poses
+message PoseUpdateRequest {
+  repeated BodyPose body_poses = 1;
+  string session_id = 2;
+  double timestamp = 3;
+}
+
+// Response for pose updates
+message PoseUpdateResponse {
+  bool success = 1;
+  string message = 2;
+  int32 bodies_updated = 3;
+}
+
+// Represents a 4x4 transformation matrix
+message Matrix4x4 {
+  float m00 = 1;
+  float m01 = 2;
+  float m02 = 3;
+  float m03 = 4;
+  float m10 = 5;
+  float m11 = 6;
+  float m12 = 7;
+  float m13 = 8;
+  float m20 = 9;
+  float m21 = 10;
+  float m22 = 11;
+  float m23 = 12;
+  float m30 = 13;
+  float m31 = 14;
+  float m32 = 15;
+  float m33 = 16;
+}
+
+// The skeleton of a hand, comprising multiple 4x4 matrices (one per joint)
+message HandSkeleton {
+  repeated Matrix4x4 joint_matrices = 1; // Array of 4x4 matrices, expecting 25 per hand
+}
+
+// The hand tracking information, including the full 4x4 matrix for the wrist and the skeleton
+message Hand {
+  Matrix4x4 wrist_matrix = 1; // 4x4 matrix for the wrist position and orientation
+  HandSkeleton skeleton = 2; // The hand's skeleton
+}
+
+// The overall hand tracking update message, including data for both hands and head
+message HandTrackingUpdate {
+  Hand left_hand = 1;
+  Hand right_hand = 2;
+  Matrix4x4 head = 3;
+  double timestamp = 4;
+}
+
+// Request to start hand tracking stream
+message HandTrackingRequest {
+  string session_id = 1;
+}

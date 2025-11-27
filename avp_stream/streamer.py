@@ -11,6 +11,17 @@ import json
 import fractions 
 import math
 import cv2
+import os
+import shutil
+import re
+import traceback
+from copy import deepcopy
+from typing import Optional, Tuple, List, Dict, Any, Callable, TYPE_CHECKING
+from pathlib import Path
+from aiortc import VideoStreamTrack, AudioStreamTrack
+from av import VideoFrame, AudioFrame
+from avp_stream.mujoco_msg import mujoco_ar_pb2, mujoco_ar_pb2_grpc
+from scipy.spatial.transform import Rotation as R
 
 
 YUP2ZUP = np.array([[[1, 0, 0, 0], 
@@ -19,9 +30,427 @@ YUP2ZUP = np.array([[[1, 0, 0, 0],
                     [0, 0, 0, 1]]], dtype = np.float64)
 
 
+# =============================================================================
+# Media Clock for A/V Synchronization
+# =============================================================================
+
+class MediaClock:
+    """
+    Shared media clock for audio/video synchronization in WebRTC streaming.
+    
+    This implements a common timing reference for both audio and video tracks,
+    using the standard RTP clock rate approach. Both tracks share the same
+    epoch and can calculate synchronized presentation timestamps.
+    
+    Key features:
+    - Shared epoch across audio and video tracks
+    - NTP-style timestamp for absolute time reference  
+    - Methods for synchronized PTS calculation
+    - Sub-millisecond precision using time.perf_counter()
+    """
+    
+    # Standard clock rates for WebRTC
+    VIDEO_CLOCK_RATE = 90000  # 90kHz for video (RTP standard)
+    AUDIO_CLOCK_RATE = 48000  # Match sample rate for audio
+    
+    def __init__(self):
+        self._lock = Lock()
+        self._epoch: Optional[float] = None  # time.perf_counter() at start
+        self._epoch_ntp: Optional[float] = None  # time.time() at start (for NTP)
+        self._started = False
+        self._video_frame_count = 0
+        self._audio_sample_count = 0
+        
+    def start(self):
+        """Start the media clock. Called when streaming begins."""
+        with self._lock:
+            if self._started:
+                return
+            self._epoch = time.perf_counter()
+            self._epoch_ntp = time.time()
+            self._started = True
+            self._video_frame_count = 0
+            self._audio_sample_count = 0
+    
+    def reset(self):
+        """Reset the clock (for reconnection scenarios)."""
+        with self._lock:
+            self._epoch = time.perf_counter()
+            self._epoch_ntp = time.time()
+            self._video_frame_count = 0
+            self._audio_sample_count = 0
+    
+    @property
+    def is_started(self) -> bool:
+        return self._started
+    
+    def elapsed_seconds(self) -> float:
+        """Get elapsed time since clock start in seconds."""
+        if not self._started:
+            return 0.0
+        return time.perf_counter() - self._epoch
+    
+    def elapsed_ms(self) -> float:
+        """Get elapsed time since clock start in milliseconds."""
+        return self.elapsed_seconds() * 1000.0
+    
+    def get_video_pts(self, frame_number: int, fps: float) -> int:
+        """
+        Calculate video PTS using frame number and FPS.
+        Uses 90kHz clock rate (RTP standard for video).
+        """
+        return int(frame_number * self.VIDEO_CLOCK_RATE / fps)
+    
+    def get_audio_pts(self, sample_count: int) -> int:
+        """
+        Calculate audio PTS using sample count.
+        Audio PTS is simply the sample count when using sample_rate as time_base.
+        """
+        return sample_count
+    
+    def get_sync_timestamp(self) -> Dict[str, Any]:
+        """
+        Get synchronized timestamp information for callbacks.
+        
+        This allows frame/audio callbacks to query the current media time
+        and generate content that is properly synchronized.
+        
+        Returns:
+            dict with:
+                - elapsed_s: Seconds since stream start
+                - elapsed_ms: Milliseconds since stream start
+                - epoch_ntp: NTP timestamp at stream start
+                - current_ntp: Current NTP timestamp
+        """
+        if not self._started:
+            return {
+                "elapsed_s": 0.0,
+                "elapsed_ms": 0.0,
+                "epoch_ntp": None,
+                "current_ntp": time.time(),
+            }
+        
+        elapsed = time.perf_counter() - self._epoch
+        return {
+            "elapsed_s": elapsed,
+            "elapsed_ms": elapsed * 1000.0,
+            "epoch_ntp": self._epoch_ntp,
+            "current_ntp": time.time(),
+        }
+    
+    def wait_until_video_time(self, frame_number: int, fps: float) -> float:
+        """
+        Calculate how long to wait before the next video frame.
+        
+        Returns:
+            Sleep duration in seconds (can be negative if behind schedule).
+        """
+        if not self._started:
+            return 0.0
+        
+        target_time = self._epoch + (frame_number / fps)
+        current_time = time.perf_counter()
+        return target_time - current_time
+    
+    def wait_until_audio_time(self, sample_count: int, sample_rate: int) -> float:
+        """
+        Calculate how long to wait before the next audio frame.
+        
+        Returns:
+            Sleep duration in seconds (can be negative if behind schedule).
+        """
+        if not self._started:
+            return 0.0
+        
+        target_time = self._epoch + (sample_count / sample_rate)
+        current_time = time.perf_counter()
+        return target_time - current_time
+
+
+# =============================================================================
+# Media Track Classes (for WebRTC streaming)
+# =============================================================================
+
+def _create_processed_audio_track_class(streamer_instance):
+    """Factory function to create ProcessedAudioTrack class with streamer reference."""
+    from aiortc import AudioStreamTrack
+    from aiortc.contrib.media import MediaPlayer
+    from av import AudioFrame
+    
+    class ProcessedAudioTrack(AudioStreamTrack):
+        """Audio track that can process frames via callback or generate synthetic audio.
+        
+        Uses MediaClock for precise A/V synchronization with the video track.
+        """
+        kind = "audio"
+        
+        def __init__(self, audio_device, audio_fmt, callback, stereo=False, sample_rate=None):
+            super().__init__()
+            self.callback = callback
+            self.use_microphone = audio_device is not None
+            self.stereo = stereo
+            self.sample_rate = sample_rate or 48000
+            self._streamer = streamer_instance
+            self._sample_count = 0  # Total samples sent (for PTS)
+            self._drift_corrections = 0  # Track clock corrections
+            
+            if self.use_microphone:
+                # Use physical microphone
+                fmt = audio_fmt if audio_fmt else "avfoundation"
+                self.player = MediaPlayer(audio_device, format=fmt, options={})
+                self.audio_track = self.player.audio
+                channels = "stereo" if stereo else "mono"
+                self._streamer._log(f"🎤 Audio initialized from device: {audio_device} ({channels})")
+            else:
+                # Generate frames programmatically
+                self.player = None
+                self.audio_track = None
+                frame_duration_s = 0.02  # 20 ms frames for low latency
+                self.samples_per_frame = max(1, int(self.sample_rate * frame_duration_s))
+                channels = "stereo" if stereo else "mono"
+                self._streamer._log(
+                    "🎤 Synthetic audio initialized "
+                    f"({self.sample_rate}Hz, {self.samples_per_frame} samples/frame, {channels}, 20ms frames)"
+                )
+        
+        async def recv(self):
+            # Ensure MediaClock is started
+            if not self._streamer._media_clock.is_started:
+                self._streamer._media_clock.start()
+            
+            if self.use_microphone:
+                frame = await self.audio_track.recv()
+                
+                # Apply user callback if registered
+                if self.callback is not None:
+                    try:
+                        processed_frame = self.callback(frame)
+                        return processed_frame
+                    except Exception as e:
+                        self._streamer._log(f"⚠️  Audio callback error: {e}", force=True)
+                        return frame
+                else:
+                    return frame
+            else:
+                # Generate synthetic audio frame using MediaClock for sync
+                clock = self._streamer._media_clock
+                
+                # Create blank audio frame (silence)
+                layout = 'stereo' if self.stereo else 'mono'
+                frame = AudioFrame(format='s16', layout=layout, samples=self.samples_per_frame)
+                frame.sample_rate = self.sample_rate
+                frame.pts = clock.get_audio_pts(self._sample_count)
+                frame.time_base = fractions.Fraction(1, self.sample_rate)
+                
+                # Initialize with silence
+                bytes_per_sample = 2  # s16 = 2 bytes per sample
+                channels = 2 if self.stereo else 1
+                for p in frame.planes:
+                    p.update(bytes(self.samples_per_frame * bytes_per_sample * channels))
+                
+                # Log first few frames
+                if self._sample_count < self.samples_per_frame * 3:
+                    frame_num = self._sample_count // self.samples_per_frame
+                    self._streamer._log(f"🎤 Generated audio frame #{frame_num}: {self.samples_per_frame} samples, {frame.sample_rate}Hz, {layout}")
+                
+                # Use MediaClock for precise timing
+                sleep_time = clock.wait_until_audio_time(
+                    self._sample_count + self.samples_per_frame, 
+                    self.sample_rate
+                )
+                
+                # Adaptive timing: sleep if ahead, track drift if behind
+                if sleep_time > 0:
+                    await asyncio.sleep(sleep_time)
+                elif sleep_time < -0.05:  # More than 50ms behind
+                    self._drift_corrections += 1
+                    if self._drift_corrections <= 3:
+                        self._streamer._log(f"⚠️  Audio drift: {-sleep_time*1000:.0f}ms behind (correction #{self._drift_corrections})")
+                
+                # Apply callback if registered (callback should generate audio)
+                if self.callback is not None:
+                    try:
+                        processed_frame = self.callback(frame)
+                        self._sample_count += self.samples_per_frame
+                        if self._sample_count == self.samples_per_frame * 10:
+                            self._streamer._log(f"🎤 Audio streaming normally (~20ms per frame, synced with MediaClock)")
+                        return processed_frame
+                    except Exception as e:
+                        self._streamer._log(f"⚠️  Audio callback error: {e}", force=True)
+                        if self._streamer.verbose:
+                            traceback.print_exc()
+                        self._sample_count += self.samples_per_frame
+                        return frame
+                else:
+                    # No callback - return silence
+                    self._sample_count += self.samples_per_frame
+                    return frame
+    
+    return ProcessedAudioTrack
+
+
+def _create_processed_video_track_class(streamer_instance):
+    """Factory function to create ProcessedVideoTrack class with streamer reference."""
+    from aiortc import VideoStreamTrack
+    from aiortc.contrib.media import MediaPlayer
+    from av import VideoFrame
+    
+    class ProcessedVideoTrack(VideoStreamTrack):
+        """Video track that can process frames via callback or generate synthetic video.
+        
+        Uses MediaClock for precise A/V synchronization with the audio track.
+        Uses 90kHz RTP clock rate for video timestamps (WebRTC standard).
+        """
+        
+        def __init__(self, device, fmt, framerate, resolution, callback):
+            super().__init__()
+            self.callback = callback
+            self.width, self.height = resolution
+            self.use_camera = device is not None
+            self.warmup_frames = 0  # Track warmup frames for encoder optimization
+            self._streamer = streamer_instance
+            self._drift_corrections = 0  # Track clock corrections
+            
+            if self.use_camera:
+                # Use physical camera
+                opts = {
+                    "video_size": f"{self.width}x{self.height}", 
+                    "framerate": str(framerate),
+                    "fflags": "nobuffer",  # Minimize buffering
+                    "flags": "low_delay"   # Low delay mode
+                }
+                self.player = MediaPlayer(device, format=fmt, options=opts)
+                self.video_track = self.player.video
+                self._streamer._log("🎥 Camera initialized, warming up encoder...")
+            else:
+                # Generate frames programmatically
+                self.player = None
+                self.video_track = None
+                self.fps = framerate
+                self.frame_count = 0
+
+        def set_resolution(self, resolution):
+            width, height = resolution
+            if width <= 0 or height <= 0:
+                self._streamer._log(f"⚠️  Ignoring invalid resolution update: {width}x{height}", force=True)
+                return
+            self.width, self.height = width, height
+            self._streamer._log(f"🔧 ProcessedVideoTrack target resolution set to {width}x{height}")
+            
+        async def recv(self):
+            # Ensure MediaClock is started
+            if not self._streamer._media_clock.is_started:
+                self._streamer._media_clock.start()
+            
+            clock = self._streamer._media_clock
+            
+            if self.use_camera:
+                # Check if user provided a frame override
+                if self._streamer.user_frame is not None:
+                    # Use user-provided frame instead of camera
+                    img = self._streamer.user_frame
+                    # Get timing from camera track if available
+                    try:
+                        camera_frame = await self.video_track.recv()
+                        pts = camera_frame.pts
+                        time_base = camera_frame.time_base
+                    except:
+                        # Fallback timing using MediaClock
+                        pts = clock.get_video_pts(self.warmup_frames, 30)
+                        time_base = fractions.Fraction(1, MediaClock.VIDEO_CLOCK_RATE)
+                else:
+                    # Get frame from camera
+                    frame = await self.video_track.recv()
+                    img = frame.to_ndarray(format="bgr24")
+                    pts = frame.pts
+                    time_base = frame.time_base
+
+                if img.shape[:2] != (self.height, self.width):
+                    img = cv2.resize(img, (self.width, self.height))
+                
+                # Store frame for reference
+                self.frame = img.copy()
+                
+                # Log encoder warmup progress
+                if self.warmup_frames < 10:
+                    self.warmup_frames += 1
+                    if self.warmup_frames == 10:
+                        self._streamer._log("✅ Encoder warmed up - optimal encoding should begin")
+                
+                # Apply user callback if registered
+                if self.callback is not None:
+                    try:
+                        # Apply user's processing function
+                        processed_img = self.callback(img)
+                        
+                        # Convert back to VideoFrame
+                        new_frame = VideoFrame.from_ndarray(processed_img, format="bgr24")
+                        new_frame.pts = pts
+                        new_frame.time_base = time_base
+                        return new_frame
+                    except Exception as e:
+                        if self._streamer.verbose:
+                            traceback.print_exc()
+                        self._streamer._log(f"Error in frame callback: {e}", force=True)
+                        # Return original frame if processing fails
+                        new_frame = VideoFrame.from_ndarray(img, format="bgr24")
+                        new_frame.pts = pts
+                        new_frame.time_base = time_base
+                        return new_frame
+                else:
+                    # No callback, return original frame (identity)
+                    new_frame = VideoFrame.from_ndarray(img, format="bgr24")
+                    new_frame.pts = pts
+                    new_frame.time_base = time_base
+                    return new_frame
+            else:
+                # Generate frame programmatically using MediaClock for sync
+                # Use MediaClock for precise timing
+                wait_time = clock.wait_until_video_time(self.frame_count, self.fps)
+                
+                if wait_time > 0:
+                    await asyncio.sleep(wait_time)
+                elif wait_time < -0.05:
+                    # Track drift but don't reset clock (MediaClock is shared)
+                    self._drift_corrections += 1
+                    if self._drift_corrections <= 3:
+                        self._streamer._log(f"⚠️  Video drift: {-wait_time*1000:.0f}ms behind (correction #{self._drift_corrections})")
+                
+                # Check if user provided a frame override
+                if self._streamer.user_frame is not None:
+                    # Use user-provided frame
+                    self.frame = self._streamer.user_frame.copy()
+                else:
+                    # Create blank frame
+                    self.frame = np.zeros((self.height, self.width, 3), dtype=np.uint8)
+                
+                # Apply callback to populate the frame
+                if self.callback is not None:
+                    try:
+                        processed_img = self.callback(self.frame)
+                    except Exception as e:
+                        if self._streamer.verbose:
+                            traceback.print_exc()
+                        self._streamer._log(f"Error in frame callback: {e}", force=True)
+                        processed_img = self.frame
+                else:
+                    # No callback - just send blank frame
+                    processed_img = self.frame
+                
+                # Convert to VideoFrame with 90kHz RTP clock rate
+                new_frame = VideoFrame.from_ndarray(processed_img, format="bgr24")
+                new_frame.pts = clock.get_video_pts(self.frame_count, self.fps)
+                new_frame.time_base = fractions.Fraction(1, MediaClock.VIDEO_CLOCK_RATE)
+                
+                self.frame_count += 1
+                return new_frame
+    
+    return ProcessedVideoTrack
+
+
 class VisionProStreamer:
 
-    def __init__(self, ip, record=True, ht_backend="grpc", benchmark_quiet=False):
+    def __init__(self, ip, record=True, ht_backend="grpc", benchmark_quiet=False, verbose=False):
         """Initialize the VisionProStreamer.
 
         Parameters
@@ -34,6 +463,8 @@ class VisionProStreamer:
             Transport used for hand tracking. Use "webrtc" for lower latency after a WebRTC session is established.
         benchmark_quiet : bool, default False
             Suppress benchmark printouts (see latency measurements in `latency_test.py`).
+        verbose : bool, default False
+            If True, print detailed status messages. If False (default), only critical messages are shown.
 
         Notes
         -----
@@ -44,6 +475,7 @@ class VisionProStreamer:
         self.ip = ip
         self.record = record 
         self.ht_backend = ht_backend.lower()
+        self.verbose = verbose
         if self.ht_backend not in {"grpc", "webrtc"}:
             raise ValueError(f"Unsupported ht_backend '{ht_backend}'. Expected 'grpc' or 'webrtc'.")
 
@@ -61,17 +493,51 @@ class VisionProStreamer:
         # Audio/Video synchronization state
         self._latest_cached = None  # Thread-local cache to reduce lock contention
         self._latest_cache_time = 0  # Timestamp of cached data
-        self._av_sync_epoch = None  # Shared A/V timing reference
+        self._av_sync_epoch = None  # Legacy: kept for backward compatibility
+        self._media_clock = MediaClock()  # Shared media clock for A/V sync
 
         self._latest_lock = Lock()
         self._webrtc_hand_channel = None
         self._webrtc_hand_ready = False
+        self._webrtc_sim_channel = None  # WebRTC data channel for sim pose streaming
+        self._webrtc_sim_ready = False
+        self._webrtc_loop = None  # Event loop for WebRTC thread
         self._benchmark_epoch = time.perf_counter()
         self._benchmark_condition = Condition()
         self._benchmark_events = {}
+        
+        # Video/Audio configuration (set by configure_video/configure_audio)
+        self._video_config: Optional[Dict[str, Any]] = None
+        self._audio_config: Optional[Dict[str, Any]] = None
+        self._webrtc_port: int = 9999
+        self._server_running: bool = False
+        
+        # MuJoCo simulation state
+        self._sim_config: Optional[Dict[str, Any]] = None
+        self._mujoco_model = None
+        self._mujoco_data = None
+        self._mujoco_bodies: Dict[str, int] = {}
+        self._mujoco_channel = None
+        self._mujoco_stub = None
+        self._pose_stream_running = False
+        self._pose_stream_thread = None
+        self._pose_stream_lock = Lock()
+        self._current_poses: Dict[str, Dict[str, Any]] = {}
+        self._attach_to_mat = np.eye(4)
+        self._session_id = f"avpstream_{int(time.time())}"
 
         self._start_info_server()  # Start HTTP endpoint immediately
         self._start_hand_tracking()  # Start hand tracking stream
+    
+    def _log(self, message: str, force: bool = False):
+        """Print a message if verbose mode is enabled or force is True.
+        
+        Args:
+            message: The message to print
+            force: If True, print regardless of verbose setting (for critical messages)
+        """
+        if self.verbose or force:
+            print(message)
 
     def _process_hand_update(self, hand_update, source="grpc"):
         if getattr(hand_update.Head, "m00", 0.0) == 777.0:
@@ -96,7 +562,7 @@ class VisionProStreamer:
             transformations["right_wrist_roll"] = get_wrist_roll(transformations["right_wrist"])
             transformations["left_wrist_roll"] = get_wrist_roll(transformations["left_wrist"])
         except Exception as exc:
-            print(f"⚠️  Failed to process hand update from {source}: {exc}")
+            self._log(f"⚠️  Failed to process hand update from {source}: {exc}", force=True)
             return
 
         with self._latest_lock:
@@ -131,13 +597,13 @@ class VisionProStreamer:
 
         if not self.benchmark_quiet:
             if event["round_trip_ms"] is not None:
-                print(f"🧪 Benchmark seq={sequence_id} round-trip={event['round_trip_ms']} ms")
+                self._log(f"🧪 Benchmark seq={sequence_id} round-trip={event['round_trip_ms']} ms")
             else:
-                print(f"🧪 Benchmark seq={sequence_id} received (missing sent timestamp)")
+                self._log(f"🧪 Benchmark seq={sequence_id} received (missing sent timestamp)")
 
     def _handle_webrtc_hand_message(self, message):
         if isinstance(message, str):
-            print("⚠️  Received text message on hand data channel; ignoring")
+            self._log("⚠️  Received text message on hand data channel; ignoring")
             return
 
         if isinstance(message, memoryview):
@@ -147,12 +613,12 @@ class VisionProStreamer:
         try:
             update.ParseFromString(message)
         except Exception as exc:
-            print(f"⚠️  Could not decode hand update from WebRTC data channel: {exc}")
+            self._log(f"⚠️  Could not decode hand update from WebRTC data channel: {exc}", force=True)
             return
 
         self._process_hand_update(update, source="webrtc")
         if not self._webrtc_hand_ready:
-            print("🟢 WebRTC hand data flow established")
+            self._log("🟢 WebRTC hand data flow established")
             self._webrtc_hand_ready = True
 
     def _register_webrtc_data_channel(self, channel):
@@ -160,11 +626,11 @@ class VisionProStreamer:
 
         @channel.on("open")
         def _on_open():
-            print("🟢 WebRTC hand data channel opened")
+            self._log("🟢 WebRTC hand data channel opened")
 
         @channel.on("close")
         def _on_close():
-            print("🔴 WebRTC hand data channel closed")
+            self._log("🔴 WebRTC hand data channel closed")
             self._webrtc_hand_ready = False
             self._webrtc_hand_channel = None
 
@@ -172,25 +638,48 @@ class VisionProStreamer:
         def _on_message(message):
             self._handle_webrtc_hand_message(message)
 
+    def _register_webrtc_sim_channel(self, channel):
+        """Register the WebRTC data channel for simulation pose streaming."""
+        self._webrtc_sim_channel = channel
+
+        @channel.on("open")
+        def _on_open():
+            self._log("🟢 WebRTC sim-poses data channel opened")
+            self._webrtc_sim_ready = True
+            # Start pose streaming once channel is ready
+            if self._sim_config is not None:
+                self._start_pose_streaming_webrtc()
+
+        @channel.on("close")
+        def _on_close():
+            self._log("🔴 WebRTC sim-poses data channel closed")
+            self._webrtc_sim_ready = False
+            self._webrtc_sim_channel = None
+
+        @channel.on("message")
+        def _on_message(message):
+            # Currently we don't expect messages back from VisionPro on this channel
+            pass
+
     def _start_hand_tracking(self): 
         """Start the hand tracking gRPC stream in a background thread."""
         stream_thread = Thread(target = self.stream, daemon=True)
         stream_thread.start() 
         
-        print(f"Hand tracking backend set to {self.ht_backend.upper()}")
+        self._log(f"Hand tracking backend set to {self.ht_backend.upper()}")
         if self.ht_backend == "webrtc":
-            print("Note: WebRTC hand tracking requires an active WebRTC session (start_streaming).")
-        print('Waiting for hand tracking data...')
+            self._log("Note: WebRTC hand tracking requires an active WebRTC session (start_streaming).")
+        self._log('Waiting for hand tracking data...')
         retry_count = 0
         while self.latest is None: 
             time.sleep(0.1)
             retry_count += 1
             if retry_count > 100:  # 10 seconds timeout
-                print('WARNING: No data received yet. Is the VisionOS app running?')
+                self._log('WARNING: No data received yet. Is the VisionOS app running?', force=True)
                 retry_count = 0
         
-        print(' == DATA IS FLOWING IN! ==')
-        print('Ready to start streaming.') 
+        self._log(' == DATA IS FLOWING IN! ==', force=True)
+        self._log('Ready to start streaming.') 
 
 
     def stream(self): 
@@ -213,23 +702,23 @@ class VisionProStreamer:
         
         for attempt in range(max_retries):
             try:
-                print(f"Attempting to connect to {self.ip}:12345 (attempt {attempt + 1}/{max_retries})...")
+                self._log(f"Attempting to connect to {self.ip}:12345 (attempt {attempt + 1}/{max_retries})...")
                 channel = grpc.insecure_channel(f"{self.ip}:12345")
                 
                 try:
                     # Wait for channel to be ready
-                    print(f"  Waiting for channel to be ready (timeout: 5s)...")
+                    self._log(f"  Waiting for channel to be ready (timeout: 5s)...")
                     grpc.channel_ready_future(channel).result(timeout=5)
-                    print("✓ gRPC channel ready")
+                    self._log("✓ gRPC channel ready")
                 except Exception as channel_error:
-                    print(f"⚠️  Channel not ready: {type(channel_error).__name__}: {channel_error}")
+                    self._log(f"⚠️  Channel not ready: {type(channel_error).__name__}: {channel_error}")
                     channel.close()
                     if attempt < max_retries - 1:
                         time.sleep(retry_delay)
                         retry_delay *= 2
                     continue
                     
-                print("  Creating stub and starting stream...")
+                self._log("  Creating stub and starting stream...")
                 stub = handtracking_pb2_grpc.HandTrackingServiceStub(channel)
                 
                 # Add WebRTC info to metadata if available
@@ -239,10 +728,10 @@ class VisionProStreamer:
                     # Encode WebRTC info in metadata
                     webrtc_data = f"{msg.Head.m01}|{msg.Head.m02}|{msg.Head.m03}|{msg.Head.m10}|{msg.Head.m11}"
                     metadata.append(('webrtc-info', webrtc_data))
-                    print(f"📤 Adding WebRTC info to gRPC metadata: {webrtc_data}")
+                    self._log(f"📤 Adding WebRTC info to gRPC metadata: {webrtc_data}")
                 
                 responses = stub.StreamHandUpdates(request, metadata=metadata if metadata else None)
-                print("✓ Stream established, waiting for responses...")
+                self._log("✓ Stream established, waiting for responses...")
                 
                 for response in responses:
                     self._process_hand_update(response, source="grpc")
@@ -253,26 +742,27 @@ class VisionProStreamer:
                     
             except grpc.RpcError as e:
                 if attempt < max_retries - 1:
-                    print(f"⚠️  Connection failed: {e.code()}. Retrying in {retry_delay}s...")
+                    self._log(f"⚠️  Connection failed: {e.code()}. Retrying in {retry_delay}s...")
                     time.sleep(retry_delay)
                     retry_delay *= 2  # Exponential backoff
                 else:
-                    print(f"❌ Failed to connect after {max_retries} attempts")
-                    print(f"Error: {e}")
-                    print("\nMake sure:")
-                    print("  1. VisionOS app is running")
-                    print("  2. You pressed 'Start' in the app")
-                    print(f"  3. Vision Pro IP ({self.ip}) is correct")
-                    print("  4. Both devices are on the same network")
+                    self._log(f"❌ Failed to connect after {max_retries} attempts", force=True)
+                    self._log(f"Error: {e}", force=True)
+                    self._log("\nMake sure:", force=True)
+                    self._log("  1. VisionOS app is running", force=True)
+                    self._log("  2. You pressed 'Start' in the app", force=True)
+                    self._log(f"  3. Vision Pro IP ({self.ip}) is correct", force=True)
+                    self._log("  4. Both devices are on the same network", force=True)
                     break
             except Exception as e:
                 error_type = type(e).__name__
                 error_msg = str(e) if str(e) else "(no error message)"
-                print(f"❌ An unexpected error occurred: {error_type}: {error_msg}")
-                import traceback
-                traceback.print_exc()
+                self._log(f"❌ An unexpected error occurred: {error_type}: {error_msg}", force=True)
+                if self.verbose:
+                    import traceback
+                    traceback.print_exc()
                 if attempt < max_retries - 1:
-                    print(f"  Retrying in {retry_delay}s...")
+                    self._log(f"  Retrying in {retry_delay}s...")
                     time.sleep(retry_delay)
                     retry_delay *= 2
                 else:
@@ -295,7 +785,6 @@ class VisionProStreamer:
 
         Example::
             streamer = VisionProStreamer(ip=avp_ip)
-            streamer.start_streaming(device="0:none", format="avfoundation")
             sample = streamer.get_latest()
             if sample:
                 left_pos = sample["left_wrist"][0, :3, 3]
@@ -331,6 +820,46 @@ class VisionProStreamer:
         """
         with self._latest_lock:
             return list(self.recording)
+    
+    def get_sync_timestamp(self) -> Dict[str, Any]:
+        """Get synchronized timestamp for use in audio/video callbacks.
+        
+        This method provides a common time reference that both audio and video
+        callbacks can use to ensure synchronized content generation. Use this
+        when you need to generate audio that corresponds to specific video frames.
+        
+        Returns:
+            dict with:
+                - elapsed_s: Seconds since streaming started
+                - elapsed_ms: Milliseconds since streaming started  
+                - epoch_ntp: NTP timestamp when streaming started
+                - current_ntp: Current NTP timestamp
+                - is_started: Whether streaming has begun
+        
+        Example (in audio callback)::
+        
+            def my_audio_callback(audio_frame):
+                sync = streamer.get_sync_timestamp()
+                elapsed_ms = sync["elapsed_ms"]
+                # Generate audio based on the synchronized time
+                return audio_frame
+        
+        Example (coordinating audio/video)::
+        
+            # Both callbacks see the same elapsed time
+            def video_cb(frame):
+                t = streamer.get_sync_timestamp()["elapsed_ms"]
+                # Draw based on t
+                return frame
+                
+            def audio_cb(frame):
+                t = streamer.get_sync_timestamp()["elapsed_ms"]
+                # Generate tone based on t
+                return frame
+        """
+        info = self._media_clock.get_sync_timestamp()
+        info["is_started"] = self._media_clock.is_started
+        return info
     
     def get_local_ip(self):
         """Get the local IP address of this machine"""
@@ -381,7 +910,7 @@ class VisionProStreamer:
             streamer.start_streaming(device=None, stereo_video=True, size="2000x1000")
         """
         self.frame_callback = callback
-        print(f"✓ Frame callback registered: {callback.__name__ if hasattr(callback, '__name__') else 'anonymous function'}")
+        self._log(f"✓ Frame callback registered: {callback.__name__ if hasattr(callback, '__name__') else 'anonymous function'}")
     
     def register_audio_callback(self, callback):
         """
@@ -412,7 +941,7 @@ class VisionProStreamer:
             streamer.start_streaming(device=None, stereo_audio=True)
         """
         self.audio_callback = callback
-        print(f"✓ Audio callback registered: {callback.__name__ if hasattr(callback, '__name__') else 'anonymous function'}")
+        self._log(f"✓ Audio callback registered: {callback.__name__ if hasattr(callback, '__name__') else 'anonymous function'}")
     
     def update_frame(self, user_frame):
         """
@@ -439,6 +968,849 @@ class VisionProStreamer:
         """
         self.user_frame = user_frame
 
+    # ============================================================================
+    # Modular Configuration API
+    # ============================================================================
+    
+    def configure_video(
+        self,
+        device: Optional[str] = None,
+        format: Optional[str] = None,
+        size: str = "640x480",
+        fps: int = 30,
+        stereo: bool = False,
+    ):
+        """
+        Configure video streaming parameters. Call this before serve().
+        
+        This stores video configuration. The actual video track is created
+        per-WebRTC connection when serve() is called.
+        
+        Args:
+            device: Video device identifier (default: None for synthetic frames).
+                   Use "0:none" for macOS camera via avfoundation.
+            format: Video format (default: "avfoundation" for macOS).
+                   Ignored if device=None.
+            size: Frame size as "WIDTHxHEIGHT" string (default: "640x480")
+            fps: Frame rate (default: 30)
+            stereo: If True, stream side-by-side stereo video (default: False)
+        
+        Example::
+        
+            streamer.configure_video(device=None, size="1280x720", fps=60)
+            streamer.configure_audio()  # optional
+            streamer.serve()
+        """
+        # Parse size
+        width, height = map(int, size.split('x'))
+        
+        # Store configuration
+        self._video_config = {
+            "device": device,
+            "format": format,
+            "size": size,
+            "fps": fps,
+            "stereo": stereo,
+            "width": width,
+            "height": height,
+        }
+        
+        self._log(f"✓ Video configured: {size} @ {fps}fps (device={device}, stereo={stereo})")
+    
+    def configure_audio(
+        self,
+        device: Optional[str] = None,
+        format: Optional[str] = None,
+        sample_rate: Optional[int] = None,
+        stereo: bool = False,
+    ):
+        """
+        Configure audio streaming parameters. Call this before serve().
+        
+        This stores audio configuration. The actual audio track is created
+        per-WebRTC connection when serve() is called.
+        
+        Args:
+            device: Audio device identifier (default: None for synthetic audio).
+                   Use ":0" for default microphone on macOS via avfoundation.
+            format: Audio input format (default: "avfoundation" for macOS).
+            sample_rate: Sample rate in Hz (default: 48000)
+            stereo: If True, stream stereo audio (2 channels), otherwise mono (default: False)
+        
+        Example::
+        
+            streamer.configure_video(device=None, size="1280x720")
+            streamer.configure_audio(stereo=True)  # synthetic stereo audio
+            streamer.serve()
+        """
+        effective_sample_rate = sample_rate or 48000
+        
+        # Store configuration
+        self._audio_config = {
+            "device": device,
+            "format": format,
+            "sample_rate": effective_sample_rate,
+            "stereo": stereo,
+        }
+        
+        self._log(f"✓ Audio configured: {effective_sample_rate}Hz (device={device}, stereo={stereo})")
+    
+    def configure_sim(
+        self,
+        xml_path: str,
+        model,
+        data,
+        relative_to: Optional[List[float]] = None,
+        grpc_port: int = 50051,
+        force_reload: bool = False,
+    ):
+        """
+        Configure MuJoCo simulation streaming. Call this before serve().
+        
+        This enables streaming MuJoCo simulation states to the VisionPro, displaying
+        a 3D model that updates in real-time as the simulation runs.
+        
+        Args:
+            xml_path: Path to the MuJoCo XML scene file
+            model: MuJoCo model object (mujoco.MjModel)
+            data: MuJoCo data object (mujoco.MjData)
+            relative_to: 7-element array [x, y, z, qw, qx, qy, qz] specifying position 
+                        and quaternion (wxyz order) in Z-up coordinates for scene placement.
+                        Or 4-element array [x, y, z, yaw_degrees] for simpler positioning.
+            grpc_port: gRPC port for MuJoCo AR communication (default: 50051)
+            force_reload: If True, force re-conversion of XML to USDZ even if cached
+        
+        Example::
+        
+            import mujoco
+            model = mujoco.MjModel.from_xml_path("scene.xml")
+            data = mujoco.MjData(model)
+            
+            streamer.configure_sim("scene.xml", model, data, relative_to=[0, 0, 1, 1, 0, 0, 0])
+            streamer.serve()
+            
+            while True:
+                mujoco.mj_step(model, data)
+                streamer.update_sim()
+        """
+        
+        # Process relative_to parameter
+        attach_to = None
+        if relative_to is not None:
+            if len(relative_to) == 4:
+                # [x, y, z, yaw_degrees] -> convert to [x, y, z, qw, qx, qy, qz]
+                yaw_deg = relative_to[3]
+                yaw_rad = np.radians(yaw_deg / 2)
+                qw = np.cos(yaw_rad)
+                qx = 0.0
+                qy = 0.0
+                qz = np.sin(yaw_rad)
+                attach_to = [relative_to[0], relative_to[1], relative_to[2], qw, qx, qy, qz]
+            elif len(relative_to) == 7:
+                attach_to = list(relative_to)
+            else:
+                raise ValueError(f"relative_to must be 4 or 7 elements, got {len(relative_to)}")
+            
+            # Build transformation matrix
+            self._attach_to_mat = np.eye(4)
+            self._attach_to_mat[:3, :3] = R.from_quat(attach_to[3:], scalar_first=True).as_matrix()
+            self._attach_to_mat[:3, 3] = attach_to[:3]
+        
+        # Register model and data
+        self._mujoco_model = model
+        self._mujoco_data = data
+        
+        # Build body name mapping
+        self._mujoco_bodies = {}
+        for i in range(model.nbody):
+            body_name = model.body(i).name
+            if body_name:
+                self._mujoco_bodies[body_name] = i
+        
+        self._sim_config = {
+            "xml_path": xml_path,
+            "attach_to": attach_to,
+            "grpc_port": grpc_port,
+            "force_reload": force_reload,
+        }
+        
+        self._log(f"✓ Simulation configured: {xml_path} ({len(self._mujoco_bodies)} bodies)")
+        if attach_to:
+            self._log(f"  Position: [{attach_to[0]:.2f}, {attach_to[1]:.2f}, {attach_to[2]:.2f}]")
+    
+    def update_sim(self):
+        """
+        Sync current MuJoCo simulation state to the VisionPro.
+        
+        Call this after each simulation step to update the 3D visualization.
+        The poses are streamed via gRPC to the MuJoCo AR viewer on VisionPro.
+        
+        Example::
+        
+            while True:
+                mujoco.mj_step(model, data)
+                streamer.update_sim()
+        """
+        if self._mujoco_model is None or self._mujoco_data is None:
+            self._log("⚠️  No simulation configured. Call configure_sim() first.", force=True)
+            return
+        
+        if not self._pose_stream_running:
+            # Pose streaming not started yet
+            return
+        
+        # Get current poses
+        poses = self._get_mujoco_poses()
+        
+        # Update the current poses that the streaming thread will send
+        with self._pose_stream_lock:
+            self._current_poses = poses
+    
+    def _get_mujoco_poses(self) -> Dict[str, Dict[str, Any]]:
+        """Get current MuJoCo body poses as a dictionary."""
+        body_dict = {}
+        model = self._mujoco_model
+        data = self._mujoco_data
+        
+        for body_name, body_id in self._mujoco_bodies.items():
+            if "world" in body_name.lower():
+                continue  # Skip world body
+            
+            xpos = deepcopy(data.body(body_id).xpos.tolist())
+            xquat = deepcopy(data.body(body_id).xquat.tolist())
+            
+            # Clean body name for Swift compatibility
+            clean_name = body_name.replace('/', '').replace('-', '') if body_name else body_name
+            body_dict[clean_name] = {
+                "xpos": xpos,
+                "xquat": xquat,
+            }
+        
+        return body_dict
+    
+    def _start_pose_streaming(self):
+        """Start pose streaming via WebRTC data channel."""
+        if self._pose_stream_running:
+            self._log("⚠️ Pose streaming already running")
+            return
+        
+        if self._sim_config is None:
+            self._log("⚠️ No simulation configured")
+            return
+        
+        # If WebRTC channel is already ready, start streaming
+        if self._webrtc_sim_ready:
+            self._start_pose_streaming_webrtc()
+        else:
+            # Streaming will start when the WebRTC channel opens
+            self._log("⏳ Waiting for WebRTC sim-poses channel to open...")
+    
+    def _start_pose_streaming_webrtc(self):
+        """Start the actual pose streaming loop via WebRTC."""
+        if self._pose_stream_running:
+            return
+        
+        self._log("🔄 Starting pose streaming via WebRTC data channel...")
+        self._pose_stream_running = True
+        self._pose_stream_thread = Thread(target=self._pose_streaming_loop_webrtc, daemon=True)
+        self._pose_stream_thread.start()
+    
+    def _stop_pose_streaming(self):
+        """Stop pose streaming."""
+        if not self._pose_stream_running:
+            return
+        
+        self._log("🛑 Stopping pose streaming...")
+        self._pose_stream_running = False
+        if self._pose_stream_thread:
+            self._pose_stream_thread.join(timeout=2.0)
+    
+    def _pose_streaming_loop_webrtc(self):
+        """Background thread to stream poses via WebRTC data channel."""
+        self._log("✅ Pose streaming via WebRTC started!")
+        frame_count = 0
+        
+        try:
+            while self._pose_stream_running:
+                if not self._webrtc_sim_ready or self._webrtc_sim_channel is None:
+                    time.sleep(0.1)
+                    continue
+                
+                with self._pose_stream_lock:
+                    current_poses = self._current_poses.copy()
+                
+                if current_poses:
+                    # Build compact JSON message for poses
+                    # Format: {"t": timestamp, "p": {"body_name": [x,y,z,qx,qy,qz,qw], ...}}
+                    pose_dict = {}
+                    for body_name, pose_data in current_poses.items():
+                        if not body_name:
+                            continue
+                        # Pack position and quaternion into a list
+                        # [x, y, z, qx, qy, qz, qw] - 7 floats per body
+                        xpos = pose_data["xpos"]
+                        xquat = pose_data["xquat"]  # MuJoCo: w,x,y,z
+                        pose_dict[body_name] = [
+                            round(xpos[0], 5), round(xpos[1], 5), round(xpos[2], 5),
+                            round(xquat[1], 5), round(xquat[2], 5), round(xquat[3], 5), round(xquat[0], 5)  # x,y,z,w
+                        ]
+                    
+                    if pose_dict:
+                        message = json.dumps({"t": time.time(), "p": pose_dict})
+                        try:
+                            # Send using the WebRTC event loop's thread-safe call
+                            if self._webrtc_loop is not None:
+                                self._webrtc_loop.call_soon_threadsafe(
+                                    self._webrtc_sim_channel.send, message
+                                )
+                            else:
+                                self._webrtc_sim_channel.send(message)
+                            frame_count += 1
+                            if frame_count == 1:
+                                self._log(f"📤 First sim pose sent via WebRTC ({len(pose_dict)} bodies)")
+                            elif frame_count % 500 == 0:
+                                self._log(f"📤 Sent {frame_count} sim pose updates")
+                        except Exception as e:
+                            self._log(f"⚠️ Failed to send pose via WebRTC: {e}")
+                
+                time.sleep(0.008)  # ~120 Hz (faster than gRPC was)
+        
+        except Exception as e:
+            if self._pose_stream_running:
+                self._log(f"❌ Pose streaming error: {e}", force=True)
+            self._pose_stream_running = False
+        
+        self._log(f"🔴 Pose streaming stopped (sent {frame_count} updates)")
+    
+    def _load_and_send_scene(self):
+        """Load USDZ scene and send to VisionPro via gRPC."""
+        if self._sim_config is None:
+            return False
+        
+        xml_path = self._sim_config["xml_path"]
+        attach_to = self._sim_config["attach_to"]
+        grpc_port = self._sim_config["grpc_port"]
+        force_reload = self._sim_config.get("force_reload", False)
+        
+        # Check if USDZ already exists
+        usdz_path = xml_path.replace('.xml', '.usdz')
+        if not os.path.exists(usdz_path) or force_reload:
+            try:
+                usdz_path = self._convert_to_usdz(xml_path)
+            except Exception as e:
+                self._log(f"⚠️ Local USDZ conversion failed: {e}")
+                # Try external converter
+                try:
+                    from avp_stream.mujoco_msg.upload_xml import convert_and_download
+                    usdz_path = convert_and_download(
+                        server="http://mujoco-usd-convert.xyz",
+                        scene_xml=Path(xml_path),
+                        out_dir=Path(xml_path).parent
+                    )
+                except Exception as e2:
+                    self._log(f"❌ External USDZ conversion also failed: {e2}", force=True)
+                    return False
+        
+        # Send USDZ to VisionPro
+        return self._send_usdz_data(usdz_path, attach_to, grpc_port)
+    
+    def _convert_to_usdz(self, xml_path: str) -> str:
+        """Convert MuJoCo XML to USDZ file (requires mujoco_usd_converter)."""
+        try:
+            import mujoco_usd_converter
+            import usdex.core
+            from pxr import Usd, UsdUtils
+        except ImportError:
+            raise ImportError("USDZ conversion requires mujoco_usd_converter. Try: pip install mujoco-usd-converter")
+        
+        converter = mujoco_usd_converter.Converter()
+        usd_output_path = xml_path.replace('.xml', '_usd')
+        usdz_output_path = xml_path.replace('.xml', '.usdz')
+        
+        asset = converter.convert(xml_path, usd_output_path)
+        stage = Usd.Stage.Open(asset.path)
+        usdex.core.saveStage(stage, comment="modified after conversion")
+        
+        UsdUtils.CreateNewUsdzPackage(asset.path, usdz_output_path)
+        self._log(f"✅ USDZ file created: {usdz_output_path}")
+        
+        return usdz_output_path
+    
+    def _send_usdz_data(self, usdz_path: str, attach_to: Optional[List[float]], grpc_port: int) -> bool:
+        """Send USDZ file data to VisionPro via gRPC."""
+        
+        try:
+            # Connect to gRPC server
+            options = [
+                ('grpc.max_send_message_length', 100 * 1024 * 1024),  # 100MB
+                ('grpc.max_receive_message_length', 100 * 1024 * 1024),  # 100MB
+                ('grpc.keepalive_time_ms', 30000),  # 30 seconds
+                ('grpc.keepalive_timeout_ms', 5000),  # 5 seconds
+                ('grpc.keepalive_permit_without_calls', True),
+                ('grpc.http2.max_pings_without_data', 0),
+                ('grpc.http2.min_time_between_pings_ms', 10000),
+                ('grpc.http2.min_ping_interval_without_data_ms', 300000),
+            ]
+            
+            with grpc.insecure_channel(f"{self.ip}:{grpc_port}", options=options) as channel:
+                grpc.channel_ready_future(channel).result(timeout=10)
+                stub = mujoco_ar_pb2_grpc.MuJoCoARServiceStub(channel)
+                
+                # Read USDZ file
+                with open(usdz_path, 'rb') as f:
+                    usdz_data = f.read()
+                
+                usdz_filename = os.path.basename(usdz_path)
+                file_size_mb = len(usdz_data) / (1024 * 1024)
+                self._log(f"📊 USDZ file size: {file_size_mb:.2f} MB")
+                
+                # Prepare attach_to parameters
+                attach_position = None
+                attach_rotation = None
+                if attach_to:
+                    position = attach_to[:3]
+                    quat_wxyz = attach_to[3:]
+                    # Convert wxyz -> xyzw for protobuf
+                    attach_position = mujoco_ar_pb2.Vector3(x=position[0], y=position[1], z=position[2])
+                    attach_rotation = mujoco_ar_pb2.Quaternion(
+                        x=quat_wxyz[1], y=quat_wxyz[2], z=quat_wxyz[3], w=quat_wxyz[0]
+                    )
+                
+                # Use chunked transfer for files larger than 2MB (more conservative)
+                if file_size_mb > 2.0:
+                    self._log("📦 Using chunked transfer for large file...")
+                    return self._send_usdz_chunked(stub, usdz_data, usdz_filename, attach_position, attach_rotation)
+                else:
+                    self._log(f"📤 Sending USDZ data as single message...")
+                    return self._send_usdz_single(stub, usdz_data, usdz_filename, attach_position, attach_rotation, file_size_mb)
+                    
+        except grpc.RpcError as e:
+            self._log(f"❌ gRPC Error sending USDZ: {e}", force=True)
+            return False
+        except Exception as e:
+            self._log(f"❌ Error sending USDZ: {e}", force=True)
+            if self.verbose:
+                import traceback
+                traceback.print_exc()
+            return False
+    
+    def _send_usdz_single(self, stub, usdz_data: bytes, filename: str, 
+                          attach_position, attach_rotation, file_size_mb: float) -> bool:
+        """Send USDZ as a single message (for small files)."""
+        request = mujoco_ar_pb2.UsdzDataRequest(
+            usdz_data=usdz_data,
+            filename=filename,
+            session_id=self._session_id,
+        )
+        
+        if attach_position and attach_rotation:
+            request.attach_to_position.CopyFrom(attach_position)
+            request.attach_to_rotation.CopyFrom(attach_rotation)
+        
+        timeout = max(60.0, file_size_mb * 2)
+        response = stub.SendUsdzData(request, timeout=timeout)
+        
+        if response.success:
+            self._log(f"✅ USDZ sent successfully: {response.local_file_path}")
+            return True
+        else:
+            self._log(f"❌ Failed to send USDZ: {response.message}", force=True)
+            return False
+    
+    def _send_usdz_chunked(self, stub, usdz_data: bytes, filename: str,
+                           attach_position, attach_rotation) -> bool:
+        """Send USDZ file in chunks via gRPC streaming."""
+        chunk_size = 1024 * 1024  # 1MB chunks
+        total_size = len(usdz_data)
+        total_chunks = (total_size + chunk_size - 1) // chunk_size
+        
+        self._log(f"📦 Sending {total_size} bytes in {total_chunks} chunks of {chunk_size} bytes each")
+        
+        def chunk_generator():
+            for i in range(total_chunks):
+                start = i * chunk_size
+                end = min(start + chunk_size, total_size)
+                chunk_data = usdz_data[start:end]
+                
+                chunk_request = mujoco_ar_pb2.UsdzChunkRequest(
+                    chunk_data=chunk_data,
+                    filename=filename,
+                    session_id=self._session_id,
+                    chunk_index=i,
+                    total_chunks=total_chunks,
+                    total_size=total_size,
+                    is_last_chunk=(i == total_chunks - 1)
+                )
+                
+                # Add attach_to information only to the first chunk
+                if i == 0 and attach_position is not None and attach_rotation is not None:
+                    chunk_request.attach_to_position.CopyFrom(attach_position)
+                    chunk_request.attach_to_rotation.CopyFrom(attach_rotation)
+                
+                self._log(f"📤 Sending chunk {i+1}/{total_chunks} ({len(chunk_data)} bytes)")
+                yield chunk_request
+        
+        try:
+            response = stub.SendUsdzDataChunked(chunk_generator(), timeout=120.0)
+            
+            if response.success:
+                self._log(f"✅ Chunked USDZ sent successfully: {response.local_file_path}")
+                return True
+            else:
+                self._log(f"❌ Failed to send chunked USDZ: {response.message}", force=True)
+                return False
+        except grpc.RpcError as e:
+            self._log(f"❌ gRPC Error in chunked transfer: {e}", force=True)
+            return False
+    
+    def serve(self, port: int = 9999):
+        """
+        Start the WebRTC streaming server using configured video/audio/simulation.
+        
+        This is the core method that starts the WebRTC server. It uses the
+        configuration set by configure_video(), configure_audio(), and configure_sim().
+        
+        Args:
+            port: WebRTC server port (default: 9999)
+        
+        Example (video only)::
+        
+            streamer.configure_video(device=None, size="1280x720")
+            streamer.serve()
+        
+        Example (simulation only)::
+        
+            streamer.configure_sim("scene.xml", model, data)
+            streamer.serve()
+        
+        Example (video + simulation)::
+        
+            streamer.configure_video(device=None, size="1280x720")
+            streamer.configure_sim("scene.xml", model, data)
+            streamer.serve()
+        """
+        self._webrtc_port = port
+        
+        # Start simulation streaming if configured
+        if self._sim_config is not None:
+            self._log("🎮 Starting MuJoCo simulation streaming...")
+            if self._load_and_send_scene():
+                self._start_pose_streaming()
+        
+        # Check if anything is configured
+        if self._video_config is None and self._audio_config is None and self._sim_config is None:
+            self._log("⚠️ No video/audio/simulation configured. Call configure_*() first.", force=True)
+            return
+        
+        # Extract configuration
+        video_cfg = self._video_config or {}
+        audio_cfg = self._audio_config or {}
+        
+        device = video_cfg.get("device")
+        fmt = video_cfg.get("format")
+        size = video_cfg.get("size", "640x480")
+        fps = video_cfg.get("fps", 30)
+        width = video_cfg.get("width", 640)
+        height = video_cfg.get("height", 480)
+        stereo_video = video_cfg.get("stereo", False)
+        
+        audio_device = audio_cfg.get("device")
+        audio_format = audio_cfg.get("format")
+        audio_sample_rate = audio_cfg.get("sample_rate", 48000)
+        stereo_audio = audio_cfg.get("stereo", False)
+        
+        # Get local IP
+        local_ip = self.get_local_ip()
+        self._log(f"Starting WebRTC server on {local_ip}:{port}")
+        
+        # Determine what is enabled based on whether configure_* was called
+        video_enabled = self._video_config is not None
+        audio_enabled = self._audio_config is not None
+        sim_enabled = self._sim_config is not None
+        
+        # Store WebRTC info for the HTTP endpoint (backup method)
+        self.webrtc_info = {
+            "host": local_ip,
+            "port": port,
+            "status": "ready",
+            "stereo_video": stereo_video,
+            "stereo_audio": stereo_audio,
+            "audio_enabled": audio_enabled,
+            "size": size,
+            "audio_sample_rate": audio_sample_rate,
+        }
+        
+        # Send WebRTC server info via gRPC
+        self._log(f"📤 Sending WebRTC server info via gRPC...")
+        self._send_webrtc_info_via_grpc(
+            local_ip, port, 
+            stereo_video=stereo_video, 
+            stereo_audio=stereo_audio, 
+            audio_enabled=audio_enabled,
+            video_enabled=video_enabled,
+            sim_enabled=sim_enabled,
+        )
+        
+        # Create track factory classes with reference to this streamer
+        ProcessedVideoTrack = _create_processed_video_track_class(self)
+        ProcessedAudioTrack = _create_processed_audio_track_class(self)
+        
+        # Store reference for closure access
+        streamer_instance = self
+        
+        # Create a new event loop for the WebRTC server in a separate thread
+        def start_async_server():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            # Store loop reference for pose streaming thread
+            streamer_instance._webrtc_loop = loop
+            
+            async def run_peer_custom(reader, writer):
+                from aiortc import RTCPeerConnection, RTCSessionDescription, RTCConfiguration, RTCIceServer
+                
+                client_addr = writer.get_extra_info('peername')
+                streamer_instance._log(f"🔗 VisionOS client connected from {client_addr}")
+                
+                # Configure RTCPeerConnection for low latency
+                config = RTCConfiguration(
+                    iceServers=[RTCIceServer(urls=["stun:stun.l.google.com:19302"])]
+                )
+                pc = RTCPeerConnection(configuration=config)
+                
+                @pc.on("iceconnectionstatechange")
+                async def on_ice_state_change():
+                    streamer_instance._log(f"ICE state ({client_addr}): {pc.iceConnectionState}")
+                    if pc.iceConnectionState == "connected":
+                        streamer_instance._log(f"🎥 WebRTC connection established ({client_addr}) - video should flow now", force=True)
+                    if pc.iceConnectionState in ("failed", "closed"):
+                        await pc.close()
+                        writer.close()
+                        await writer.wait_closed()
+                
+                @pc.on("track")
+                def on_track(track):
+                    streamer_instance._log(f"📹 Track received: {track.kind}")
+                
+                # Create video track if video is configured
+                if streamer_instance._video_config is not None:
+                    try:
+                        if device is None:
+                            streamer_instance._log("Creating synthetic video stream (no camera)...")
+                            if streamer_instance.frame_callback is None:
+                                streamer_instance._log("⚠️  WARNING: No frame callback registered. Stream will be blank.", force=True)
+                                streamer_instance._log("   Use register_frame_callback() to generate frames.", force=True)
+                        else:
+                            streamer_instance._log(f"Opening video device: {device}...")
+                        
+                        processed_track = ProcessedVideoTrack(
+                            device, 
+                            fmt, 
+                            fps,
+                            (width, height),
+                            streamer_instance.frame_callback
+                        )
+                        
+                        # Store the track for external access
+                        streamer_instance.camera = processed_track
+                        
+                        if device is None:
+                            streamer_instance._log(f"✓ Synthetic video track created ({size} @ {fps}fps)")
+                        else:
+                            streamer_instance._log(f"✓ Camera track created for device: {device}")
+                        
+                        if streamer_instance.frame_callback:
+                            streamer_instance._log("✓ Frame processing enabled")
+                        else:
+                            streamer_instance._log("✓ Frame processing disabled (identity)")
+                        
+                        pc.addTrack(processed_track)
+                    except Exception as e:
+                        streamer_instance._log(f"Error creating video track: {e}", force=True)
+                        if streamer_instance.verbose:
+                            traceback.print_exc()
+                else:
+                    streamer_instance._log("📡 No video configured, WebRTC will only use data channels")
+                
+                # Create hand tracking data channel if using WebRTC backend
+                if streamer_instance.ht_backend == "webrtc":
+                    hand_channel = pc.createDataChannel(
+                        "hand-tracking",
+                        ordered=False,
+                        maxRetransmits=0,
+                    )
+                    streamer_instance._register_webrtc_data_channel(hand_channel)
+
+                    @pc.on("datachannel")
+                    def _on_remote_datachannel(channel):
+                        if channel.label == "hand-tracking":
+                            streamer_instance._log("🔁 Remote hand data channel detected")
+                            streamer_instance._register_webrtc_data_channel(channel)
+                        elif channel.label == "sim-poses":
+                            streamer_instance._log("🔁 Remote sim-poses data channel detected")
+                            streamer_instance._register_webrtc_sim_channel(channel)
+                
+                # Create sim-poses data channel if simulation is configured
+                if streamer_instance._sim_config is not None:
+                    sim_channel = pc.createDataChannel(
+                        "sim-poses",
+                        ordered=False,
+                        maxRetransmits=0,
+                    )
+                    streamer_instance._register_webrtc_sim_channel(sim_channel)
+                    streamer_instance._log("📡 Created sim-poses WebRTC data channel")
+
+                # Create audio track if audio is configured (configure_audio was called)
+                if streamer_instance._audio_config is not None:
+                    try:
+                        processed_audio_track = ProcessedAudioTrack(
+                            audio_device, 
+                            audio_format, 
+                            streamer_instance.audio_callback,
+                            stereo=stereo_audio,
+                            sample_rate=audio_sample_rate,
+                        )
+                        pc.addTrack(processed_audio_track)
+                        channels = "stereo" if stereo_audio else "mono"
+                        if audio_device:
+                            streamer_instance._log(f"🎤 Audio track added from device: {audio_device} ({channels})")
+                        else:
+                            streamer_instance._log(f"🎤 Synthetic audio track added ({channels}, callback-generated)")
+                    except Exception as e:
+                        streamer_instance._log(f"⚠️  Could not create audio track: {e}", force=True)
+                        streamer_instance._log(f"    Continuing with video only...")
+                        if streamer_instance.verbose:
+                            traceback.print_exc()
+                
+                # Create offer
+                offer = await pc.createOffer()
+                
+                # Force high bitrate by modifying SDP
+                sdp = offer.sdp
+                if "m=video" in sdp:
+                    sdp = re.sub(r"(m=video.*\r\n)", r"\1b=AS:15000\r\n", sdp)
+                
+                offer = RTCSessionDescription(sdp=sdp, type=offer.type)
+                await pc.setLocalDescription(offer)
+                
+                # Wait briefly for ICE candidates
+                start_time = asyncio.get_event_loop().time()
+                max_wait_time = 0.5
+                
+                while asyncio.get_event_loop().time() - start_time < max_wait_time:
+                    if pc.iceGatheringState == "complete":
+                        streamer_instance._log(f"ICE gathering complete in {asyncio.get_event_loop().time() - start_time:.2f}s")
+                        break
+                    elif pc.iceGatheringState == "gathering":
+                        await asyncio.sleep(0.1)
+                        streamer_instance._log(f"ICE gathering in progress, proceeding after {asyncio.get_event_loop().time() - start_time:.2f}s")
+                        break
+                    await asyncio.sleep(0.05)
+                
+                if pc.iceGatheringState == "new":
+                    streamer_instance._log("Warning: ICE gathering hasn't started yet, sending offer anyway")
+                
+                # Send offer
+                offer_payload = {
+                    "sdp": pc.localDescription.sdp,
+                    "type": pc.localDescription.type,
+                }
+                writer.write((json.dumps(offer_payload) + "\n").encode("utf-8"))
+                await writer.drain()
+                streamer_instance._log(f"Sent offer to VisionOS (ICE state: {pc.iceGatheringState})")
+                
+                # Wait for answer
+                line = await reader.readline()
+                if not line:
+                    streamer_instance._log("VisionOS disconnected before sending answer")
+                    await pc.close()
+                    return
+                
+                answer_payload = json.loads(line.decode("utf-8"))
+                answer = RTCSessionDescription(
+                    sdp=answer_payload["sdp"],
+                    type=answer_payload["type"],
+                )
+                
+                await pc.setRemoteDescription(answer)
+                streamer_instance._log("WebRTC connection established!")
+                
+                # Keep connection alive
+                try:
+                    while True:
+                        await asyncio.sleep(1)
+                except asyncio.CancelledError:
+                    pass
+                finally:
+                    await pc.close()
+                    writer.close()
+                    await writer.wait_closed()
+            
+            async def run_server():
+                server = await asyncio.start_server(
+                    run_peer_custom, "0.0.0.0", port,
+                    start_serving=True, reuse_address=True, reuse_port=True
+                )
+                streamer_instance._log(f"WebRTC server listening on 0.0.0.0:{port}")
+                async with server:
+                    await server.serve_forever()
+            
+            loop.run_until_complete(run_server())
+        
+        webrtc_thread = Thread(target=start_async_server, daemon=True)
+        webrtc_thread.start()
+        
+        # Wait a bit for server to start
+        time.sleep(0.5)
+        
+        self._log(f"✓ WebRTC server ready at {local_ip}:{port}", force=True)
+        self._log(f"✓ VisionOS can query http://{local_ip}:8888/webrtc_info to get connection details")
+        
+        self._server_running = True
+
+        # Wait for WebRTC sim-poses channel to be ready
+        if self._sim_config is None:
+            return
+        self._log("⏳ Waiting for WebRTC connection...")
+        if not self.wait_for_sim_channel(timeout=30):
+            self._log("❌ Failed to establish WebRTC sim-poses channel", force=True)
+            return
+        self._log("✅ WebRTC sim-poses channel ready!", force=True)
+
+
+
+    def wait_for_sim_channel(self, timeout: float = 30.0) -> bool:
+        """
+        Wait for the WebRTC sim-poses data channel to open.
+        
+        Args:
+            timeout: Maximum time to wait in seconds (default: 30)
+        
+        Returns:
+            True if channel opened successfully, False on timeout
+        
+        Example::
+        
+            streamer.configure_sim("scene.xml", model, data)
+            streamer.serve()
+            if streamer.wait_for_sim_channel():
+                # Channel is ready, start simulation
+                while True:
+                    mujoco.mj_step(model, data)
+                    streamer.update_sim()
+        """
+        if self._sim_config is None:
+            self._log("⚠️ No simulation configured")
+            return False
+        
+        start_time = time.time()
+        while not self._webrtc_sim_ready:
+            if time.time() - start_time > timeout:
+                self._log(f"⚠️ Timeout waiting for sim-poses channel (waited {timeout}s)", force=True)
+                return False
+            time.sleep(0.1)
+        
+        return True
+
     def reset_benchmark_epoch(self, epoch=None):
         if epoch is None:
             epoch = time.perf_counter()
@@ -457,13 +1829,13 @@ class VisionProStreamer:
             streamer.update_stream_resolution("1024x768")
         """
         if self.camera is None:
-            print("⚠️  Cannot update stream resolution before starting video streaming")
+            self._log("⚠️  Cannot update stream resolution before starting video streaming", force=True)
             return
 
         try:
             width, height = map(int, size.lower().split("x", 1))
         except ValueError:
-            print(f"⚠️  Invalid resolution '{size}' (expected WIDTHxHEIGHT)")
+            self._log(f"⚠️  Invalid resolution '{size}' (expected WIDTHxHEIGHT)", force=True)
             return
 
         if hasattr(self.camera, "set_resolution"):
@@ -472,7 +1844,7 @@ class VisionProStreamer:
         if self.webrtc_info is not None:
             self.webrtc_info["size"] = size
 
-        print(f"🔄 Updated WebRTC stream resolution to {width}x{height}")
+        self._log(f"🔄 Updated WebRTC stream resolution to {width}x{height}")
 
     def wait_for_benchmark_event(self, sequence_id, timeout=2.0):
         deadline = time.perf_counter() + timeout
@@ -499,27 +1871,27 @@ class VisionProStreamer:
             allow_reuse_address = True
 
         class InfoHandler(BaseHTTPRequestHandler):
-            def do_GET(self):
-                client_ip = self.client_address[0]
-                print(f"📥 [HTTP] Request from {client_ip}: {self.path}")
+            def do_GET(handler_self):
+                client_ip = handler_self.client_address[0]
+                self._log(f"📥 [HTTP] Request from {client_ip}: {handler_self.path}")
                 
-                if self.path == '/webrtc_info':
+                if handler_self.path == '/webrtc_info':
                     if streamer_instance.webrtc_info:
-                        print(f"✅ [HTTP] Sending WebRTC info to {client_ip}: {streamer_instance.webrtc_info}")
-                        self.send_response(200)
-                        self.send_header('Content-type', 'application/json')
-                        self.end_headers()
-                        self.wfile.write(json.dumps(streamer_instance.webrtc_info).encode())
+                        self._log(f"✅ [HTTP] Sending WebRTC info to {client_ip}: {streamer_instance.webrtc_info}")
+                        handler_self.send_response(200)
+                        handler_self.send_header('Content-type', 'application/json')
+                        handler_self.end_headers()
+                        handler_self.wfile.write(json.dumps(streamer_instance.webrtc_info).encode())
                     else:
-                        print(f"⚠️ [HTTP] WebRTC not started yet, sending 404 to {client_ip}")
-                        self.send_response(404)
-                        self.send_header('Content-type', 'application/json')
-                        self.end_headers()
-                        self.wfile.write(json.dumps({"error": "WebRTC not started"}).encode())
+                        self._log(f"⚠️ [HTTP] WebRTC not started yet, sending 404 to {client_ip}")
+                        handler_self.send_response(404)
+                        handler_self.send_header('Content-type', 'application/json')
+                        handler_self.end_headers()
+                        handler_self.wfile.write(json.dumps({"error": "WebRTC not started"}).encode())
                 else:
-                    print(f"❌ [HTTP] Unknown path from {client_ip}: {self.path}")
-                    self.send_response(404)
-                    self.end_headers()
+                    self._log(f"❌ [HTTP] Unknown path from {client_ip}: {handler_self.path}")
+                    handler_self.send_response(404)
+                    handler_self.end_headers()
             
             def log_message(self, format, *args):
                 # Custom logging
@@ -555,11 +1927,13 @@ class VisionProStreamer:
         port=9999,
     ):
         """
-        Start WebRTC video streaming server with optional audio.
-        VisionOS will discover the server address by querying the info HTTP endpoint.
+        Convenience method that configures video/audio and starts the WebRTC server.
+        
+        This is equivalent to calling configure_video(), configure_audio(), and serve()
+        with the appropriate parameters.
         
         Args:
-            device: Video device identifier (default: "0:none" for macOS).
+            device: Video device identifier (default: None for synthetic frames).
                    Set to None to generate frames programmatically without a camera.
             format: Video format (default: "avfoundation" for macOS). 
                    Ignored if device=None.
@@ -576,501 +1950,47 @@ class VisionProStreamer:
                                 Defaults to 48000 when not specified.
         
         Note:
-            - Use register_frame_callback() to add custom frame processing
-            - Use register_audio_callback() to add custom audio processing
+            - Use register_frame_callback() to add custom frame processing before calling this
+            - Use register_audio_callback() to add custom audio processing before calling this
             - If device=None, the callback MUST generate frames (not just modify them)
             - Without device, callback receives a blank frame to populate
+        
+        Example::
+        
+            # Simple usage (equivalent to configure_video + serve)
+            streamer.start_streaming(device="0:none", format="avfoundation")
+            
+            # With callbacks
+            streamer.register_frame_callback(my_frame_processor)
+            streamer.start_streaming(device=None, size="1280x720", fps=60)
         """
-        from aiortc import VideoStreamTrack, AudioStreamTrack
-        from aiortc.contrib.media import MediaPlayer
-        from av import VideoFrame
+        # Always configure video (start_streaming implies video streaming)
+        self.configure_video(
+            device=device,
+            format=format,
+            size=size,
+            fps=fps,
+            stereo=stereo_video,
+        )
         
-        # Get local IP
-        local_ip = self.get_local_ip()
+        # Configure audio if audio_device is specified or audio_callback is registered
+        if audio_device is not None or self.audio_callback is not None:
+            self.configure_audio(
+                device=audio_device,
+                format=audio_format,
+                sample_rate=audio_sample_rate,
+                stereo=stereo_audio,
+            )
         
-        print(f"Starting WebRTC server on {local_ip}:{port}")
-        
-        # Determine if audio will be present
-        audio_enabled = audio_device is not None or self.audio_callback is not None
-        
-        # Store WebRTC info for the HTTP endpoint (backup method)
-        self.webrtc_info = {
-            "host": local_ip,
-            "port": port,
-            "status": "ready",
-            "stereo_video": stereo_video,
-            "stereo_audio": stereo_audio,
-            "audio_enabled": audio_enabled,
-            "size": size,
-            "audio_sample_rate": audio_sample_rate if audio_sample_rate else 48000,
-        }
-        
-        # Send WebRTC server info via gRPC
-        print(f"📤 Sending WebRTC server info via gRPC (stereo_video={stereo_video}, stereo_audio={stereo_audio}, audio_enabled={audio_enabled})...")
-        self._send_webrtc_info_via_grpc(local_ip, port, stereo_video, stereo_audio, audio_enabled)
-        
-        # Parse size
-        width, height = map(int, size.split('x'))
-        
-        # Store reference to streamer instance for use in ProcessedVideoTrack
-        streamer_instance = self
-        
-        # Define custom audio track for audio processing
-        class ProcessedAudioTrack(AudioStreamTrack):
-            kind = "audio"
-            _track_counter = 0  # Class-level counter for unique track IDs
-            
-            def __init__(self, audio_device, audio_fmt, callback, stereo=False, sample_rate=None):
-                super().__init__()
-                self.callback = callback
-                self.use_microphone = audio_device is not None
-                self.stereo = stereo
-                self.sample_rate = sample_rate or 48000
-                
-                if self.use_microphone:
-                    # Use physical microphone
-                    fmt = audio_fmt if audio_fmt else "avfoundation"
-                    self.player = MediaPlayer(audio_device, format=fmt, options={})
-                    self.audio_track = self.player.audio
-                    channels = "stereo" if stereo else "mono"
-                    print(f"🎤 Audio initialized from device: {audio_device} ({channels})")
-                else:
-                    # Generate frames programmatically
-                    self.player = None
-                    self.audio_track = None
-                    frame_duration_s = 0.02  # 20 ms
-                    self.samples_per_frame = max(1, int(self.sample_rate * frame_duration_s))
-                    self.frame_count = 0
-                    self.start_time = None
-                    channels = "stereo" if stereo else "mono"
-                    print(
-                        "🎤 Synthetic audio initialized "
-                        f"({self.sample_rate}Hz, {self.samples_per_frame} samples/frame, {channels}, 20ms frames)"
-                    )
-            
-            async def recv(self):
-                if self.use_microphone:
-                    frame = await self.audio_track.recv()
-                    
-                    # Apply user callback if registered
-                    if self.callback is not None:
-                        try:
-                            processed_frame = self.callback(frame)
-                            return processed_frame
-                        except Exception as e:
-                            print(f"⚠️  Audio callback error: {e}")
-                            return frame
-                    else:
-                        return frame
-                else:
-                    # Generate synthetic audio frame
-                    from av import AudioFrame
-                    import numpy as np
-                    
-                    # Synchronize with video timing if available
-                    if streamer_instance._av_sync_epoch is None:
-                        streamer_instance._av_sync_epoch = asyncio.get_event_loop().time()
-                    
-                    if self.start_time is None:
-                        self.start_time = streamer_instance._av_sync_epoch
-                    
-                    # Create blank audio frame (silence)
-                    layout = 'stereo' if self.stereo else 'mono'
-                    frame = AudioFrame(format='s16', layout=layout, samples=self.samples_per_frame)
-                    frame.sample_rate = self.sample_rate
-                    frame.pts = self.frame_count * self.samples_per_frame
-                    frame.time_base = fractions.Fraction(1, self.sample_rate)
-                    
-                    # Initialize with silence
-                    bytes_per_sample = 2  # s16 = 2 bytes per sample
-                    channels = 2 if self.stereo else 1
-                    for p in frame.planes:
-                        p.update(bytes(self.samples_per_frame * bytes_per_sample * channels))
-                    
-                    # Log first few frames
-                    if self.frame_count < 3:
-                        print(f"🎤 Generated audio frame #{self.frame_count}: {self.samples_per_frame} samples, {frame.sample_rate}Hz, {layout}")
-                    
-                    # Precise timing control with jitter compensation
-                    expected_time = self.start_time + (self.frame_count * self.samples_per_frame / self.sample_rate)
-                    current_time = asyncio.get_event_loop().time()
-                    sleep_time = expected_time - current_time
-                    
-                    # Adaptive timing: sleep if ahead, reset if too far behind
-                    if sleep_time > 0:
-                        await asyncio.sleep(sleep_time)
-                    elif sleep_time < -0.05:  # More than 50ms behind - reset to avoid drift
-                        self.start_time = current_time - (self.frame_count * self.samples_per_frame / self.sample_rate)
-                    
-                    # Apply callback if registered (callback should generate audio)
-                    if self.callback is not None:
-                        try:
-                            processed_frame = self.callback(frame)
-                            self.frame_count += 1
-                            if self.frame_count == 10:
-                                print(f"🎤 Audio streaming normally (generated {self.frame_count} frames, ~20ms per frame)")
-                            return processed_frame
-                        except Exception as e:
-                            print(f"⚠️  Audio callback error: {e}")
-                            import traceback
-                            traceback.print_exc()
-                            self.frame_count += 1
-                            return frame
-                    else:
-                        # No callback - return silence
-                        self.frame_count += 1
-                        return frame
-        
-        # Define custom video track for frame processing
-        class ProcessedVideoTrack(VideoStreamTrack):
-            def __init__(self, device, fmt, framerate, resolution, callback):
-                super().__init__()
-                self.callback = callback
-                self.width, self.height = resolution
-                self.use_camera = device is not None
-                self.warmup_frames = 0  # Track warmup frames for encoder optimization
-                
-                if self.use_camera:
-                    # Use physical camera
-                    opts = {
-                        "video_size": f"{self.width}x{self.height}", 
-                        "framerate": str(framerate),
-                        "fflags": "nobuffer",  # Minimize buffering
-                        "flags": "low_delay"   # Low delay mode
-                    }
-                    self.player = MediaPlayer(device, format=fmt, options=opts)
-                    self.video_track = self.player.video
-                    print("🎥 Camera initialized, warming up encoder...")
-                else:
-                    # Generate frames programmatically
-                    self.player = None
-                    self.video_track = None
-                    self.fps = framerate
-                    self.frame_count = 0
-                    self.start_time = None
-
-            def set_resolution(self, resolution):
-                width, height = resolution
-                if width <= 0 or height <= 0:
-                    print(f"⚠️  Ignoring invalid resolution update: {width}x{height}")
-                    return
-                self.width, self.height = width, height
-                print(f"🔧 ProcessedVideoTrack target resolution set to {width}x{height}")
-                
-            async def recv(self):
-                if self.use_camera:
-                    # Check if user provided a frame override
-                    if streamer_instance.user_frame is not None:
-                        # Use user-provided frame instead of camera
-                        img = streamer_instance.user_frame
-                        # Get timing from camera track if available
-                        try:
-                            camera_frame = await self.video_track.recv()
-                            pts = camera_frame.pts
-                            time_base = camera_frame.time_base
-                        except:
-                            # Fallback timing if camera fails
-                            pts = None
-                            time_base = None
-                    else:
-                        # Get frame from camera
-                        frame = await self.video_track.recv()
-                        img = frame.to_ndarray(format="bgr24")
-                        pts = frame.pts
-                        time_base = frame.time_base
-
-                    if img.shape[:2] != (self.height, self.width):
-                        img = cv2.resize(img, (self.width, self.height))
-                    
-                    # Store frame for reference
-                    self.frame = img.copy()
-                    
-                    # Log encoder warmup progress
-                    if self.warmup_frames < 10:
-                        self.warmup_frames += 1
-                        if self.warmup_frames == 10:
-                            print("✅ Encoder warmed up - optimal encoding should begin")
-                    
-                    # Apply user callback if registered
-                    if self.callback is not None:
-                        try:
-                            # Apply user's processing function
-                            processed_img = self.callback(img)
-                            
-                            # Convert back to VideoFrame
-                            new_frame = VideoFrame.from_ndarray(processed_img, format="bgr24")
-                            new_frame.pts = pts
-                            new_frame.time_base = time_base
-                            return new_frame
-                        except Exception as e:
-                            import traceback
-                            traceback.print_exc()
-                            print(f"Error in frame callback: {e}")
-                            # Return original frame if processing fails
-                            new_frame = VideoFrame.from_ndarray(img, format="bgr24")
-                            new_frame.pts = pts
-                            new_frame.time_base = time_base
-                            return new_frame
-                    else:
-                        # No callback, return original frame (identity)
-                        new_frame = VideoFrame.from_ndarray(img, format="bgr24")
-                        new_frame.pts = pts
-                        new_frame.time_base = time_base
-                        return new_frame
-                else:
-                    # Generate frame programmatically
-                    # Synchronize with audio timing if available
-                    if streamer_instance._av_sync_epoch is None:
-                        streamer_instance._av_sync_epoch = asyncio.get_event_loop().time()
-                    
-                    if self.start_time is None:
-                        self.start_time = streamer_instance._av_sync_epoch
-
-                    target_time = self.start_time + (self.frame_count / self.fps)
-                    current_time = asyncio.get_event_loop().time()
-                    wait_time = target_time - current_time
-                    
-                    if wait_time > 0:
-                        await asyncio.sleep(wait_time)
-                    elif wait_time < -0.05:
-                        # Reset clock if we are behind by more than 50ms to prevent buffer bloat
-                        if wait_time < -0.1:
-                            print(f"⚠️  Video lag {-wait_time*1000:.0f}ms - resetting clock")
-                        self.start_time = current_time - (self.frame_count / self.fps)
-                    
-                    # Check if user provided a frame override
-                    if streamer_instance.user_frame is not None:
-                        # Use user-provided frame
-                        self.frame = streamer_instance.user_frame.copy()
-                    else:
-                        # Create blank frame
-                        self.frame = np.zeros((self.height, self.width, 3), dtype=np.uint8)
-                    
-                    # Apply callback to populate the frame
-                    if self.callback is not None:
-                        try:
-                            processed_img = self.callback(self.frame)
-                        except Exception as e:
-                            import traceback
-                            traceback.print_exc()
-                            print(f"Error in frame callback: {e}")
-                            processed_img = self.frame
-                    else:
-                        # No callback - just send blank frame
-                        processed_img = self.frame
-                    
-                    # Convert to VideoFrame
-                    new_frame = VideoFrame.from_ndarray(processed_img, format="bgr24")
-                    new_frame.pts = self.frame_count
-                    new_frame.time_base = fractions.Fraction(1, self.fps)
-                    
-                    self.frame_count += 1
-                    return new_frame
-        
-        # Create a new event loop for the WebRTC server in a separate thread
-        def start_async_server():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            
-            # Modify run_peer to use custom parameters
-            async def run_peer_custom(reader, writer):
-                from aiortc import RTCPeerConnection, RTCSessionDescription, RTCConfiguration, RTCIceServer
-                import logging
-                
-                client_addr = writer.get_extra_info('peername')
-                print(f"🔗 VisionOS client connected from {client_addr}")
-                
-                # Configure RTCPeerConnection for low latency
-                config = RTCConfiguration(
-                    iceServers=[RTCIceServer(urls=["stun:stun.l.google.com:19302"])]
-                )
-                pc = RTCPeerConnection(configuration=config)
-                
-                @pc.on("iceconnectionstatechange")
-                async def on_ice_state_change():
-                    print(f"ICE state ({client_addr}): {pc.iceConnectionState}")
-                    if pc.iceConnectionState == "connected":
-                        print(f"🎥 WebRTC connection established ({client_addr}) - video should flow now")
-                    if pc.iceConnectionState in ("failed", "closed"):
-                        await pc.close()
-                        writer.close()
-                        await writer.wait_closed()
-                
-                @pc.on("track")
-                def on_track(track):
-                    print(f"📹 Track received: {track.kind}")
-                
-                # Create video track with or without camera
-                try:
-                    if device is None:
-                        print("Creating synthetic video stream (no camera)...")
-                        if self.frame_callback is None:
-                            print("⚠️  WARNING: No frame callback registered. Stream will be blank.")
-                            print("   Use register_frame_callback() to generate frames.")
-                    else:
-                        print(f"Opening video device: {device}...")
-                    
-                    processed_track = ProcessedVideoTrack(
-                        device, 
-                        format, 
-                        fps,
-                        (width, height),
-                        self.frame_callback  # Pass the registered callback
-                    )
-                    
-                    # Store the track as instance attribute for external access
-                    self.camera = processed_track
-                    
-                    if device is None:
-                        print(f"✓ Synthetic video track created ({size} @ {fps}fps)")
-                    else:
-                        print(f"✓ Camera track created for device: {device}")
-                    
-                    if self.frame_callback:
-                        print("✓ Frame processing enabled")
-                    else:
-                        print("✓ Frame processing disabled (identity)")
-                except Exception as e:
-                    print(f"Error creating ProcessedVideoTrack: {e}")
-                    raise
-                
-                pc.addTrack(processed_track)
-                
-                if streamer_instance.ht_backend == "webrtc":
-                    hand_channel = pc.createDataChannel(
-                        "hand-tracking",
-                        ordered=False,
-                        maxRetransmits=0,
-                    )
-                    streamer_instance._register_webrtc_data_channel(hand_channel)
-
-                    @pc.on("datachannel")
-                    def _on_remote_datachannel(channel):
-                        if channel.label == "hand-tracking":
-                            print("🔁 Remote hand data channel detected")
-                            streamer_instance._register_webrtc_data_channel(channel)
-
-                # Add audio track if audio device is specified OR if audio callback is registered
-                if audio_device is not None or self.audio_callback is not None:
-                    try:
-                        processed_audio_track = ProcessedAudioTrack(
-                            audio_device, 
-                            audio_format, 
-                            self.audio_callback,
-                            stereo=stereo_audio,
-                            sample_rate=audio_sample_rate,
-                        )
-                        pc.addTrack(processed_audio_track)
-                        channels = "stereo" if stereo_audio else "mono"
-                        if audio_device:
-                            print(f"🎤 Audio track added from device: {audio_device} ({channels})")
-                        else:
-                            print(f"🎤 Synthetic audio track added ({channels}, callback-generated)")
-                    except Exception as e:
-                        print(f"⚠️  Could not create audio track: {e}")
-                        print(f"    Continuing with video only...")
-                        import traceback
-                        traceback.print_exc()
-                
-                # Create offer
-                offer = await pc.createOffer()
-                
-                # Force high bitrate by modifying SDP directly
-                # This is the most reliable way to set bitrate in WebRTC
-                # We add a b=AS:15000 line (15 Mbps) to the video section
-                sdp = offer.sdp
-                # Find the video media section and add bandwidth limit
-                if "m=video" in sdp:
-                    # Add b=AS:15000 (15 Mbps) after c=IN ... line or just after m=video line
-                    # A simple way is to replace "m=video" with "m=video ...\r\nb=AS:15000"
-                    # But we need to be careful not to break the SDP structure.
-                    # Let's insert it after the first attribute of the video section.
-                    import re
-                    sdp = re.sub(r"(m=video.*\r\n)", r"\1b=AS:15000\r\n", sdp)
-                
-                offer = RTCSessionDescription(sdp=sdp, type=offer.type)
-                
-                await pc.setLocalDescription(offer)
-                
-                # Wait briefly for at least one ICE candidate (improves connection speed)
-                # Modern WebRTC uses trickle ICE, so we don't need complete gathering
-                start_time = asyncio.get_event_loop().time()
-                max_wait_time = 0.5  # 500ms max
-                
-                while asyncio.get_event_loop().time() - start_time < max_wait_time:
-                    if pc.iceGatheringState == "complete":
-                        print(f"ICE gathering complete in {asyncio.get_event_loop().time() - start_time:.2f}s")
-                        break
-                    elif pc.iceGatheringState == "gathering":
-                        # At least one candidate should be available, that's good enough
-                        await asyncio.sleep(0.1)
-                        print(f"ICE gathering in progress, proceeding after {asyncio.get_event_loop().time() - start_time:.2f}s")
-                        break
-                    await asyncio.sleep(0.05)
-                
-                if pc.iceGatheringState == "new":
-                    print("Warning: ICE gathering hasn't started yet, sending offer anyway")
-                
-                # Send offer (ICE candidates will be trickled separately if needed)
-                offer_payload = {
-                    "sdp": pc.localDescription.sdp,
-                    "type": pc.localDescription.type,
-                }
-                writer.write((json.dumps(offer_payload) + "\n").encode("utf-8"))
-                await writer.drain()
-                print(f"Sent offer to VisionOS (ICE state: {pc.iceGatheringState})")
-                
-                # Wait for answer
-                line = await reader.readline()
-                if not line:
-                    print("VisionOS disconnected before sending answer")
-                    await pc.close()
-                    return
-                
-                answer_payload = json.loads(line.decode("utf-8"))
-                answer = RTCSessionDescription(
-                    sdp=answer_payload["sdp"],
-                    type=answer_payload["type"],
-                )
-                
-                await pc.setRemoteDescription(answer)
-                print("WebRTC connection established!")
-                
-                # Keep connection alive
-                try:
-                    while True:
-                        await asyncio.sleep(1)
-                except asyncio.CancelledError:
-                    pass
-                finally:
-                    await pc.close()
-                    writer.close()
-                    await writer.wait_closed()
-            
-            async def run_server():
-                server = await asyncio.start_server(run_peer_custom, "0.0.0.0", port,     start_serving=True, reuse_address=True, reuse_port=True)
-
-                print(f"WebRTC server listening on 0.0.0.0:{port}")
-                async with server:
-                    await server.serve_forever()
-            
-            loop.run_until_complete(run_server())
-        
-        webrtc_thread = Thread(target=start_async_server, daemon=True)
-        webrtc_thread.start()
-        
-        # Wait a bit for server to start
-        time.sleep(0.5)
-        
-        print(f"✓ WebRTC server ready at {local_ip}:{port}")
-        print(f"✓ VisionOS can query http://{local_ip}:8888/webrtc_info to get connection details")
+        # Start the WebRTC server
+        self.serve(port=port)
     
-    def _send_webrtc_info_via_grpc(self, host, port, stereo_video=False, stereo_audio=False, audio_enabled=False):
+    def _send_webrtc_info_via_grpc(self, host, port, stereo_video=False, stereo_audio=False, audio_enabled=False, video_enabled=False, sim_enabled=False):
         """Send WebRTC server info to VisionOS by opening a new gRPC connection."""
         try:
             ip_parts = host.split('.')
             
-            print(f"📤 Opening new gRPC connection to send WebRTC info (stereo_video={stereo_video}, stereo_audio={stereo_audio}, audio_enabled={audio_enabled})...")
+            self._log(f"📤 Opening new gRPC connection to send WebRTC info (video={video_enabled}, audio={audio_enabled}, sim={sim_enabled})...")
             
             # Create a new connection just to send WebRTC server info
             with grpc.insecure_channel(f"{self.ip}:12345") as channel:
@@ -1088,6 +2008,8 @@ class VisionProStreamer:
                     webrtc_msg.Head.m12 = 1.0 if stereo_video else 0.0  # Stereo video flag
                     webrtc_msg.Head.m13 = 1.0 if stereo_audio else 0.0  # Stereo audio flag
                     webrtc_msg.Head.m20 = 1.0 if audio_enabled else 0.0  # Audio enabled flag
+                    webrtc_msg.Head.m21 = 1.0 if video_enabled else 0.0  # Video enabled flag
+                    webrtc_msg.Head.m22 = 1.0 if sim_enabled else 0.0    # Sim enabled flag
                     
                     self._webrtc_info_to_send = webrtc_msg
 
@@ -1097,12 +2019,12 @@ class VisionProStreamer:
                     # Just start the stream but don't consume responses
                     next(responses)  # Get first response to ensure message was sent
                     
-                    print(f"✓ WebRTC info sent via gRPC: {host}:{port} (stereo_video={stereo_video}, stereo_audio={stereo_audio}, audio_enabled={audio_enabled})")
+                    self._log(f"✓ WebRTC info sent via gRPC: {host}:{port} (video={video_enabled}, audio={audio_enabled}, sim={sim_enabled})")
                 except Exception as e:
-                    print(f"⚠️  Error sending WebRTC info via gRPC: {e}")
+                    self._log(f"⚠️  Error sending WebRTC info via gRPC: {e}")
                     
         except Exception as e:
-            print(f"❌ Error in _send_webrtc_info_via_grpc: {e}")
+            self._log(f"❌ Error in _send_webrtc_info_via_grpc: {e}", force=True)
     
 
 if __name__ == "__main__": 

@@ -110,13 +110,12 @@ if __name__ == "__main__":
     
     
     streamer.register_frame_callback(hand_tracking_visualizer(streamer))
-    streamer.start_streaming(
-        device=None,        
-        format=None,       
+    
+    streamer.configure_video(
         fps=60,            
-        size="1280x720",  
-        port=9999
+        size="1280x720",
     )
+    streamer.serve(port=9999)
     
     print("Streaming synthetic video at 60fps...")
     print("Press Ctrl+C to stop")

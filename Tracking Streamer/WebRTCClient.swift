@@ -10,10 +10,15 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
     private var videoTrack: LKRTCVideoTrack?
     private var audioTrack: LKRTCAudioTrack?
     private var handDataChannel: LKRTCDataChannel?
+    private var simPosesDataChannel: LKRTCDataChannel?  // WebRTC data channel for sim pose streaming
     private var handStreamTask: Task<Void, Never>?
     private let handStreamIntervalNanoseconds: UInt64 = 2_000_000
     
     var onFrameReceived: ((CVPixelBuffer) -> Void)?
+    
+    /// Callback for receiving simulation pose updates via WebRTC data channel
+    /// Format: JSON dictionary {"t": timestamp, "p": {"body_name": [x,y,z,qx,qy,qz,qw], ...}}
+    var onSimPosesReceived: (([String: [Float]]) -> Void)?
     
     private let stunServer = "stun:stun.l.google.com:19302"
     
@@ -343,30 +348,70 @@ extension WebRTCClient {
     
     func peerConnection(_ peerConnection: LKRTCPeerConnection, didOpen dataChannel: LKRTCDataChannel) {
         print("DEBUG: Data channel opened (label=\(dataChannel.label), state=\(dataChannel.readyState.rawValue))")
-        handDataChannel = dataChannel
-        dataChannel.delegate = self
-        startHandTrackingStream(on: dataChannel)
-        Task { @MainActor in
-            DataManager.shared.connectionStatus = "Hand data channel open"
+        
+        if dataChannel.label == "hand-tracking" {
+            handDataChannel = dataChannel
+            dataChannel.delegate = self
+            startHandTrackingStream(on: dataChannel)
+            Task { @MainActor in
+                DataManager.shared.connectionStatus = "Hand data channel open"
+            }
+        } else if dataChannel.label == "sim-poses" {
+            simPosesDataChannel = dataChannel
+            dataChannel.delegate = self
+            print("DEBUG: Sim-poses data channel connected for MuJoCo simulation streaming")
+            Task { @MainActor in
+                DataManager.shared.connectionStatus = "Sim-poses data channel open"
+            }
+        } else {
+            print("DEBUG: Unknown data channel: \(dataChannel.label)")
         }
     }
 }
 
 extension WebRTCClient: LKRTCDataChannelDelegate {
     func dataChannelDidChangeState(_ dataChannel: LKRTCDataChannel) {
-        print("DEBUG: Data channel state changed to: \(dataChannel.readyState.rawValue)")
+        print("DEBUG: Data channel '\(dataChannel.label)' state changed to: \(dataChannel.readyState.rawValue)")
         if dataChannel.readyState == .closed || dataChannel.readyState == .closing {
             if dataChannel == handDataChannel {
                 stopHandTrackingStream()
                 Task { @MainActor in
                     DataManager.shared.connectionStatus = "Hand data channel closed"
                 }
+            } else if dataChannel == simPosesDataChannel {
+                simPosesDataChannel = nil
+                Task { @MainActor in
+                    DataManager.shared.connectionStatus = "Sim-poses data channel closed"
+                }
             }
         }
     }
 
     func dataChannel(_ dataChannel: LKRTCDataChannel, didReceiveMessageWith buffer: LKRTCDataBuffer) {
-        print("DEBUG: Received \(buffer.data.count) bytes on data channel (ignored)")
+        if dataChannel.label == "sim-poses" {
+            // Parse JSON pose data: {"t": timestamp, "p": {"body_name": [x,y,z,qx,qy,qz,qw], ...}}
+            guard let jsonString = String(data: buffer.data, encoding: .utf8),
+                  let jsonData = jsonString.data(using: .utf8),
+                  let parsed = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+                  let poses = parsed["p"] as? [String: [NSNumber]] else {
+                return
+            }
+            
+            // Convert to [String: [Float]]
+            var floatPoses: [String: [Float]] = [:]
+            for (bodyName, values) in poses {
+                floatPoses[bodyName] = values.map { $0.floatValue }
+            }
+            
+            // Call callback on main thread
+            if let callback = onSimPosesReceived {
+                DispatchQueue.main.async {
+                    callback(floatPoses)
+                }
+            }
+        } else {
+            print("DEBUG: Received \(buffer.data.count) bytes on data channel '\(dataChannel.label)' (ignored)")
+        }
     }
 }
 

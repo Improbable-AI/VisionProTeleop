@@ -187,18 +187,23 @@ if __name__ == "__main__":
     # Register audio callback for file streaming
     streamer.register_audio_callback(audio_file_streamer(args.audio, stereo=args.stereo_audio))
     
-    # Start video and audio streaming
-    streamer.start_streaming(
+    # Configure video streaming
+    streamer.configure_video(
         device=None,           # No camera - synthetic video
         format=None,           
         fps=30,                # 30fps video
         size="1280x720",       # HD resolution
-        port=9999,
-        stereo_video=False,    # Mono video
-        stereo_audio=args.stereo_audio,  # Stereo audio if flag is set
-        audio_device=None,     # No microphone - use audio file
-        audio_format=None
+        stereo=False,          # Mono video
     )
+    
+    # Configure audio streaming
+    streamer.configure_audio(
+        device=None,           # No microphone - use audio file
+        format=None,
+        stereo=args.stereo_audio,  # Stereo audio if flag is set
+    )
+    
+    streamer.serve(port=9999)
     
     print("=" * 60)
     print("Streaming hand tracking visualization with audio file")

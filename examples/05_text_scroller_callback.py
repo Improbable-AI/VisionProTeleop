@@ -117,14 +117,12 @@ if __name__ == "__main__":
     # Register the callback
     streamer.register_frame_callback(callback)
     
-    # Start video streaming without device (synthetic mode)
-    streamer.start_streaming(
-        device=None,        
-        format=None,       
+    # Configure video streaming without device (synthetic mode)
+    streamer.configure_video(
         fps=60,            
-        size="1280x720",  
-        port=9999
+        size="1280x720",
     )
+    streamer.serve(port=9999)
     
     print(f"Streaming {args.mode} animation at 60fps using callbacks...")
     print("Press Ctrl+C to stop")

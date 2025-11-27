@@ -1,0 +1,294 @@
+<?xml version="1.0" ?>
+<mujoco model="mocap_boxes">
+  <compiler angle="radian" coordinate="local" inertiafromgeom="true"/>
+  
+  <option timestep="0.01" integrator="Euler"/>
+  
+  <default>
+    <geom conaffinity="1" condim="3" material="matgeom" rgba="0.8 0.6 0.4 1" size="1 1 1" type="box"/>
+    <joint armature="1" damping="1" limited="true"/>
+    <motor ctrllimited="true" ctrlrange="-1 1"/>
+  </default>
+
+  <asset>
+    <texture builtin="gradient" height="100" rgb1="1 1 1" rgb2="0 0 0" type="skybox" width="100"/>
+    <texture builtin="flat" height="1278" mark="cross" markrgb="1 1 1" name="texgeom" random="0.01" rgb1="0.8 0.6 0.4" rgb2="0.8 0.6 0.4" type="cube" width="127"/>
+    <texture builtin="checker" height="100" name="texplane" rgb1="0 0 0" rgb2="0.8 0.8 0.8" type="2d" width="100"/>
+    <material name="MatPlane" reflectance="0.5" shininess="1" specular="1" texrepeat="60 60" texture="texplane"/>
+    <material name="matgeom" texture="texgeom" texuniform="true"/>
+  </asset>
+
+  <worldbody>
+    <light cutoff="100" diffuse="1 1 1" dir="-0 0 -1.3" directional="true" exponent="1" pos="0 0 1.3" specular=".1 .1 .1"/>
+    
+    <!-- Mocap Body 1 -->
+    <body name="mocap_body_1" pos="0 0 0.5" mocap="true">
+      <geom name="box_1" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 2 -->
+    <body name="mocap_body_2" pos="0.5 0 0.5" mocap="true">
+      <geom name="box_2" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 3 -->
+    <body name="mocap_body_3" pos="-0.5 0 0.5" mocap="true">
+      <geom name="box_3" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 4 -->
+    <body name="mocap_body_4" pos="0 0.5 0.5" mocap="true">
+      <geom name="box_4" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 5 -->
+    <body name="mocap_body_5" pos="0 -0.5 0.5" mocap="true">
+      <geom name="box_5" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 6 -->
+    <body name="mocap_body_6" pos="1 0 0.5" mocap="true">
+      <geom name="box_6" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 7 -->
+    <body name="mocap_body_7" pos="-1 0 0.5" mocap="true">
+      <geom name="box_7" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 8 -->
+    <body name="mocap_body_8" pos="0 1 0.5" mocap="true">
+      <geom name="box_8" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 9 -->
+    <body name="mocap_body_9" pos="0 -1 0.5" mocap="true">
+      <geom name="box_9" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 10 -->
+    <body name="mocap_body_10" pos="0.5 0.5 0.5" mocap="true">
+      <geom name="box_10" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 11 -->
+    <body name="mocap_body_11" pos="-0.5 0.5 0.5" mocap="true">
+      <geom name="box_11" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 12 -->
+    <body name="mocap_body_12" pos="0.5 -0.5 0.5" mocap="true">
+      <geom name="box_12" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 13 -->
+    <body name="mocap_body_13" pos="-0.5 -0.5 0.5" mocap="true">
+      <geom name="box_13" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 14 -->
+    <body name="mocap_body_14" pos="1.5 0 0.5" mocap="true">
+      <geom name="box_14" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 15 -->
+    <body name="mocap_body_15" pos="-1.5 0 0.5" mocap="true">
+      <geom name="box_15" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 16 -->
+    <body name="mocap_body_16" pos="0 1.5 0.5" mocap="true">
+      <geom name="box_16" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 17 -->
+    <body name="mocap_body_17" pos="0 -1.5 0.5" mocap="true">
+      <geom name="box_17" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 18 -->
+    <body name="mocap_body_18" pos="1 1 0.5" mocap="true">
+      <geom name="box_18" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 19 -->
+    <body name="mocap_body_19" pos="-1 1 0.5" mocap="true">
+      <geom name="box_19" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 20 -->
+    <body name="mocap_body_20" pos="1 -1 0.5" mocap="true">
+      <geom name="box_20" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 21 -->
+    <body name="mocap_body_21" pos="-1 -1 0.5" mocap="true">
+      <geom name="box_21" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 22 -->
+    <body name="mocap_body_22" pos="0 0 1" mocap="true">
+      <geom name="box_22" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 23 -->
+    <body name="mocap_body_23" pos="0.5 0 1" mocap="true">
+      <geom name="box_23" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 24 -->
+    <body name="mocap_body_24" pos="-0.5 0 1" mocap="true">
+      <geom name="box_24" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 25 -->
+    <body name="mocap_body_25" pos="0 0.5 1" mocap="true">
+      <geom name="box_25" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 26 -->
+    <body name="mocap_body_26" pos="0 -0.5 1" mocap="true">
+      <geom name="box_26" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 27 -->
+    <body name="mocap_body_27" pos="1 0 1" mocap="true">
+      <geom name="box_27" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 28 -->
+    <body name="mocap_body_28" pos="-1 0 1" mocap="true">
+      <geom name="box_28" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 29 -->
+    <body name="mocap_body_29" pos="0 1 1" mocap="true">
+      <geom name="box_29" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 30 -->
+    <body name="mocap_body_30" pos="0 -1 1" mocap="true">
+      <geom name="box_30" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 31 -->
+    <body name="mocap_body_31" pos="0.5 0.5 1" mocap="true">
+      <geom name="box_31" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 32 -->
+    <body name="mocap_body_32" pos="-0.5 0.5 1" mocap="true">
+      <geom name="box_32" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 33 -->
+    <body name="mocap_body_33" pos="0.5 -0.5 1" mocap="true">
+      <geom name="box_33" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 34 -->
+    <body name="mocap_body_34" pos="-0.5 -0.5 1" mocap="true">
+      <geom name="box_34" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 35 -->
+    <body name="mocap_body_35" pos="1.5 0 1" mocap="true">
+      <geom name="box_35" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 36 -->
+    <body name="mocap_body_36" pos="-1.5 0 1" mocap="true">
+      <geom name="box_36" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 37 -->
+    <body name="mocap_body_37" pos="0 1.5 1" mocap="true">
+      <geom name="box_37" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 38 -->
+    <body name="mocap_body_38" pos="0 -1.5 1" mocap="true">
+      <geom name="box_38" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 39 -->
+    <body name="mocap_body_39" pos="1 1 1" mocap="true">
+      <geom name="box_39" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 40 -->
+    <body name="mocap_body_40" pos="-1 1 1" mocap="true">
+      <geom name="box_40" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 41 -->
+    <body name="mocap_body_41" pos="1 -1 1" mocap="true">
+      <geom name="box_41" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 42 -->
+    <body name="mocap_body_42" pos="-1 -1 1" mocap="true">
+      <geom name="box_42" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 43 -->
+    <body name="mocap_body_43" pos="0 0 1.5" mocap="true">
+      <geom name="box_43" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 44 -->
+    <body name="mocap_body_44" pos="0.5 0 1.5" mocap="true">
+      <geom name="box_44" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 45 -->
+    <body name="mocap_body_45" pos="-0.5 0 1.5" mocap="true">
+      <geom name="box_45" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 46 -->
+    <body name="mocap_body_46" pos="0 0.5 1.5" mocap="true">
+      <geom name="box_46" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 47 -->
+    <body name="mocap_body_47" pos="0 -0.5 1.5" mocap="true">
+      <geom name="box_47" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 48 -->
+    <body name="mocap_body_48" pos="1 0 1.5" mocap="true">
+      <geom name="box_48" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 49 -->
+    <body name="mocap_body_49" pos="-1 0 1.5" mocap="true">
+      <geom name="box_49" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+    
+    <!-- Mocap Body 50 -->
+    <body name="mocap_body_50" pos="0 0 2" mocap="true">
+      <geom name="box_50" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+
+
+    <body name="mocap_body_51" pos="0 0 2" mocap="true">
+      <geom name="box_51" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+
+    <body name="mocap_body_52" pos="0 0 2" mocap="true">
+      <geom name="box_52" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+
+    <body name="mocap_body_53" pos="0 0 2" mocap="true">
+      <geom name="box_53" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+
+    <body name="mocap_body_54" pos="0 0 2" mocap="true">
+      <geom name="box_54" type="box" size="0.01 0.01 0.01" rgba="0.2 0.4 0.8 0.8"/>
+    </body>
+
+
+
+  </worldbody>
+</mujoco>

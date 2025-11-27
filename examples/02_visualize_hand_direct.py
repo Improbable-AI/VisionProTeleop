@@ -97,13 +97,13 @@ if __name__ == "__main__":
     # Create streamer
     streamer = VisionProStreamer(ip=args.ip)
     
-    streamer.start_streaming(
-        device=None,        
-        format=None,       
-        fps=60,            
-        size="1280x720",  
-        port=9999
+    streamer.configure_video(
+        format=None,  
+        fps=60,             
+        size="1280x720"    
     )
+
+    streamer.serve()
     
     print("Streaming hand visualization at 60fps using direct frame updates...")
     print("Press Ctrl+C to stop")

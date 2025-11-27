@@ -1,0 +1,77 @@
+<mujoco model="mug_with_tag">
+  <compiler autolimits="true" meshdir="assets" angle="radian"/>
+  <!-- <default>
+    <default class="visual">
+      <geom group="2" type="mesh" contype="0" conaffinity="0"/>
+    </default>
+    <default class="collision">
+      <geom group="3" type="mesh"/>
+    </default>
+  </default> -->
+  <asset>
+    <texture type="2d" name="baked_mesh_ac1cdfa2_tex0" file="assets/baked_mesh_ac1cdfa2_tex0.png"/>
+    <material name="Texture_Mug" texture="baked_mesh_ac1cdfa2_tex0" specular="0.5" shininess="0.5"/>
+    <mesh file="mug_with_tag.obj"/>
+    <mesh file="mug_with_tag_collision_0.obj"/>
+    <mesh file="mug_with_tag_collision_1.obj"/>
+    <mesh file="mug_with_tag_collision_2.obj"/>
+    <mesh file="mug_with_tag_collision_3.obj"/>
+    <mesh file="mug_with_tag_collision_4.obj"/>
+    <mesh file="mug_with_tag_collision_5.obj"/>
+    <mesh file="mug_with_tag_collision_6.obj"/>
+    <mesh file="mug_with_tag_collision_7.obj"/>
+    <mesh file="mug_with_tag_collision_8.obj"/>
+    <mesh file="mug_with_tag_collision_9.obj"/>
+    <mesh file="mug_with_tag_collision_10.obj"/>
+    <mesh file="mug_with_tag_collision_11.obj"/>
+    <mesh file="mug_with_tag_collision_12.obj"/>
+    <mesh file="mug_with_tag_collision_13.obj"/>
+    <mesh file="mug_with_tag_collision_14.obj"/>
+    <mesh file="mug_with_tag_collision_15.obj"/>
+    <mesh file="mug_with_tag_collision_16.obj"/>
+    <mesh file="mug_with_tag_collision_17.obj"/>
+    <mesh file="mug_with_tag_collision_18.obj"/>
+    <mesh file="mug_with_tag_collision_19.obj"/>
+    <mesh file="mug_with_tag_collision_20.obj"/>
+    <mesh file="mug_with_tag_collision_21.obj"/>
+    <mesh file="mug_with_tag_collision_22.obj"/>
+    <mesh file="mug_with_tag_collision_23.obj"/>
+    <mesh file="mug_with_tag_collision_24.obj"/>
+    <mesh file="mug_with_tag_collision_25.obj"/>
+    <mesh file="mug_with_tag_collision_26.obj"/>
+    <mesh file="mug_with_tag_collision_27.obj"/>
+    <mesh file="mug_with_tag_collision_28.obj"/>
+    <mesh file="mug_with_tag_collision_29.obj"/>
+    <mesh file="mug_with_tag_collision_30.obj"/>
+    <mesh file="mug_with_tag_collision_31.obj"/>
+    <mesh file="mug_with_tag_collision_32.obj"/>
+    <mesh file="mug_with_tag_collision_33.obj"/>
+    <mesh file="mug_with_tag_collision_34.obj"/>
+    <mesh file="mug_with_tag_collision_35.obj"/>
+    <mesh file="mug_with_tag_collision_36.obj"/>
+    <mesh file="mug_with_tag_collision_37.obj"/>
+    <mesh file="mug_with_tag_collision_38.obj"/>
+    <mesh file="mug_with_tag_collision_39.obj"/>
+    <mesh file="mug_with_tag_collision_40.obj"/>
+    <mesh file="mug_with_tag_collision_41.obj"/>
+    <mesh file="mug_with_tag_collision_42.obj"/>
+    <mesh file="mug_with_tag_collision_43.obj"/>
+    <mesh file="mug_with_tag_collision_44.obj"/>
+    <mesh file="mug_with_tag_collision_45.obj"/>
+    <mesh file="mug_with_tag_collision_46.obj"/>
+    <mesh file="mug_with_tag_collision_47.obj"/>
+    <mesh file="mug_with_tag_collision_48.obj"/>
+    <mesh file="mug_with_tag_collision_49.obj"/>
+    <mesh file="mug_with_tag_collision_50.obj"/>
+    <mesh file="mug_with_tag_collision_51.obj"/>
+    <mesh file="mug_with_tag_collision_52.obj"/>
+    <mesh file="mug_with_tag_collision_53.obj"/>
+    <mesh file="mug_with_tag_collision_54.obj"/>
+    <mesh file="mug_with_tag_collision_55.obj"/>
+    <mesh file="mug_with_tag_collision_56.obj"/>
+  </asset>
+  <worldbody>
+
+
+  </worldbody>
+</mujoco>

@@ -24,49 +24,25 @@ struct ContentView: View {
             .padding(.top, 32)
             
             
-            // Two start buttons side by side
-            HStack(spacing: 40) {
-                Button {
-                    Task {
-                        await self.openImmersiveSpace(id: "immersiveSpace")
-                        self.dismissWindow()
-                    }
-                } label: {
-                    VStack(spacing: 8) {
-                        Text("START")
-                            .font(.largeTitle.bold())
-                        Text("Only Hand Tracking")
-                            .font(.title3)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.vertical, 20)
-                    .padding(.horizontal, 40)
-                    .background(Color.blue.opacity(0.2))
-                    .cornerRadius(16)
+            Button {
+                Task {
+                    await self.openImmersiveSpace(id: "combinedStreamSpace")
+                    self.dismissWindow()
                 }
-                .buttonStyle(.plain)
-                
-                Button {
-                    Task {
-                        await self.openImmersiveSpace(id: "videoStreamSpace")
-                        self.dismissWindow()
-                    }
-                } label: {
-                    VStack(spacing: 8) {
-                        Text("START")
-                            .font(.largeTitle.bold())
-                        Text("with Video/Audio Streaming")
-                            .font(.title3)
-                            .foregroundColor(.secondary)
-                            .fixedSize()
-                    }
-                    .padding(.vertical, 20)
-                    .padding(.horizontal, 40)
-                    .background(Color.green.opacity(0.2))
-                    .cornerRadius(16)
+            } label: {
+                VStack(spacing: 8) {
+                    Text("START")
+                        .font(.largeTitle.bold())
+                    Text("with Video/Audio/Sim Streaming")
+                        .font(.title3)
+                        .foregroundColor(.secondary)
                 }
-                .buttonStyle(.plain)
+                .padding(.vertical, 20)
+                .padding(.horizontal, 32)
+                .background(Color.purple.opacity(0.2))
+                .cornerRadius(16)
             }
+            .buttonStyle(.plain)
             .padding(.top, 16)
             
             VStack(spacing: 8) {

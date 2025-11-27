@@ -4,6 +4,9 @@ Example: Hand tracking visualization with audio feedback
 This example visualizes hand tracking data and plays a beep sound
 whenever a pinch gesture is detected on either hand. The audio is
 generated programmatically and streamed in real-time to Vision Pro.
+
+Audio/Video synchronization is achieved using the MediaClock system,
+which ensures both tracks share a common timing reference.
 """
 
 from avp_stream.streamer import VisionProStreamer
@@ -12,7 +15,11 @@ import numpy as np
 import time
 
 def hand_tracking_visualizer(streamer):
-    """Visualize hand tracking data in 3D space"""
+    """Visualize hand tracking data in 3D space.
+    
+    Uses get_sync_timestamp() to access synchronized timing for consistent
+    rendering that matches the audio track timing.
+    """
     
     def generate_frame(blank_frame):
         h, w = blank_frame.shape[:2]
@@ -20,8 +27,9 @@ def hand_tracking_visualizer(streamer):
         # Dark background
         blank_frame[:] = [20, 20, 20]
         
-        # Get latest hand tracking data (use cache for consistency with audio)
-        latest = streamer.get_latest(use_cache=True, cache_ms=10)
+        # Get latest hand tracking data with short cache for low latency
+        # Using shorter cache (5ms) for video since it runs at 60fps (~16ms per frame)
+        latest = streamer.get_latest(use_cache=True, cache_ms=5)
         if latest is None:
             cv2.putText(blank_frame, "Waiting for hand data...", (w//2 - 200, h//2),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
@@ -94,8 +102,11 @@ def hand_tracking_visualizer(streamer):
 
 
 def beep_audio_generator(streamer):
-    """Generate beep audio when pinch is detected (highly optimized)"""
-    import math
+    """Generate beep audio when pinch is detected (highly optimized).
+    
+    Uses synchronized timing via get_sync_timestamp() to ensure audio
+    events align with video frames showing the pinch gesture.
+    """
     import numpy as np
     
     # Audio state
@@ -134,8 +145,9 @@ def beep_audio_generator(streamer):
         nonlocal left_beep_samples_remaining, right_beep_samples_remaining
         nonlocal left_phase, right_phase
         
-        # Get latest hand tracking data with caching (only check every ~20ms, not every audio frame)
-        latest = streamer.get_latest(use_cache=True, cache_ms=20)
+        # Get latest hand tracking data with short cache for low latency
+        # Audio runs at ~50fps (20ms frames), so 5ms cache is appropriate
+        latest = streamer.get_latest(use_cache=True, cache_ms=5)
         
         if latest is None:
             return audio_frame
@@ -150,11 +162,14 @@ def beep_audio_generator(streamer):
         # Trigger beep on pinch start
         if left_pinching and not left_was_pinching:
             left_beep_samples_remaining = samples_per_beep
-            print("🔊 Left pinch")
+            # Get sync timestamp to verify audio/video alignment
+            sync_ts = streamer.get_sync_timestamp()
+            print(f"🔊 Left pinch @ {sync_ts['elapsed_ms']:.0f}ms")
         
         if right_pinching and not right_was_pinching:
             right_beep_samples_remaining = samples_per_beep
-            print("🔊 Right pinch")
+            sync_ts = streamer.get_sync_timestamp()
+            print(f"🔊 Right pinch @ {sync_ts['elapsed_ms']:.0f}ms")
         
         left_was_pinching = left_pinching
         right_was_pinching = right_pinching
@@ -213,25 +228,33 @@ if __name__ == "__main__":
     # Register audio callback for beep generation
     streamer.register_audio_callback(beep_audio_generator(streamer))
     
-    # Start video and audio streaming
-    streamer.start_streaming(
-        device=None,           # No camera - synthetic video
-        format=None,           
-        fps=60,                # 60fps video for low latency (matches 01_visualize_hand_callback.py)
-        size="1280x720",       # HD resolution
-        port=9999,
-        audio_device=None,     # No microphone - synthetic audio
-        audio_format=None
+    # Configure video at 60fps for low latency
+    streamer.configure_video(
+        fps=60,             
+        size="1280x720"
     )
-    
+
+    # Configure audio at 48kHz (standard WebRTC sample rate)
+    streamer.configure_audio(
+        sample_rate=48000,
+    )
+
+    # Start streaming - MediaClock will synchronize audio and video
+    streamer.serve()
+
     print("=" * 60)
     print("Streaming hand tracking visualization with audio feedback")
     print("=" * 60)
     print()
-    print("📹 Video: Hand tracking visualization at 60fps (low latency)")
-    print("🔊 Audio: Beep sounds when pinching (synced with video)")
-    print("   - Left hand pinch: Lower tone beep")
-    print("   - Right hand pinch: Higher tone beep")
+    print("📹 Video: Hand tracking visualization at 60fps")
+    print("🔊 Audio: Beep sounds when pinching")
+    print("   - Left hand pinch: Lower tone beep (700Hz)")
+    print("   - Right hand pinch: Higher tone beep (900Hz)")
+    print()
+    print("🔄 A/V Sync: Using MediaClock (shared 90kHz RTP clock)")
+    print("   - Video PTS: 90kHz clock rate")
+    print("   - Audio PTS: 48kHz sample rate")
+    print("   - Callbacks use get_sync_timestamp() for coordination")
     print()
     print("Make sure Vision Pro app is running and connected!")
     print("Press Ctrl+C to stop")

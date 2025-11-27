@@ -1,0 +1,33 @@
+<mujoco model="mugtree_with_tag">
+  <compiler autolimits="true" meshdir="assets" angle="radian"/>
+  <!-- <default>
+    <default class="visual">
+      <geom group="2" type="mesh" contype="0" conaffinity="0"/>
+    </default>
+    <default class="collision">
+      <geom group="3" type="mesh"/>
+    </default>
+  </default> -->
+  <asset>
+    <texture type="2d" name="baked_mesh_570dd0b2_tex0" file="assets/baked_mesh_570dd0b2_tex0.png"/>
+    <material name="Texture" texture="baked_mesh_570dd0b2_tex0" specular="0.5" shininess="0.5"/>
+    <mesh file="mugtree_with_tag.obj"/>
+    <mesh file="mugtree_with_tag_collision_0.obj"/>
+    <mesh file="mugtree_with_tag_collision_1.obj"/>
+    <mesh file="mugtree_with_tag_collision_2.obj"/>
+    <mesh file="mugtree_with_tag_collision_3.obj"/>
+    <mesh file="mugtree_with_tag_collision_4.obj"/>
+    <mesh file="mugtree_with_tag_collision_5.obj"/>
+    <mesh file="mugtree_with_tag_collision_6.obj"/>
+    <mesh file="mugtree_with_tag_collision_7.obj"/>
+    <mesh file="mugtree_with_tag_collision_8.obj"/>
+    <mesh file="mugtree_with_tag_collision_9.obj"/>
+    <mesh file="mugtree_with_tag_collision_10.obj"/>
+    <mesh file="mugtree_with_tag_collision_11.obj"/>
+    <mesh file="mugtree_with_tag_collision_12.obj"/>
+    <mesh file="mugtree_with_tag_collision_13.obj"/>
+  </asset>
+  <worldbody>
+
+  </worldbody>
+</mujoco>

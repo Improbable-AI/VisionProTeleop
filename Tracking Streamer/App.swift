@@ -21,6 +21,17 @@ struct VisionProTeleopApp: App {
             ImmersiveView()
                 .environmentObject(imageData)
         }
+        
+        // MuJoCo streaming view (new)
+        ImmersiveSpace(id: "mujocoStreamSpace") {
+            MuJoCoStreamingView()
+        }
+        
+        // Combined streaming view (Video + Audio + MuJoCo Sim)
+        ImmersiveSpace(id: "combinedStreamSpace") {
+            CombinedStreamingView()
+                .environmentObject(imageData)
+        }
     }
     
     init() {

@@ -1,6 +1,22 @@
 import SwiftUI
 import RealityKit
 import Network
+import GRPCCore
+import GRPCNIOTransportHTTP2
+import GRPCProtobuf
+
+/// Protocol for MuJoCo manager to allow StatusOverlay to display status
+@MainActor
+protocol MuJoCoManager: ObservableObject {
+    var ipAddress: String { get }
+    var connectionStatus: String { get }
+    var grpcPort: Int { get }
+    var isServerRunning: Bool { get }
+    var simEnabled: Bool { get }  // True if simulation data has been received (USDZ loaded or poses streaming)
+    var poseStreamingViaWebRTC: Bool { get }
+    var bodyCount: Int { get }
+    var updateFrequency: Double { get }  // Hz
+}
 
 /// Network information manager for displaying connection status
 class NetworkInfoManager: ObservableObject {
@@ -38,6 +54,7 @@ struct StatusOverlay: View {
     @Binding var videoFixed: Bool
     @Binding var previewStatusPosition: (x: Float, y: Float)?
     @Binding var previewStatusActive: Bool
+    var mujocoManager: (any MuJoCoManager)?  // Optional MuJoCo manager for combined streaming
     @ObservedObject var dataManager = DataManager.shared
     @State private var ipAddresses: [(name: String, address: String)] = []
     @State private var pythonConnected: Bool = false
@@ -46,8 +63,9 @@ struct StatusOverlay: View {
     @State private var hidePreviewTask: Task<Void, Never>?
     @State private var showStatusPositionControls: Bool = false
     @State private var showLocalExitConfirmation: Bool = false
+    @State private var mujocoStatusUpdateTrigger: Bool = false  // Trigger for MuJoCo status updates
     
-    init(hasFrames: Binding<Bool> = .constant(false), showVideoStatus: Bool = true, isMinimized: Binding<Bool> = .constant(false), showViewControls: Binding<Bool> = .constant(false), previewZDistance: Binding<Float?> = .constant(nil), previewActive: Binding<Bool> = .constant(false), userInteracted: Binding<Bool> = .constant(false), videoMinimized: Binding<Bool> = .constant(false), videoFixed: Binding<Bool> = .constant(false), previewStatusPosition: Binding<(x: Float, y: Float)?> = .constant(nil), previewStatusActive: Binding<Bool> = .constant(false)) {
+    init(hasFrames: Binding<Bool> = .constant(false), showVideoStatus: Bool = true, isMinimized: Binding<Bool> = .constant(false), showViewControls: Binding<Bool> = .constant(false), previewZDistance: Binding<Float?> = .constant(nil), previewActive: Binding<Bool> = .constant(false), userInteracted: Binding<Bool> = .constant(false), videoMinimized: Binding<Bool> = .constant(false), videoFixed: Binding<Bool> = .constant(false), previewStatusPosition: Binding<(x: Float, y: Float)?> = .constant(nil), previewStatusActive: Binding<Bool> = .constant(false), mujocoManager: (any MuJoCoManager)? = nil) {
         self._hasFrames = hasFrames
         self.showVideoStatus = showVideoStatus
         self._isMinimized = isMinimized
@@ -59,7 +77,8 @@ struct StatusOverlay: View {
         self._videoFixed = videoFixed
         self._previewStatusPosition = previewStatusPosition
         self._previewStatusActive = previewStatusActive
-        print("🟢 [StatusView] StatusOverlay init called, hasFrames: \(hasFrames.wrappedValue), showVideoStatus: \(showVideoStatus)")
+        self.mujocoManager = mujocoManager
+        print("🟢 [StatusView] StatusOverlay init called, hasFrames: \(hasFrames.wrappedValue), showVideoStatus: \(showVideoStatus), mujocoEnabled: \(mujocoManager != nil)")
     }
     
     var body: some View {
@@ -91,6 +110,9 @@ struct StatusOverlay: View {
                 }
                 
                 webrtcConnected = DataManager.shared.webrtcServerInfo != nil
+                
+                // Toggle trigger to force MuJoCo status update
+                mujocoStatusUpdateTrigger.toggle()
                 
                 // Detect disconnection and maximize status view
                 if (wasPythonConnected && !pythonConnected) || (wasWebrtcConnected && !webrtcConnected) {
@@ -333,106 +355,157 @@ struct StatusOverlay: View {
     }
 
     private var streamDetailsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Stream Details")
-                .font(.subheadline)
-                .foregroundColor(.white.opacity(0.6))
-                .fontWeight(.semibold)
-            
-            // Video track info
-            HStack(spacing: 8) {
-                Image(systemName: "video.fill")
-                .font(.system(size: 12))
-                .foregroundColor(.blue)
-                Text("Video:")
-                    .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.7))
-                if dataManager.stereoEnabled {
-                    Text("Stereo")
-                        .font(.subheadline)
-                        .foregroundColor(.cyan)
-                        .fontWeight(.medium)
-                } else {
-                    Text("Mono")
-                        .font(.subheadline)
-                        .foregroundColor(.white)
-                        .fontWeight(.medium)
-                }
-            }
-            
-            // Video Stats
-            if !dataManager.videoResolution.isEmpty || dataManager.videoFPS > 0 {
-                HStack(spacing: 12) {
-                    if !dataManager.videoResolution.isEmpty {
-                        HStack(spacing: 4) {
-                            Image(systemName: "arrow.up.left.and.arrow.down.right")
-                                .font(.caption2)
-                                .foregroundColor(.white.opacity(0.5))
-                            Text(dataManager.videoResolution)
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.9))
-                                .monospacedDigit()
-                        }
+        HStack(spacing: 0) {
+            // Video column
+            VStack(spacing: 6) {
+                // Title badge
+                Text("Video")
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(dataManager.videoEnabled ? .blue : .gray)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background((dataManager.videoEnabled ? Color.blue : Color.gray).opacity(0.2))
+                    .cornerRadius(8)
+                
+                if dataManager.videoEnabled {
+                    // Status
+                    if dataManager.stereoEnabled {
+                        Text("Stereo")
+                            .font(.caption)
+                            .foregroundColor(.cyan)
+                            .fontWeight(.medium)
+                    } else {
+                        Text("Mono")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.9))
                     }
                     
-                    if dataManager.videoFPS > 0 {
-                        HStack(spacing: 4) {
-                            Image(systemName: "speedometer")
-                                .font(.caption2)
-                                .foregroundColor(.white.opacity(0.5))
-                            Text("\(dataManager.videoFPS) FPS")
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.9))
-                                .monospacedDigit()
-                        }
+                    // Stats
+                    if !dataManager.videoResolution.isEmpty && dataManager.videoResolution != "Waiting..." {
+                        Text(dataManager.videoResolution)
+                            .font(.caption2)
+                            .foregroundColor(.white.opacity(0.7))
+                            .monospacedDigit()
                     }
+                    if dataManager.videoFPS > 0 {
+                        Text("\(dataManager.videoFPS) fps")
+                            .font(.caption2)
+                            .foregroundColor(.white.opacity(0.7))
+                            .monospacedDigit()
+                    }
+                } else {
+                    Text("N/A")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.5))
                 }
-                .padding(.leading, 20)
             }
+            .frame(maxWidth: .infinity)
             
-            // Audio track info (optional - may not be present)
-            HStack(spacing: 8) {
-                Image(systemName: "waveform")
-                    .font(.system(size: 12))
+            // Vertical divider
+            Rectangle()
+                .fill(Color.white.opacity(0.2))
+                .frame(width: 1, height: 40)
+            
+            // Audio column
+            VStack(spacing: 6) {
+                // Title badge
+                Text("Audio")
+                    .font(.caption2)
+                    .fontWeight(.semibold)
                     .foregroundColor(dataManager.audioEnabled ? .green : .gray)
-                Text("Audio:")
-                    .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.7))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background((dataManager.audioEnabled ? Color.green : Color.gray).opacity(0.2))
+                    .cornerRadius(8)
+                
+                // Status
                 if dataManager.audioEnabled {
                     if dataManager.stereoAudioEnabled {
                         Text("Stereo")
-                            .font(.subheadline)
+                            .font(.caption)
                             .foregroundColor(.green)
                             .fontWeight(.medium)
                     } else {
                         Text("Mono")
-                            .font(.subheadline)
-                            .foregroundColor(.white)
-                            .fontWeight(.medium)
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.9))
+                    }
+                    
+                    // Stats
+                    if dataManager.audioSampleRate > 0 {
+                        Text("\(dataManager.audioSampleRate) Hz")
+                            .font(.caption2)
+                            .foregroundColor(.white.opacity(0.7))
+                            .monospacedDigit()
                     }
                 } else {
                     Text("N/A")
-                        .font(.subheadline)
-                        .foregroundColor(.white.opacity(0.5))
-                        .fontWeight(.medium)
-                }
-            }
-            
-            // Audio Stats
-            if dataManager.audioEnabled && dataManager.audioSampleRate > 0 {
-                HStack(spacing: 4) {
-                    Image(systemName: "waveform.path.ecg")
-                        .font(.caption2)
-                        .foregroundColor(.white.opacity(0.5))
-                    Text("\(dataManager.audioSampleRate) Hz")
                         .font(.caption)
-                        .foregroundColor(.white.opacity(0.9))
-                        .monospacedDigit()
+                        .foregroundColor(.white.opacity(0.5))
                 }
-                .padding(.leading, 20)
             }
+            .frame(maxWidth: .infinity)
+            
+            // Vertical divider
+            Rectangle()
+                .fill(Color.white.opacity(0.2))
+                .frame(width: 1, height: 40)
+            
+            // Sim column
+            VStack(spacing: 6) {
+                let _ = mujocoStatusUpdateTrigger  // Force refresh
+                
+                // Determine if simulation is active (has received data)
+                let simActive = mujocoManager?.simEnabled == true || (mujocoManager?.bodyCount ?? 0) > 0
+                
+                // Title badge
+                Text("Sim")
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(simActive ? .orange : .gray)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background((simActive ? Color.orange : Color.gray).opacity(0.2))
+                    .cornerRadius(8)
+                
+                if let mujoco = mujocoManager, simActive {
+                    // Status
+                    if mujoco.poseStreamingViaWebRTC {
+                        Text("WebRTC")
+                            .font(.caption)
+                            .foregroundColor(.green)
+                            .fontWeight(.medium)
+                    } else {
+                        Text("gRPC")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                            .fontWeight(.medium)
+                    }
+                    
+                    // Body count
+                    if mujoco.bodyCount > 0 {
+                        Text("\(mujoco.bodyCount) bodies")
+                            .font(.caption2)
+                            .foregroundColor(.white.opacity(0.7))
+                    }
+                    
+                    // Update frequency
+                    if mujoco.updateFrequency > 0 {
+                        Text(String(format: "%.0f Hz", mujoco.updateFrequency))
+                            .font(.caption2)
+                            .foregroundColor(.white.opacity(0.7))
+                            .monospacedDigit()
+                    }
+                } else {
+                    Text("N/A")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.5))
+                }
+            }
+            .frame(maxWidth: .infinity)
         }
-        .padding(.vertical, 5)
+        .padding(.vertical, 8)
     }
 
     private var expandedView: some View {

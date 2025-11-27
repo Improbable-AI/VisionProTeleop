@@ -2,8 +2,9 @@ import SwiftUI
 import RealityKit
 import ARKit
 import Foundation
-import GRPC
-import NIO
+import GRPCCore
+import GRPCNIOTransportHTTP2
+import GRPCProtobuf
 
 struct Skeleton {
     var joints: [simd_float4x4]
@@ -28,35 +29,33 @@ struct BenchmarkEvent {
     let detectedTimestampMs: UInt32
 }
 
-final class BenchmarkEventDispatcher {
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+final class BenchmarkEventDispatcher: @unchecked Sendable {
     static let shared = BenchmarkEventDispatcher()
 
     private let lock = NSLock()
-    private weak var context: StreamingResponseCallContext<Handtracking_HandUpdate>?
-    private var eventLoop: EventLoop?
+    private var responseWriter: (any RPCWriterProtocol)?
     private var swiftEpochNanoseconds: UInt64?
 
     private init() {}
 
-    func register(context: StreamingResponseCallContext<Handtracking_HandUpdate>) {
+    func register(responseWriter: some RPCWriterProtocol) {
         lock.lock()
-        self.context = context
-        self.eventLoop = context.eventLoop
+        self.responseWriter = responseWriter
         self.swiftEpochNanoseconds = nil
         lock.unlock()
     }
 
     func clear() {
         lock.lock()
-        context = nil
-        eventLoop = nil
+        responseWriter = nil
         swiftEpochNanoseconds = nil
         lock.unlock()
     }
 
     func emitDetection(sequenceID: UInt32, sentTimestampMs: UInt32, detectedAtNanoseconds: UInt64) {
         lock.lock()
-        guard let loop = eventLoop, let ctx = context else {
+        guard responseWriter != nil else {
             lock.unlock()
             print("⚠️ [Benchmark] No active gRPC stream; dropping detection for seq=\(sequenceID)")
             return
@@ -77,19 +76,26 @@ final class BenchmarkEventDispatcher {
         )
         lock.unlock()
 
-        loop.execute {
-            var message = Handtracking_HandUpdate()
-            message.head.m00 = 777.0
-            message.head.m01 = Float(event.sequenceID)
-            message.head.m02 = Float(event.sentTimestampMs)
-            message.head.m03 = Float(event.detectedTimestampMs)
+        var message = Handtracking_HandUpdate()
+        message.head.m00 = 777.0
+        message.head.m01 = Float(event.sequenceID)
+        message.head.m02 = Float(event.sentTimestampMs)
+        message.head.m03 = Float(event.detectedTimestampMs)
 
-            ctx.sendResponse(message).whenFailure { error in
+        Task {
+            do {
+                if let writer = self.responseWriter as? GRPCCore.RPCWriter<Handtracking_HandUpdate> {
+                    try await writer.write(message)
+                }
+            } catch {
                 print("⚠️ [Benchmark] Failed to send detection event: \(error)")
             }
         }
     }
 }
+
+/// Protocol to allow type erasure for RPCWriter
+protocol RPCWriterProtocol: Sendable {}
 
 class DataManager: ObservableObject {
     static let shared = DataManager()
@@ -102,6 +108,8 @@ class DataManager: ObservableObject {
     @Published var stereoEnabled: Bool = false  // Whether stereo video mode is enabled
     @Published var stereoAudioEnabled: Bool = false  // Whether stereo audio mode is enabled
     @Published var audioEnabled: Bool = false  // Whether audio track is present at all
+    @Published var videoEnabled: Bool = false  // Whether video track is present at all
+    @Published var simEnabled: Bool = false    // Whether simulation is enabled
     
     // Stream stats
     @Published var videoResolution: String = "Waiting..."
@@ -313,200 +321,33 @@ extension 🥽AppModel {
 }
 
 
+// MARK: - gRPC Server (grpc-swift-2)
 
-class HandTrackingServiceProvider: Handtracking_HandTrackingServiceProvider {
+/// Extension to make RPCWriter conform to RPCWriterProtocol for type erasure
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+extension GRPCCore.RPCWriter: RPCWriterProtocol {}
 
-    var interceptors: Handtracking_HandTrackingServiceServerInterceptorFactoryProtocol?
-
-    nonisolated func streamHandUpdates(
-        request: Handtracking_HandUpdate,
-        context: StreamingResponseCallContext<Handtracking_HandUpdate>
-    ) -> EventLoopFuture<GRPCStatus> {
-        let eventLoop = context.eventLoop
-        print("📥 [DEBUG] streamHandUpdates called - client connected!")
-        
-        // Check for WebRTC info in metadata (gRPC headers)
-        let headers = context.headers
-        if let webrtcInfo = headers.first(name: "webrtc-info") {
-            print("🎞️ [DEBUG] Found WebRTC info in metadata: \(webrtcInfo)")
-            let parts = webrtcInfo.split(separator: "|")
-            if parts.count == 5 {
-                let ip1 = Int(parts[0]) ?? 0
-                let ip2 = Int(parts[1]) ?? 0
-                let ip3 = Int(parts[2]) ?? 0
-                let ip4 = Int(parts[3]) ?? 0
-                let port = Int(parts[4]) ?? 9999
-                let host = "\(ip1).\(ip2).\(ip3).\(ip4)"
-                print("🎞️ WebRTC server from metadata: \(host):\(port)")
-                DataManager.shared.webrtcServerInfo = (host: host, port: port)
-            }
-        }
-        
-        print("🔍 [DEBUG] Checking for discovery message (m00=\(request.head.m00))...")
-        
-        // Track if this is a WebRTC info-only connection (will close immediately)
-        let isWebRTCInfoOnly = request.head.m00 == 999.0
-        
-        // Check if this is a special "discovery" message from Python
-        // Python will send a message with Head.m00 = 888.0 to announce its presence
-        // and encode its IP in subsequent matrix elements
-        if request.head.m00 == 888.0 {
-            print("✨ [DEBUG] Discovery message detected!")
-            let ip1 = Int(request.head.m01)
-            let ip2 = Int(request.head.m02)
-            let ip3 = Int(request.head.m03)
-            let ip4 = Int(request.head.m10)
-            let pythonIP = "\(ip1).\(ip2).\(ip3).\(ip4)"
-            print("🔍 Python client discovered at: \(pythonIP)")
-            print("💾 [DEBUG] Storing Python IP in DataManager...")
-            DataManager.shared.pythonClientIP = pythonIP
-        } else if isWebRTCInfoOnly {
-            // WebRTC server info message (this connection will close immediately after sending info)
-            print("🎞️ [DEBUG] WebRTC server info message detected (info-only connection)!")
-            let ip1 = Int(request.head.m01)
-            let ip2 = Int(request.head.m02)
-            let ip3 = Int(request.head.m03)
-            let ip4 = Int(request.head.m10)
-            let port = Int(request.head.m11)
-            let stereoVideo = request.head.m12 > 0.5  // Stereo video flag
-            let stereoAudio = request.head.m13 > 0.5  // Stereo audio flag
-            let audioEnabled = request.head.m20 > 0.5  // Audio enabled flag
-            let host = "\(ip1).\(ip2).\(ip3).\(ip4)"
-            print("🎞️ WebRTC server available at: \(host):\(port) (stereo_video=\(stereoVideo), stereo_audio=\(stereoAudio), audio_enabled=\(audioEnabled))")
-            print("💾 [DEBUG] Storing WebRTC info in DataManager...")
-            
-            DispatchQueue.main.async {
-                let hadConnection = DataManager.shared.webrtcServerInfo != nil
-                DataManager.shared.webrtcServerInfo = (host: host, port: port)
-                DataManager.shared.stereoEnabled = stereoVideo
-                DataManager.shared.stereoAudioEnabled = stereoAudio
-                DataManager.shared.audioEnabled = audioEnabled
-                // Increment generation to trigger reconnect
-                // Use positive numbers for valid connections
-                if DataManager.shared.webrtcGeneration < 0 || !hadConnection {
-                    DataManager.shared.webrtcGeneration = 1
-                } else {
-                    DataManager.shared.webrtcGeneration += 1
-                }
-                print("🔄 [DEBUG] Set WebRTC generation to \(DataManager.shared.webrtcGeneration)")
-            }
-        } else {
-            print("⚠️ [DEBUG] Not a special message (expected m00=888.0 or 999.0, got \(request.head.m00))")
-        }
-        
-        if !isWebRTCInfoOnly {
-            BenchmarkEventDispatcher.shared.register(context: context)
-        }
-
-        print("🔄 [DEBUG] Starting hand tracking data stream...")
-        print("hey...")
-        // Example task to simulate sending hand tracking data.
-        // In a real application, you would replace this with actual data collection and streaming.
-        print("⏱️ [DEBUG] Scheduling repeated task for hand tracking updates (10ms interval)...")
-        var updateCount = 0
-        // Reduce delay to increase frequency (compensating for execution time)
-        let task = eventLoop.scheduleRepeatedAsyncTask(initialDelay: .milliseconds(10), delay: .milliseconds(5)) { task -> EventLoopFuture<Void> in
-//            var handUpdate = Handtracking_HandUpdate()
-            
-            let recent_hand = fill_handUpdate()
-            updateCount += 1
-            if updateCount == 1 || updateCount % 100 == 0 {
-                print("📤 [DEBUG] Sending hand update #\(updateCount)...")
-            }
-            
-            // Send the update to the client.
-            return context.sendResponse(recent_hand).map { _ in }
-        }
-
-        // Ensure the task is cancelled when the client disconnects or the stream is otherwise closed.
-        print("🔗 [DEBUG] Setting up disconnect handler...")
-        context.statusPromise.futureResult.whenComplete { result in
-            print("🔌 [DEBUG] Client disconnected or stream closed. Sent \(updateCount) updates. Result: \(result)")
-            task.cancel()
-
-            if !isWebRTCInfoOnly {
-                BenchmarkEventDispatcher.shared.clear()
-            }
-            
-            // Only clear connection state if this was NOT a WebRTC info-only connection
-            // WebRTC info connections close immediately after sending info, but that's normal
-            if !isWebRTCInfoOnly {
-                DispatchQueue.main.async {
-                    print("🧹 [DEBUG] Cleaning up connection state after main client disconnect")
-                    DataManager.shared.pythonClientIP = nil
-                    DataManager.shared.webrtcServerInfo = nil
-                    // Set generation to negative to signal disconnection
-                    DataManager.shared.webrtcGeneration = -1
-                }
-            } else {
-                print("ℹ️ [DEBUG] WebRTC info-only connection closed (expected behavior)")
-            }
-        }
-
-        // Return a future that will complete when the streaming operation is done.
-        // Here, we're indicating that the stream will remain open indefinitely until the client disconnects.
-        return eventLoop.makePromise(of: GRPCStatus.self).futureResult
+/// Starts the gRPC server using grpc-swift-2
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+func startServer() {
+    print("📡 [DEBUG] startServer() - Starting gRPC server setup (grpc-swift-2)...")
+    
+    Task {
+        let serverManager = GRPCServerManager()
+        await serverManager.startServer(port: 12345)
     }
 }
 
-func startServer() {
-    print("📡 [DEBUG] startServer() - Starting gRPC server setup...")
-    DispatchQueue.global().async {
-        print("🔧 [DEBUG] Dispatched to background thread")
-        
-        let port = 12345
-        let host = "0.0.0.0"
-        print("🔧 [DEBUG] Server configuration: host=\(host), port=\(port)")
-        
-        print("🔧 [DEBUG] Creating MultiThreadedEventLoopGroup...")
-        let group = MultiThreadedEventLoopGroup(numberOfThreads: 2)
-        defer {
-            print("🔧 [DEBUG] Shutting down EventLoopGroup...")
-            try! group.syncShutdownGracefully()
-        }
-        
-        print("🔧 [DEBUG] Creating HandTrackingServiceProvider...")
-        let provider = HandTrackingServiceProvider()
-        
-        print("🔧 [DEBUG] Building gRPC server with provider...")
-        
-        // Configure keepalive to detect dead connections
-        let keepalive = ServerConnectionKeepalive(
-            interval: .seconds(5),
-            timeout: .seconds(3),
-            permitWithoutCalls: true
-        )
-        
-        let server = GRPC.Server.insecure(group: group)
-            .withKeepalive(keepalive)
-            .withServiceProviders([provider])
-            .bind(host: host, port: port)
-        
-        print("🔧 [DEBUG] Server binding initiated, waiting for result...")
-        server.map {
-            $0.channel.localAddress
-        }.whenSuccess { address in
-            print("🟢 gRPC server started on \(address!) port \(address!.port!)")
-            print("✅ [DEBUG] Server is now accepting connections")
-            DataManager.shared.grpcServerReady = true
-        }
-        
-        server.whenFailure { error in
-            print("❌ [DEBUG] Server failed to start: \(error)")
-        }
-        
-        //         Wait on the server's `onClose` future to stop the program from exiting.
-        _ = try! server.flatMap {
-            $0.onClose
-        }.wait()
-    }
+/// Legacy startServer function for backwards compatibility with older iOS versions
+func startServerLegacy() {
+    print("⚠️ [DEBUG] Legacy startServer called - grpc-swift-2 requires iOS 18.0+/visionOS 2.0+")
 }
 
 func fill_handUpdate() -> Handtracking_HandUpdate {
     var handUpdate = Handtracking_HandUpdate()
     
     // Assuming DataManager provides an ordered list/array of joints for leftSkeleton and rightSkeleton
-    let leftJoints = DataManager.shared.latestHandTrackingData.leftSkeleton.joints // Your actual data structure access method might differ
+    let leftJoints = DataManager.shared.latestHandTrackingData.leftSkeleton.joints
     let rightJoints = DataManager.shared.latestHandTrackingData.rightSkeleton.joints
     let leftWrist = DataManager.shared.latestHandTrackingData.leftWrist
     let rightWrist = DataManager.shared.latestHandTrackingData.rightWrist

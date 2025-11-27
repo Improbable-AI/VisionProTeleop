@@ -513,6 +513,15 @@ class VideoStreamManager: ObservableObject {
     private var audioRenderer: AudioFrameRenderer?
     private var isRunning = false
     
+    /// Callback for sim-poses data channel messages (JSON format from Python)
+    /// Format: {"body_name": [x,y,z,qx,qy,qz,qw], ...}
+    var onSimPosesReceived: (([String: [Float]]) -> Void)? {
+        didSet {
+            // Forward to webrtcClient if already connected
+            webrtcClient?.onSimPosesReceived = onSimPosesReceived
+        }
+    }
+    
     func start(imageData: ImageData) {
         // If already running, we might want to restart if called explicitly, 
         // but for now let's respect the flag unless stop() was called.
@@ -587,6 +596,11 @@ class VideoStreamManager: ObservableObject {
                 // Connect to WebRTC server
                 let client = WebRTCClient()
                 self.webrtcClient = client
+                
+                // Set up sim-poses callback if it was configured before connection
+                if let simCallback = self.onSimPosesReceived {
+                    client.onSimPosesReceived = simCallback
+                }
                 
                 let videoRenderer = VideoFrameRenderer(imageData: imageData)
                 self.videoRenderer = videoRenderer
