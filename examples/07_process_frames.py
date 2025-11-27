@@ -82,7 +82,7 @@ if __name__ == "__main__":
         size="640x480",
         fps=30,
     )
-    streamer.serve(port=9999)
+    streamer.start_webrtc(port=9999)
     
     # Keep running
     print("Streaming with custom frame processing...")

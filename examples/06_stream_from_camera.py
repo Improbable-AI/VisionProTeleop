@@ -21,7 +21,7 @@ def main(args):
         size="640x480",
         fps=30,
     )
-    streamer.serve(port=9999)
+    streamer.start_webrtc(port=9999)
     
     try:
         # Keep the script running and show hand tracking data

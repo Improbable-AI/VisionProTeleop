@@ -203,7 +203,7 @@ if __name__ == "__main__":
         stereo=args.stereo_audio,  # Stereo audio if flag is set
     )
     
-    streamer.serve(port=9999)
+    streamer.start_webrtc(port=9999)
     
     print("=" * 60)
     print("Streaming hand tracking visualization with audio file")

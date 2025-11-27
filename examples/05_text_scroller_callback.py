@@ -122,7 +122,7 @@ if __name__ == "__main__":
         fps=60,            
         size="1280x720",
     )
-    streamer.serve(port=9999)
+    streamer.start_webrtc(port=9999)
     
     print(f"Streaming {args.mode} animation at 60fps using callbacks...")
     print("Press Ctrl+C to stop")

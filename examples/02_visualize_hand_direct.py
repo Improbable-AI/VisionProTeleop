@@ -103,7 +103,7 @@ if __name__ == "__main__":
         size="1280x720"    
     )
 
-    streamer.serve()
+    streamer.start_webrtc()
     
     print("Streaming hand visualization at 60fps using direct frame updates...")
     print("Press Ctrl+C to stop")

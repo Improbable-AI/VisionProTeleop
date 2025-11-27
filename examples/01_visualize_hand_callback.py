@@ -115,7 +115,7 @@ if __name__ == "__main__":
         fps=60,            
         size="1280x720",
     )
-    streamer.serve(port=9999)
+    streamer.start_webrtc(port=9999)
     
     print("Streaming synthetic video at 60fps...")
     print("Press Ctrl+C to stop")

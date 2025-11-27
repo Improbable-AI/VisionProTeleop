@@ -251,7 +251,7 @@ if __name__ == "__main__":
         size=args.resolution,     # Side-by-side stereo resolution
         stereo=True,              # Enable stereo video mode
     )
-    streamer.serve(port=9999)
+    streamer.start_webrtc(port=9999)
     
     
     try:

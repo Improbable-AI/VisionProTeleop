@@ -2,7 +2,7 @@ VisionProTeleop
 ===========
 
 
-> **🎉 UPDATE: Now supporting Low-Latency Video Streaming!** You can now stream back your robot's video/audio feed back to Vision Pro via webRTC protocol, alongside the original hand tracking data stream. No complicated network setting required.  Update the app, `pip install --upgrade avp_stream`, and you're done!
+> **🎉 V2 UPDATE: Low-Latency Video/Audio/Simulation Streaming!** Now stream video, audio, and MuJoCo simulations back to Vision Pro via WebRTC — alongside the original hand tracking stream, from any machine on the network. Update the app, `pip install --upgrade avp_stream`, and you're ready!
 
 
 <div align="center">
@@ -97,60 +97,166 @@ while True:
     print(r['head'], r['right_wrist'], r['right_fingers'])
 ```
 
-### Step 4. [🎉V2 Update🎉] Stream video feeds back to Vision Pro! 
+### Step 4. [🎉V2 Update🎉] Stream video/audio/simulation back to Vision Pro! 
 
-Streaming your robot's video feed back to Vision Pro requires one additional line: `start_streaming`. This feature is only supported on the latest version of the VisionOS app, and python package. Make sure you upgrade both python library / visionOS app. 
+Stream your robot's video feed, audio, and even MuJoCo simulations back to Vision Pro via WebRTC. Make sure you upgrade both the python library and the VisionOS app.
+
+#### Quick Start: Video Streaming
 
 ```python
 from avp_stream import VisionProStreamer
-avp_ip = "10.31.181.201"   # example IP 
+avp_ip = "10.31.181.201"   # Vision Pro IP (shown in the app)
 s = VisionProStreamer(ip = avp_ip)
 
-# you can simply start a video stream 
-# by defining which video device you want to use
-s.start_streaming(device="/dev/video0", format="v4l2", \
-                        size="640x480", fps=30, stereo_video=False)
+# Configure and start video streaming
+s.configure_video(device="/dev/video0", format="v4l2", size="640x480", fps=30)
+s.start_webrtc()  # Start streaming to Vision Pro
 
 while True:
     r = s.latest
     print(r['head'], r['right_wrist'], r['right_fingers'])
 ```
 
-You can also: 
+#### Configuration Options
 
-- image-process the camera frames before you send it to Vision Pro 
-  ```python
-  s = VisionProStreamer(ip = avp_ip)
-  # define your own image processing function, and register
-  s.register_frame_callback(my_own_processor)
-  s.start_streaming(device="/dev/video0", format="v4l2", \
-                        size="640x480", fps=30)
-  ```
+**Video Configuration** (`configure_video`):
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `device` | Camera device. `None` for synthetic frames | `"/dev/video0"`, `"0:none"` (macOS), `None` |
+| `format` | Video format | `"v4l2"` (Linux), `"avfoundation"` (macOS) |
+| `size` | Resolution as "WxH" | `"640x480"`, `"1280x720"`, `"1920x1080"` |
+| `fps` | Frame rate | `30`, `60` |
+| `stereo` | Side-by-side stereo video | `True`, `False` |
 
-- send over as a stereo camera feed   (assumes side-by-side concatenated image)
+**Audio Configuration** (`configure_audio`):
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `device` | Audio device. `None` for synthetic audio | `":0"` (default mic on macOS), `None` |
+| `sample_rate` | Sample rate in Hz | `48000` |
+| `stereo` | Stereo or mono audio | `True`, `False` |
 
-  ```python
-  s = VisionProStreamer(ip = avp_ip)
-  s.start_streaming(device="/dev/video0", format="v4l2", \
-                        size="640x480", fps=30, stereo_video=True)
-  ```
+**Simulation Configuration** (`configure_sim`):
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `xml_path` | Path to MuJoCo XML scene | `"scene.xml"` |
+| `model` | MuJoCo model object | `mujoco.MjModel` |
+| `data` | MuJoCo data object | `mujoco.MjData` |
+| `relative_to` | Scene placement [x, y, z, yaw°] or [x, y, z, qw, qx, qy, qz] | `[0, 1, 0.5, -90]` |
 
-- work without a physical camera and send over synthetically generated frames (i.e., simulation renderings, or purely synthetic images)
-  ```python
-  s = VisionProStreamer(ip = avp_ip)
-  # define your own image generating function, and register
-  s.register_frame_callback(synthetic_frame_generator)
-  s.start_streaming(size="1280x720", fps=60)
-  ```
+#### Example: Streaming Modes
 
-which is explained in detail in [examples](examples) folder. 
+**1. Camera with custom processing:**
+```python
+s = VisionProStreamer(ip=avp_ip)
+s.register_frame_callback(my_image_processor)  # Your processing function
+s.configure_video(device="/dev/video0", format="v4l2", size="640x480", fps=30)
+s.start_webrtc()
+```
 
-**Note:** Finding the right combination of `device`, `format`, `size`, and `fps` can sometime be tricky, since camera models only support certain combination. Also, depending on your operation system and how you plugged the camera, the camera might have been mounted on a different directory. To find the right combination of these parameters, you can use the following script: 
+**2. Stereo camera (side-by-side):**
+```python
+s = VisionProStreamer(ip=avp_ip)
+s.configure_video(device="/dev/video0", format="v4l2", size="1920x1080", fps=30, stereo=True)
+s.start_webrtc()
+```
+
+**3. Synthetic video (no camera - e.g., simulation rendering):**
+```python
+s = VisionProStreamer(ip=avp_ip)
+s.register_frame_callback(render_simulation_frame)  # Generate frames programmatically
+s.configure_video(size="1280x720", fps=60)  # No device = synthetic mode
+s.start_webrtc()
+```
+
+**4. Video + Audio:**
+```python
+s = VisionProStreamer(ip=avp_ip)
+s.register_frame_callback(visualizer)
+s.register_audio_callback(audio_generator)  # Generate or process audio
+s.configure_video(size="1280x720", fps=60)
+s.configure_audio(sample_rate=48000, stereo=True)
+s.start_webrtc()
+```
+
+**5. MuJoCo Simulation AR Streaming:**
+
+Stream your MuJoCo physics simulations directly into AR! The simulation scene is converted to USD and rendered natively on Vision Pro using RealityKit, with real-time pose updates streamed via webRTC.
+
+![](assets/diagram-mjar3.png)
+
+https://github.com/user-attachments/assets/7e6a3b6a-34f8-472a-ac6f-0f032fc0eae5
+
+```python
+import mujoco
+model = mujoco.MjModel.from_xml_path("robot.xml")
+data = mujoco.MjData(model)
+
+s = VisionProStreamer(ip=avp_ip)
+s.configure_sim("robot.xml", model, data, relative_to=[0, 1, 0.5, -90])
+s.start_webrtc()
+
+while True:
+    mujoco.mj_step(model, data)
+    s.update_sim()  # Stream updated poses to Vision Pro
+```
+
+#### Positioning Your Simulation in AR (`relative_to`)
+
+Since AR blends your simulation with the real world, you need to decide where the simulation's `world` frame should be placed in your physical space. Use `relative_to` parameter:
+
+- **4-dim**: `[x, y, z, yaw°]` — translation + rotation around z-axis (degrees)
+- **7-dim**: `[x, y, z, qw, qx, qy, qz]` — full quaternion orientation
+
+```python
+# Place world frame 0.8m above ground, rotated 90° around z-axis
+s.configure_sim("robot.xml", model, data, relative_to=[0, 0, 0.8, 90])
+```
+
+**Default Behavior**: VisionOS automatically detects the physical ground and places the origin there (below your feet if standing, below your chair if sitting).
+
+| Scene Type | Example | Recommended `relative_to` |
+|------------|---------|---------------------------|
+| **Locomotion / Mobile** | ![](assets/unitree_g1.png) Unitree G1 | Default (world = ground) |
+| **Mobile Manipulation** | ![](assets/google_robot.png) Google Robot | Default (world = ground) |
+| **Table-top Manipulation** | ![](assets/aloha2.png) ALOHA 2 | `[0, 0, 0.8, 0]` (raise table height) |
+
+#### Hand Tracking Coordinate Frame (`origin`)
+
+When using MuJoCo simulation streaming, you often want hand tracking data in the simulation's coordinate frame (not Vision Pro's native frame). By default, calling `configure_sim()` automatically sets `origin="sim"`, so hand positions are relative to your scene's `world` frame.
+
+```python
+s = VisionProStreamer(ip=avp_ip)
+s.configure_sim("robot.xml", model, data, relative_to=[0, 0, 0.8, 90])
+# origin is now "sim" — hand tracking is in simulation coordinates
+
+# You can also switch manually:
+s.set_origin("avp")  # Vision Pro's native coordinate frame
+s.set_origin("sim")  # Simulation's coordinate frame (relative to attach_to)
+```
+
+| Origin | Hand Tracking Frame | Use Case |
+|--------|---------------------|----------|
+| `"avp"` | Vision Pro ground frame | Default, general hand tracking |
+| `"sim"` | Simulation world frame | Teleoperation, robot control in sim |
+
+**6. Everything together (Video + Audio + Simulation):**
+```python
+s = VisionProStreamer(ip=avp_ip)
+s.register_frame_callback(camera_overlay)
+s.register_audio_callback(audio_feedback)
+s.configure_video(size="1280x720", fps=30)
+s.configure_audio(stereo=True)
+s.configure_sim("scene.xml", model, data, relative_to=[0, 1, 0.5, 0])
+s.start_webrtc()
+```
+
+More examples in the [examples](examples) folder.
+
+**Note:** Finding the right combination of `device`, `format`, `size`, and `fps` can be tricky since cameras only support certain combinations. Use this script to find valid configurations:
 
 ```bash
 python test_video_devices.py --live
-```
-When it's the right combination, it'll show up a live feed of the selected camera. 
+``` 
 
 
 

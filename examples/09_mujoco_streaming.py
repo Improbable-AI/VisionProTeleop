@@ -43,7 +43,7 @@ def main(args):
         grpc_port=args.port,
     )
 
-    streamer.serve()
+    streamer.start_webrtc()
 
 
     logs_dir = ASSETS_DIR / "logs"

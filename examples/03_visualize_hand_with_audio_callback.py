@@ -239,8 +239,8 @@ if __name__ == "__main__":
         sample_rate=48000,
     )
 
-    # Start streaming - MediaClock will synchronize audio and video
-    streamer.serve()
+    # Start WebRTC streaming - MediaClock will synchronize audio and video
+    streamer.start_webrtc()
 
     print("=" * 60)
     print("Streaming hand tracking visualization with audio feedback")

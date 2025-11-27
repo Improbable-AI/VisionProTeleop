@@ -3,6 +3,9 @@ import CoreLocation
 import UIKit
 import SystemConfiguration.CaptiveNetwork
 
+// Version key for tracking "What's New" display
+private let currentAppVersion = "2.0"
+private let lastSeenVersionKey = "lastSeenAppVersion"
 
 struct ContentView: View {
     @Environment(\.openImmersiveSpace) var openImmersiveSpace
@@ -11,6 +14,12 @@ struct ContentView: View {
     @AppStorage("pythonServerIP") private var pythonServerIP = "10.29.239.70"
     @State private var showSettings = false
     @State private var serverReady = false
+    @State private var showWhatsNew = false
+    @State private var pulseNewBadge = false
+    
+    private var isNewUser: Bool {
+        UserDefaults.standard.string(forKey: lastSeenVersionKey) != currentAppVersion
+    }
     
     var body: some View {
         VStack(spacing: 32) {
@@ -23,26 +32,49 @@ struct ContentView: View {
             }
             .padding(.top, 32)
             
-            
-            Button {
-                Task {
-                    await self.openImmersiveSpace(id: "combinedStreamSpace")
-                    self.dismissWindow()
+            // Main START button with NEW badge for updated features
+            ZStack(alignment: .topTrailing) {
+                Button {
+                    Task {
+                        await self.openImmersiveSpace(id: "combinedStreamSpace")
+                        self.dismissWindow()
+                    }
+                } label: {
+                    VStack(spacing: 8) {
+                        Text("START")
+                            .font(.largeTitle.bold())
+                        Text("Hand Tracking + Video · Audio · Sim AR ")
+                            .font(.title3)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.vertical, 20)
+                    .padding(.horizontal, 32)
+                    .background(
+                        LinearGradient(
+                            colors: [Color.purple.opacity(0.3), Color.blue.opacity(0.2)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .cornerRadius(16)
                 }
-            } label: {
-                VStack(spacing: 8) {
-                    Text("START")
-                        .font(.largeTitle.bold())
-                    Text("with Video/Audio/Sim Streaming")
-                        .font(.title3)
-                        .foregroundColor(.secondary)
+                .buttonStyle(.plain)
+                
+                // "NEW" badge for returning users
+                if isNewUser {
+                    Text("NEW")
+                        .font(.caption.bold())
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.orange)
+                        .cornerRadius(8)
+                        .offset(x: 10, y: -10)
+                        .scaleEffect(pulseNewBadge ? 1.1 : 1.0)
+                        .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: pulseNewBadge)
+                        .onAppear { pulseNewBadge = true }
                 }
-                .padding(.vertical, 20)
-                .padding(.horizontal, 32)
-                .background(Color.purple.opacity(0.2))
-                .cornerRadius(16)
             }
-            .buttonStyle(.plain)
             .padding(.top, 16)
             
             VStack(spacing: 8) {
@@ -85,6 +117,21 @@ struct ContentView: View {
             // Settings and Exit buttons
             HStack(spacing: 24) {
                 
+                // What's New button (always available)
+                Button {
+                    showWhatsNew = true
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(Color.blue.opacity(0.8))
+                            .frame(width: 50, height: 50)
+                        Image(systemName: "sparkles")
+                            .font(.title2.bold())
+                            .foregroundColor(.white)
+                    }
+                }
+                .buttonStyle(.plain)
+                
                 Button {
                     exit(0)
                 } label: {
@@ -102,6 +149,131 @@ struct ContentView: View {
             
         }
         .padding(32)
+        .frame(minWidth: 700, minHeight: 600)
+        .onAppear {
+            // Show What's New automatically for returning users
+            if isNewUser {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    showWhatsNew = true
+                }
+            }
+        }
+        .sheet(isPresented: $showWhatsNew) {
+            WhatsNewView {
+                // Mark as seen when dismissed
+                UserDefaults.standard.set(currentAppVersion, forKey: lastSeenVersionKey)
+                showWhatsNew = false
+            }
+        }
+    }
+}
+
+// MARK: - What's New View
+struct WhatsNewView: View {
+    let onDismiss: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 24) {
+            Text("What's New")
+                .font(.system(size: 48, weight: .bold))
+                .padding(.top, 32)
+            
+            Text("VisionProTeleop 2.0")
+                .font(.title2)
+                .foregroundColor(.secondary)
+            
+            VStack(alignment: .leading, spacing: 20) {
+                FeatureRow(
+                    icon: "video.fill",
+                    iconColor: .blue,
+                    title: "Video Streaming",
+                    description: "Stream video from any client machine to Vision Pro"
+                )
+                
+                FeatureRow(
+                    icon: "speaker.wave.3.fill",
+                    iconColor: .green,
+                    title: "Audio Streaming",
+                    description: "Bidirectional audio support for immersive experiences"
+                )
+                
+                FeatureRow(
+                    icon: "cube.transparent",
+                    iconColor: .purple,
+                    title: "MuJoCo AR Streaming",
+                    description: "Visualize MuJoCo simulations in augmented reality"
+                )
+                
+                FeatureRow(
+                    icon: "hand.raised.fill",
+                    iconColor: .orange,
+                    title: "Enhanced Hand Tracking",
+                    description: "Improved accuracy and lower latency for teleoperation"
+                )
+            }
+            .padding(.horizontal, 32)
+            .padding(.vertical, 16)
+            
+            // Upgrade notice
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.yellow)
+                    Text("Don't forget to upgrade the Python package:")
+                        .font(.subheadline.bold())
+                }
+                
+                Text("pip install --upgrade avp_stream")
+                    .font(.system(.footnote, design: .monospaced))
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.black.opacity(0.3))
+                    .cornerRadius(8)
+            }
+            .padding(.horizontal, 32)
+            
+            Spacer()
+            
+            Button {
+                onDismiss()
+            } label: {
+                Text("Get Started")
+                    .font(.title2.bold())
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(Color.blue)
+                    .cornerRadius(12)
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 32)
+            .padding(.bottom, 32)
+        }
+        .frame(width: 500, height: 700)
+    }
+}
+
+struct FeatureRow: View {
+    let icon: String
+    let iconColor: Color
+    let title: String
+    let description: String
+    
+    var body: some View {
+        HStack(alignment: .top, spacing: 16) {
+            Image(systemName: icon)
+                .font(.title)
+                .foregroundColor(iconColor)
+                .frame(width: 40)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                Text(description)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+        }
     }
 }
 

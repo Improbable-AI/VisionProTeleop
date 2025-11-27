@@ -450,7 +450,7 @@ def _create_processed_video_track_class(streamer_instance):
 
 class VisionProStreamer:
 
-    def __init__(self, ip, record=True, ht_backend="grpc", benchmark_quiet=False, verbose=False):
+    def __init__(self, ip, record=True, ht_backend="grpc", benchmark_quiet=False, verbose=False, origin="avp"):
         """Initialize the VisionProStreamer.
 
         Parameters
@@ -465,6 +465,11 @@ class VisionProStreamer:
             Suppress benchmark printouts (see latency measurements in `latency_test.py`).
         verbose : bool, default False
             If True, print detailed status messages. If False (default), only critical messages are shown.
+        origin : {"avp", "sim"}, default "avp"
+            Coordinate frame origin for hand tracking data.
+            - "avp": Hand tracking in Vision Pro's native coordinate frame (default).
+            - "sim": Hand tracking relative to the simulation's attach_to position.
+              Useful when you want hand positions in the same frame as your MuJoCo scene.
 
         Notes
         -----
@@ -476,8 +481,11 @@ class VisionProStreamer:
         self.record = record 
         self.ht_backend = ht_backend.lower()
         self.verbose = verbose
+        self.origin = origin.lower()
         if self.ht_backend not in {"grpc", "webrtc"}:
             raise ValueError(f"Unsupported ht_backend '{ht_backend}'. Expected 'grpc' or 'webrtc'.")
+        if self.origin not in {"avp", "sim"}:
+            raise ValueError(f"Unsupported origin '{origin}'. Expected 'avp' or 'sim'.")
 
         self.recording = [] 
         self.latest = None 
@@ -549,12 +557,24 @@ class VisionProStreamer:
             return
 
         try:
+            # Base transforms in AVP coordinate frame
+            left_wrist = self.axis_transform @ process_matrix(hand_update.left_hand.wristMatrix)
+            right_wrist = self.axis_transform @ process_matrix(hand_update.right_hand.wristMatrix)
+            head = rotate_head(self.axis_transform @ process_matrix(hand_update.Head))
+            
+            # If origin="sim", transform to simulation's attach_to frame
+            if self.origin == "sim":
+                inv_attach = np.linalg.inv(self._attach_to_mat)[np.newaxis, :, :]
+                left_wrist = inv_attach @ left_wrist
+                right_wrist = inv_attach @ right_wrist
+                head = inv_attach @ head
+            
             transformations = {
-                "left_wrist": self.axis_transform @ process_matrix(hand_update.left_hand.wristMatrix),
-                "right_wrist": self.axis_transform @ process_matrix(hand_update.right_hand.wristMatrix),
+                "left_wrist": left_wrist,
+                "right_wrist": right_wrist,
                 "left_fingers": process_matrices(hand_update.left_hand.skeleton.jointMatrices),
                 "right_fingers": process_matrices(hand_update.right_hand.skeleton.jointMatrices),
-                "head": rotate_head(self.axis_transform @ process_matrix(hand_update.Head)),
+                "head": head,
                 "left_pinch_distance": get_pinch_distance(hand_update.left_hand.skeleton.jointMatrices),
                 "right_pinch_distance": get_pinch_distance(hand_update.right_hand.skeleton.jointMatrices),
             }
@@ -821,6 +841,28 @@ class VisionProStreamer:
         with self._latest_lock:
             return list(self.recording)
     
+    def set_origin(self, origin: str):
+        """Set the coordinate frame origin for hand tracking data.
+        
+        Args:
+            origin: Either "avp" or "sim".
+                - "avp": Hand tracking in Vision Pro's native coordinate frame.
+                - "sim": Hand tracking relative to the simulation's attach_to position.
+                  Useful when you want hand positions in the same frame as your MuJoCo scene.
+        
+        Example::
+        
+            streamer = VisionProStreamer(ip=avp_ip)
+            streamer.configure_sim("scene.xml", model, data, relative_to=[0, 0, 0.8, 90])
+            streamer.set_origin("sim")  # Now hand tracking is in simulation frame
+            streamer.start_webrtc()
+        """
+        origin = origin.lower()
+        if origin not in {"avp", "sim"}:
+            raise ValueError(f"Unsupported origin '{origin}'. Expected 'avp' or 'sim'.")
+        self.origin = origin
+        self._log(f"✓ Origin set to '{origin}'")
+    
     def get_sync_timestamp(self) -> Dict[str, Any]:
         """Get synchronized timestamp for use in audio/video callbacks.
         
@@ -999,7 +1041,7 @@ class VisionProStreamer:
         
             streamer.configure_video(device=None, size="1280x720", fps=60)
             streamer.configure_audio()  # optional
-            streamer.serve()
+            streamer.start_webrtc()
         """
         # Parse size
         width, height = map(int, size.split('x'))
@@ -1041,7 +1083,7 @@ class VisionProStreamer:
         
             streamer.configure_video(device=None, size="1280x720")
             streamer.configure_audio(stereo=True)  # synthetic stereo audio
-            streamer.serve()
+            streamer.start_webrtc()
         """
         effective_sample_rate = sample_rate or 48000
         
@@ -1087,7 +1129,7 @@ class VisionProStreamer:
             data = mujoco.MjData(model)
             
             streamer.configure_sim("scene.xml", model, data, relative_to=[0, 0, 1, 1, 0, 0, 0])
-            streamer.serve()
+            streamer.start_webrtc()
             
             while True:
                 mujoco.mj_step(model, data)
@@ -1133,6 +1175,9 @@ class VisionProStreamer:
             "grpc_port": grpc_port,
             "force_reload": force_reload,
         }
+        
+        # Automatically switch to simulation-relative coordinates
+        self.set_origin("sim")
         
         self._log(f"✓ Simulation configured: {xml_path} ({len(self._mujoco_bodies)} bodies)")
         if attach_to:
@@ -1470,24 +1515,26 @@ class VisionProStreamer:
         This is the core method that starts the WebRTC server. It uses the
         configuration set by configure_video(), configure_audio(), and configure_sim().
         
+        Note: Consider using start_webrtc() instead for clarity.
+        
         Args:
             port: WebRTC server port (default: 9999)
         
         Example (video only)::
         
             streamer.configure_video(device=None, size="1280x720")
-            streamer.serve()
+            streamer.start_webrtc()
         
         Example (simulation only)::
         
             streamer.configure_sim("scene.xml", model, data)
-            streamer.serve()
+            streamer.start_webrtc()
         
         Example (video + simulation)::
         
             streamer.configure_video(device=None, size="1280x720")
             streamer.configure_sim("scene.xml", model, data)
-            streamer.serve()
+            streamer.start_webrtc()
         """
         self._webrtc_port = port
         
@@ -1776,7 +1823,27 @@ class VisionProStreamer:
             return
         self._log("✅ WebRTC sim-poses channel ready!", force=True)
 
-
+    def start_webrtc(self, port: int = 9999):
+        """
+        Start WebRTC streaming to Vision Pro.
+        
+        This starts the outbound media streaming (video/audio/simulation) to Vision Pro
+        using the configuration set by configure_video(), configure_audio(), and configure_sim().
+        
+        Note: Hand tracking data flows automatically via gRPC when VisionProStreamer is
+        instantiated. This method starts the *outbound* streaming for visual/audio feedback.
+        
+        Args:
+            port: WebRTC server port (default: 9999)
+        
+        Example::
+        
+            streamer = VisionProStreamer(ip=avp_ip)  # Hand tracking starts automatically
+            
+            streamer.configure_video(device=None, size="1280x720")
+            streamer.start_webrtc()  # Start video streaming to Vision Pro
+        """
+        self.serve(port=port)
 
     def wait_for_sim_channel(self, timeout: float = 30.0) -> bool:
         """
@@ -1791,7 +1858,7 @@ class VisionProStreamer:
         Example::
         
             streamer.configure_sim("scene.xml", model, data)
-            streamer.serve()
+            streamer.start_webrtc()
             if streamer.wait_for_sim_channel():
                 # Channel is ready, start simulation
                 while True:
