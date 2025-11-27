@@ -15,7 +15,6 @@ struct ContentView: View {
     @State private var showSettings = false
     @State private var serverReady = false
     @State private var showWhatsNew = false
-    @State private var pulseNewBadge = false
     
     private var isNewUser: Bool {
         UserDefaults.standard.string(forKey: lastSeenVersionKey) != currentAppVersion
@@ -26,54 +25,88 @@ struct ContentView: View {
             VStack(spacing: 4) {
                 Text("VisionProTeleop")
                     .font(.system(size: 72, weight: .bold))
-                Text("Tracking Streamer")
-                    .font(.largeTitle)
-                    .foregroundColor(.secondary)
+                HStack(spacing: 0) {
+                    Text("Tracking Streamer")
+                        .font(.largeTitle)
+                        .foregroundColor(.secondary)
+                    
+                    // Clickable version badge
+                    Button {
+                        showWhatsNew = true
+                    } label: {
+                        Text("v2.0")
+                            .font(.subheadline.bold())
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color.gray.opacity(0.6))
+                            .cornerRadius(8)
+                    }
+                    .buttonStyle(.borderless)
+                    .hoverEffect(.highlight)
+                    .padding(.leading, 8)
+                }
             }
             .padding(.top, 32)
-            
-            // Main START button with NEW badge for updated features
-            ZStack(alignment: .topTrailing) {
+                
+            // Animated data flow visualization + START button
+            HStack(spacing: 10) {
+                // Video/Audio/Sim label (left side)
+                VStack(spacing: 4) {
+                    Image(systemName: "video.fill")
+                        .font(.title)
+                        .foregroundColor(.green)
+                    Text("Video · Audio")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text("Sim (MuJoCo)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .frame(width: 120)
+                
+                // Arrows flowing right (from video/audio/sim toward button)
+                AnimatedArrows(color: .green)
+                    
+                    // Simple START button
                 Button {
                     Task {
                         await self.openImmersiveSpace(id: "combinedStreamSpace")
                         self.dismissWindow()
                     }
                 } label: {
-                    VStack(spacing: 8) {
-                        Text("START")
-                            .font(.largeTitle.bold())
-                        Text("Hand Tracking + Video · Audio · Sim AR ")
-                            .font(.title3)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.vertical, 20)
-                    .padding(.horizontal, 32)
-                    .background(
-                        LinearGradient(
-                            colors: [Color.purple.opacity(0.3), Color.blue.opacity(0.2)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+                    Text("START")
+                        .font(.system(size: 36, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.vertical, 20)
+                        .padding(.horizontal, 60)
+                        .background(
+                            LinearGradient(
+                                colors: [Color.green, Color.orange],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
                         )
-                    )
-                    .cornerRadius(16)
+                        .cornerRadius(16)
                 }
                 .buttonStyle(.plain)
                 
-                // "NEW" badge for returning users
-                if isNewUser {
-                    Text("NEW")
-                        .font(.caption.bold())
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.orange)
-                        .cornerRadius(8)
-                        .offset(x: 10, y: -10)
-                        .scaleEffect(pulseNewBadge ? 1.1 : 1.0)
-                        .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: pulseNewBadge)
-                        .onAppear { pulseNewBadge = true }
+                // Arrows flowing right (from button toward hand tracking)
+                AnimatedArrows(color: .orange)
+                
+                // Hand/Head tracking label (right side)
+                VStack(spacing: 4) {
+                    Image(systemName: "hand.raised.fill")
+                        .font(.title)
+                        .foregroundColor(.orange)
+                    Text("Hand / Head")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text("Tracking")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
+                .frame(width: 100)
             }
             .padding(.top, 16)
             
@@ -114,24 +147,8 @@ struct ContentView: View {
                 }
             }
             
-            // Settings and Exit buttons
+            // Exit button
             HStack(spacing: 24) {
-                
-                // What's New button (always available)
-                Button {
-                    showWhatsNew = true
-                } label: {
-                    ZStack {
-                        Circle()
-                            .fill(Color.blue.opacity(0.8))
-                            .frame(width: 50, height: 50)
-                        Image(systemName: "sparkles")
-                            .font(.title2.bold())
-                            .foregroundColor(.white)
-                    }
-                }
-                .buttonStyle(.plain)
-                
                 Button {
                     exit(0)
                 } label: {
@@ -274,6 +291,48 @@ struct FeatureRow: View {
                     .foregroundColor(.secondary)
             }
         }
+    }
+}
+
+// MARK: - Animated Arrows Component
+struct AnimatedArrows: View {
+    let color: Color
+    
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1/60)) { timeline in
+            Canvas { context, size in
+                let time = timeline.date.timeIntervalSinceReferenceDate
+                let dotCount = 8
+                let dotSpacing: CGFloat = 8
+                let totalWidth = CGFloat(dotCount) * dotSpacing
+                let startX = (size.width - totalWidth) / 2
+                let centerY = size.height / 2
+                
+                // Animation phase (0 to 1, cycling every 0.8 seconds)
+                let phase = (time.truncatingRemainder(dividingBy: 0.8)) / 0.8
+                
+                for i in 0..<dotCount {
+                    let baseX = startX + CGFloat(i) * dotSpacing
+                    
+                    // Calculate opacity based on wave position
+                    let normalizedPos = Double(i) / Double(dotCount - 1)
+                    let wavePos = phase
+                    
+                    // Create traveling wave effect
+                    var diff = normalizedPos - wavePos
+                    if diff < 0 { diff += 1.0 }
+                    
+                    let opacity = diff < 0.4 ? (1.0 - diff / 0.4) * 0.85 + 0.15 : 0.15
+                    
+                    // Draw dot
+                    let dotSize: CGFloat = 4
+                    let rect = CGRect(x: baseX - dotSize/2, y: centerY - dotSize/2, width: dotSize, height: dotSize)
+                    let path = Path(ellipseIn: rect)
+                    context.fill(path, with: .color(color.opacity(opacity)))
+                }
+            }
+        }
+        .frame(width: 70, height: 24)
     }
 }
 

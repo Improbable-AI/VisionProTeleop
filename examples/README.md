@@ -4,22 +4,25 @@
 
 ## Feature Comparison
 
-| Example | Description | Hardware Camera | Update Method | Audio | Stereo Video |
-|---------|-------------|----------------|--------------|-------|--------------|
-| **[01_visualize_hand_callback.py](01_visualize_hand_callback.py)** | Hand tracking visualization with callback method | ❌ | Callback | ❌ | ❌ |
-| **[02_visualize_hand_direct.py](02_visualize_hand_direct.py)** | Hand tracking visualization with direct frame updates | ❌ | Direct | ❌ | ❌ |
-| **[03_visualize_hand_with_audio_callback.py](03_visualize_hand_with_audio_callback.py)** | Hand tracking with beep sounds on pinch gestures | ❌ | Callback | ✅ | ❌ |
-| **[04_stereo_depth_visualization.py](04_stereo_depth_visualization.py)** | Stereoscopic 3D hand tracking with depth perception | ❌ | Callback | ❌ | ✅ |
-| **[05_text_scroller_callback.py](05_text_scroller_callback.py)** | Animated text and graphics without camera input | ❌ | Callback | ❌ | ❌ |
-| **[06_stream_from_camera.py](06_stream_from_camera.py)** | Stream live camera feed to Vision Pro | ✅ | Callback | ❌ | ❌ |
-| **[07_process_frames.py](07_process_frames.py)** | Camera streaming with custom frame processing | ✅ | Callback | ❌ | ❌ |
-| **[08_stream_audio_file.py](08_stream_audio_file.py)** | Hand tracking with looping audio file playback | ❌ | Callback | ✅ | ❌ |
+| Example | Description | Hardware Camera | Update Method | Audio | Stereo Video | MuJoCo |
+|---------|-------------|----------------|--------------|-------|--------------|--------|
+| **[01_visualize_hand_callback.py](01_visualize_hand_callback.py)** | Hand tracking visualization with callback method | ❌ | Callback | ❌ | ❌ | ❌ |
+| **[02_visualize_hand_direct.py](02_visualize_hand_direct.py)** | Hand tracking visualization with direct frame updates | ❌ | Direct | ❌ | ❌ | ❌ |
+| **[03_visualize_hand_with_audio_callback.py](03_visualize_hand_with_audio_callback.py)** | Hand tracking with beep sounds on pinch gestures | ❌ | Callback | ✅ | ❌ | ❌ |
+| **[04_stereo_depth_visualization.py](04_stereo_depth_visualization.py)** | Stereoscopic 3D hand tracking with depth perception | ❌ | Callback | ❌ | ✅ | ❌ |
+| **[05_text_scroller_callback.py](05_text_scroller_callback.py)** | Animated text and graphics without camera input | ❌ | Callback | ❌ | ❌ | ❌ |
+| **[06_stream_from_camera.py](06_stream_from_camera.py)** | Stream live camera feed to Vision Pro | ✅ | Callback | ❌ | ❌ | ❌ |
+| **[07_process_frames.py](07_process_frames.py)** | Camera streaming with custom frame processing | ✅ | Callback | ❌ | ❌ | ❌ |
+| **[08_stream_audio_file.py](08_stream_audio_file.py)** | Hand tracking with looping audio file playback | ❌ | Callback | ✅ | ❌ | ❌ |
+| **[09_mujoco_streaming.py](09_mujoco_streaming.py)** | MuJoCo simulation replay streaming to Vision Pro | ❌ | N/A | ❌ | ❌ | ✅ |
+| **[10_teleop_osc_franka.py](10_teleop_osc_franka.py)** | Real-time teleoperation of Franka Panda with OSC | ❌ | N/A | ❌ | ❌ | ✅ |
 
 **Legend:**
 - **Hardware Camera**: Whether the example requires a physical camera device (✅) or generates synthetic video (❌)
-- **Update Method**: Whether the example uses callback-based or direct frame update method
+- **Update Method**: Whether the example uses callback-based or direct frame update method (N/A for MuJoCo-only examples)
 - **Audio**: Whether the example includes audio streaming (✅) or not (❌)
 - **Stereo Video**: Whether the example demonstrates stereoscopic 3D video (✅) or standard video (❌)
+- **MuJoCo**: Whether the example streams MuJoCo simulation to Vision Pro (✅) or not (❌)
 
 
 ---
