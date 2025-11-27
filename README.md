@@ -214,11 +214,11 @@ s.configure_sim("robot.xml", model, data, relative_to=[0, 0, 0.8, 90])
 
 **Default Behavior**: VisionOS automatically detects the physical ground and places the origin there (below your feet if standing, below your chair if sitting).
 
-| Scene Type | Example | Recommended `relative_to` |
-|------------|---------|---------------------------|
-| **Locomotion / Mobile** | ![](assets/unitree_g1.png) Unitree G1 | Default (world = ground) |
-| **Mobile Manipulation** | ![](assets/google_robot.png) Google Robot | Default (world = ground) |
-| **Table-top Manipulation** | ![](assets/aloha2.png) ALOHA 2 | `[0, 0, 0.8, 0]` (raise table height) |
+| Examples from [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) | [Unitree G1 XML](https://github.com/google-deepmind/mujoco_menagerie/tree/main/unitree_g1/scene.xml) | [Google Robot XML](https://github.com/google-deepmind/mujoco_menagerie/tree/main/google_robot/scene.xml) | [ALOHA 2 XML](https://github.com/google-deepmind/mujoco_menagerie/blob/main/aloha/scene.xml) |
+|-------|---------|----------|----------|
+| Visualization of `world` frame | ![](assets/unitree_g1.png)  | ![](assets/google_robot.png)     | ![](assets/aloha2.png)     |
+|  | `world` frame is attached on a "ground".     | `world` frame is attached on a "ground".     | `world` frame is attached on a "table".     |
+| Recommended `attach_to` | Default Setting    | Default Setting     | Offset in `z-axis`, that can bring up the table surface to reasonable height in your real world.    |
 
 #### Hand Tracking Coordinate Frame (`origin`)
 
