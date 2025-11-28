@@ -30,9 +30,9 @@ PROJECT_NAME="Tracking Streamer"
 SCHEME="VisionProTeleop"
 BUNDLE_ID="improbable.younghyo.DexTeleop2"
 
-# Use /tmp for build directory to avoid iCloud Drive extended attributes issues
-# iCloud Drive adds resource forks that break code signing
-BUILD_DIR="/tmp/VisionProTeleop-build"
+# Use a persistent build directory outside iCloud Drive for incremental builds
+# This avoids iCloud extended attributes AND preserves build cache between runs
+BUILD_DIR="$HOME/.visionpro-build/VisionProTeleop"
 
 # Xcode path - change this if you want to use a different Xcode version
 XCODE_PATH="/Applications/Xcode.app"
@@ -70,18 +70,24 @@ log_error() {
 }
 
 print_usage() {
-    echo "Usage: $0 [build|device|simulator]"
+    echo "Usage: $0 [build|device|simulator|logs-simulator|logs-device|clean]"
     echo ""
     echo "Arguments:"
-    echo "  build       Build only, no install (default, fastest for checking errors)"
-    echo "  device      Build and install on physical Vision Pro"
-    echo "  simulator   Build and install on visionOS Simulator"
+    echo "  build           Build only, no install (default, fastest for checking errors)"
+    echo "  device          Build and install on physical Vision Pro"
+    echo "  simulator       Build and install on visionOS Simulator"
+    echo "  logs-simulator  Stream console logs from visionOS Simulator"
+    echo "  logs-device     Stream console logs from physical Vision Pro"
+    echo "  clean           Delete build cache to force full rebuild"
     echo ""
     echo "Examples:"
-    echo "  $0              # Just build (check for errors)"
-    echo "  $0 build        # Same as above"
-    echo "  $0 device       # Build and install on Vision Pro"
-    echo "  $0 simulator    # Build and install on Simulator"
+    echo "  $0                  # Just build (check for errors)"
+    echo "  $0 build            # Same as above"
+    echo "  $0 device           # Build and install on Vision Pro"
+    echo "  $0 simulator        # Build and install on Simulator"
+    echo "  $0 logs-simulator   # View simulator logs (Ctrl+C to stop)"
+    echo "  $0 logs-device      # View device logs (Ctrl+C to stop)"
+    echo "  $0 clean            # Clean build cache"
 }
 
 check_xcode() {
@@ -194,7 +200,7 @@ build_only() {
             -configuration Debug \
             -derivedDataPath "$BUILD_DIR" \
             build \
-            | xcpretty --color
+            2>&1 | grep -v "DTDKRemoteDeviceConnection\|passcode protected" | xcpretty --color
     else
         xcodebuild \
             -project "$PROJECT_DIR/$PROJECT_NAME.xcodeproj" \
@@ -202,7 +208,8 @@ build_only() {
             -destination "platform=visionOS Simulator,id=$sim_id" \
             -configuration Debug \
             -derivedDataPath "$BUILD_DIR" \
-            build
+            build \
+            2>&1 | grep -v "DTDKRemoteDeviceConnection\|passcode protected"
     fi
     
     log_success "Build completed successfully - no errors!"
@@ -224,7 +231,7 @@ build_for_simulator() {
             -configuration Debug \
             -derivedDataPath "$BUILD_DIR" \
             build \
-            | xcpretty --color
+            2>&1 | grep -v "DTDKRemoteDeviceConnection\|passcode protected" | xcpretty --color
     else
         xcodebuild \
             -project "$PROJECT_DIR/$PROJECT_NAME.xcodeproj" \
@@ -232,7 +239,8 @@ build_for_simulator() {
             -destination "platform=visionOS Simulator,id=$sim_id" \
             -configuration Debug \
             -derivedDataPath "$BUILD_DIR" \
-            build
+            build \
+            2>&1 | grep -v "DTDKRemoteDeviceConnection\|passcode protected"
     fi
     
     log_success "Build completed for simulator"
@@ -255,7 +263,7 @@ build_for_device() {
             -derivedDataPath "$BUILD_DIR" \
             -allowProvisioningUpdates \
             build \
-            | xcpretty --color
+            2>&1 | grep -v "DTDKRemoteDeviceConnection\|passcode protected" | xcpretty --color
     else
         xcodebuild \
             -project "$PROJECT_DIR/$PROJECT_NAME.xcodeproj" \
@@ -264,7 +272,8 @@ build_for_device() {
             -configuration Debug \
             -derivedDataPath "$BUILD_DIR" \
             -allowProvisioningUpdates \
-            build
+            build \
+            2>&1 | grep -v "DTDKRemoteDeviceConnection\|passcode protected"
     fi
     
     log_success "Build completed for device"
@@ -363,7 +372,7 @@ main() {
     
     # Validate argument
     case "$target" in
-        build|device|simulator)
+        build|device|simulator|logs-simulator|logs-device|clean)
             ;;
         -h|--help|help)
             print_usage
@@ -376,13 +385,44 @@ main() {
             ;;
     esac
     
+    # Handle clean command early (doesn't need Xcode check)
+    if [ "$target" = "clean" ]; then
+        log_info "Cleaning build cache..."
+        rm -rf "$BUILD_DIR"
+        log_success "Build cache deleted: $BUILD_DIR"
+        exit 0
+    fi
+    
     # Check prerequisites
     check_xcode
     
     # Create build directory
     mkdir -p "$BUILD_DIR"
     
-    if [ "$target" = "build" ]; then
+    if [ "$target" = "logs-simulator" ]; then
+        log_info "Streaming logs from visionOS Simulator..."
+        log_info "Filtering for: $BUNDLE_ID"
+        log_info "Press Ctrl+C to stop"
+        echo ""
+        
+        SIM_ID=$(get_simulator_id)
+        # Stream logs from simulator, filtering by our bundle ID
+        xcrun simctl spawn "$SIM_ID" log stream --predicate "subsystem CONTAINS '$BUNDLE_ID' OR process CONTAINS 'Tracking Streamer'" --style compact
+        exit 0
+        
+    elif [ "$target" = "logs-device" ]; then
+        log_info "Streaming logs from Vision Pro device..."
+        log_info "Filtering for: $BUNDLE_ID"
+        log_info "Press Ctrl+C to stop"
+        echo ""
+        
+        DEVICE_ID=$(get_device_id)
+        # Stream logs from device using devicectl
+        xcrun devicectl device info consoleOutput --device "$DEVICE_ID" 2>/dev/null || \
+            log stream --device "$DEVICE_ID" --predicate "subsystem CONTAINS '$BUNDLE_ID' OR process CONTAINS 'Tracking Streamer'" --style compact
+        exit 0
+        
+    elif [ "$target" = "build" ]; then
         log_info "Target: Build only (checking for errors)"
         echo ""
         

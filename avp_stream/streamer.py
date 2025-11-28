@@ -533,6 +533,10 @@ class VisionProStreamer:
         self._current_poses: Dict[str, Dict[str, Any]] = {}
         self._attach_to_mat = np.eye(4)
         self._session_id = f"avpstream_{int(time.time())}"
+        
+        # Sim benchmark state
+        self._sim_benchmark_enabled = False
+        self._sim_benchmark_seq = 0
 
         self._start_info_server()  # Start HTTP endpoint immediately
         self._start_hand_tracking()  # Start hand tracking stream
@@ -678,8 +682,44 @@ class VisionProStreamer:
 
         @channel.on("message")
         def _on_message(message):
-            # Currently we don't expect messages back from VisionPro on this channel
-            pass
+            # Handle benchmark echoes from VisionPro
+            self._handle_sim_benchmark_message(message)
+
+    def _handle_sim_benchmark_message(self, message):
+        """Handle benchmark echo messages from the sim-poses channel."""
+        try:
+            if isinstance(message, str):
+                data = json.loads(message)
+            else:
+                data = json.loads(message.decode('utf-8') if isinstance(message, bytes) else str(message))
+            
+            # Check for benchmark echo: {"b": {"s": sequence_id, "t": sent_timestamp_ms}}
+            if "b" in data:
+                bench = data["b"]
+                sequence_id = bench.get("s")
+                sent_timestamp_ms = bench.get("t")
+                swift_detected_ms = bench.get("d")  # Optional: Swift's detection timestamp
+                
+                if sequence_id is not None and sent_timestamp_ms is not None:
+                    python_receive_ms = int((time.perf_counter() - self._benchmark_epoch) * 1000)
+                    
+                    event = {
+                        "sequence_id": sequence_id,
+                        "sent_timestamp_ms": sent_timestamp_ms,
+                        "swift_detected_ms": swift_detected_ms,
+                        "python_receive_ms": python_receive_ms,
+                        "round_trip_ms": python_receive_ms - sent_timestamp_ms,
+                        "source": "sim-poses"
+                    }
+                    
+                    with self._benchmark_condition:
+                        self._benchmark_events[sequence_id] = event
+                        self._benchmark_condition.notify_all()
+                    
+                    if not self.benchmark_quiet:
+                        self._log(f"🧪 Sim benchmark seq={sequence_id} round-trip={event['round_trip_ms']} ms")
+        except (json.JSONDecodeError, ValueError, TypeError):
+            pass  # Not a benchmark message, ignore
 
     def _start_hand_tracking(self): 
         """Start the hand tracking gRPC stream in a background thread."""
@@ -1287,6 +1327,7 @@ class VisionProStreamer:
                 if current_poses:
                     # Build compact JSON message for poses
                     # Format: {"t": timestamp, "p": {"body_name": [x,y,z,qx,qy,qz,qw], ...}}
+                    # With benchmark: {"t": ..., "p": {...}, "b": {"s": seq, "t": sent_ms}}
                     pose_dict = {}
                     for body_name, pose_data in current_poses.items():
                         if not body_name:
@@ -1301,7 +1342,18 @@ class VisionProStreamer:
                         ]
                     
                     if pose_dict:
-                        message = json.dumps({"t": time.time(), "p": pose_dict})
+                        msg_data = {"t": time.time(), "p": pose_dict}
+                        
+                        # Add benchmark data if enabled
+                        if self._sim_benchmark_enabled:
+                            sent_ms = int((time.perf_counter() - self._benchmark_epoch) * 1000)
+                            msg_data["b"] = {
+                                "s": self._sim_benchmark_seq,
+                                "t": sent_ms
+                            }
+                            self._sim_benchmark_seq += 1
+                        
+                        message = json.dumps(msg_data)
                         try:
                             # Send using the WebRTC event loop's thread-safe call
                             if self._webrtc_loop is not None:
@@ -1884,7 +1936,34 @@ class VisionProStreamer:
         with self._benchmark_condition:
             self._benchmark_epoch = epoch
             self._benchmark_events.clear()
+        self._sim_benchmark_seq = 0  # Also reset sim benchmark sequence
         return self._benchmark_epoch
+
+    def enable_sim_benchmark(self, enabled: bool = True):
+        """Enable or disable simulation benchmark mode.
+        
+        When enabled, each pose update includes a sequence ID and timestamp
+        that Swift can echo back to measure round-trip latency.
+        
+        Args:
+            enabled: Whether to enable benchmark mode
+            
+        Example::
+        
+            streamer.enable_sim_benchmark(True)
+            streamer.reset_benchmark_epoch()
+            
+            # After some updates, check for echoes
+            event = streamer.wait_for_benchmark_event(sequence_id, timeout=1.0)
+            if event:
+                print(f"Round-trip: {event['round_trip_ms']} ms")
+        """
+        self._sim_benchmark_enabled = enabled
+        if enabled:
+            self._sim_benchmark_seq = 0
+            self._log("🧪 Sim benchmark mode enabled")
+        else:
+            self._log("🧪 Sim benchmark mode disabled")
 
     def update_stream_resolution(self, size):
         """Request the video track to emit frames at a new resolution.

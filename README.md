@@ -6,7 +6,7 @@ VisionProTeleop
 
 
 <div align="center">
-  <img width="340" src="assets/new-logo.png">
+  <img width="340" src="assets/vptv2.png">
 </div>
 <p align="center">
   <a href="https://pypi.org/project/avp_stream/">
@@ -26,7 +26,12 @@ This VisionOS app and python library streams your Head + Wrist + Hand Tracking r
 
 > **For a more detailed explanation, check out this short [paper](./assets/short_paper_new.pdf).*
 
+## Supported Features
 
+- [x] Wrist / Fingers / Head Tracking
+- [x] Video Streaming
+- [x] Audio Streaming
+- [x] MuJoCo Environment Streaming in AR
 
 
 ## Latency Benchmark Results
@@ -34,8 +39,8 @@ This VisionOS app and python library streams your Head + Wrist + Hand Tracking r
 We performed comprehensive round-trip latency measurements to benchmark our video streaming system. The measurement captures the full cycle: 
 1. Python encodes a timestamp into a video frame as a marker
 2. WebRTC transmission happens over the network
-3. Vision Pro decodes the image, and reads the marekr
-4. sends timing data back via gRPC 
+3. Vision Pro decodes the image, and reads the marker ID 
+4. sends the marker ID back to Python.
 5. Python calculates latency. 
 
 This provides a conservative upper bound on user-experienced latency. According to our own testing, the system can consistently hit under 100ms both in wired mode and wireless mode for resolution under 720p. When wired up (requires developer strap), you can get stable 50ms latency even for **stereo 4K streaming**. 

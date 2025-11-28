@@ -389,12 +389,35 @@ extension WebRTCClient: LKRTCDataChannelDelegate {
 
     func dataChannel(_ dataChannel: LKRTCDataChannel, didReceiveMessageWith buffer: LKRTCDataBuffer) {
         if dataChannel.label == "sim-poses" {
-            // Parse JSON pose data: {"t": timestamp, "p": {"body_name": [x,y,z,qx,qy,qz,qw], ...}}
+            // Parse JSON pose data: {"t": timestamp, "p": {"body_name": [x,y,z,qx,qy,qz,qw], ...}, "b": {...}}
             guard let jsonString = String(data: buffer.data, encoding: .utf8),
                   let jsonData = jsonString.data(using: .utf8),
                   let parsed = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
                   let poses = parsed["p"] as? [String: [NSNumber]] else {
                 return
+            }
+            
+            // Check for benchmark data and echo back
+            if let benchmarkData = parsed["b"] as? [String: Any],
+               let sequenceId = benchmarkData["s"] as? Int,
+               let sentTimestamp = benchmarkData["t"] as? Int {
+                // Echo benchmark data back to Python for round-trip measurement
+                let nowNanoseconds = DispatchTime.now().uptimeNanoseconds
+                let detectedMs = Int(nowNanoseconds / 1_000_000) % Int(Int32.max)  // Relative timestamp
+                
+                let echoData: [String: Any] = [
+                    "b": [
+                        "s": sequenceId,
+                        "t": sentTimestamp,
+                        "d": detectedMs  // Swift detection time
+                    ]
+                ]
+                
+                if let echoJson = try? JSONSerialization.data(withJSONObject: echoData),
+                   let echoString = String(data: echoJson, encoding: .utf8) {
+                    let rtcBuffer = LKRTCDataBuffer(data: echoString.data(using: .utf8)!, isBinary: false)
+                    dataChannel.sendData(rtcBuffer)
+                }
             }
             
             // Convert to [String: [Float]]
