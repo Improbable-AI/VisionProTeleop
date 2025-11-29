@@ -1,3 +1,5 @@
+"""Stream hand tracking data from Vision Pro and print the latest tracking state."""
+
 from avp_stream import VisionProStreamer
 import time 
 

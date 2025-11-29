@@ -1,10 +1,4 @@
-"""
-Example: Visualizing hand tracking using direct frame updates
-
-This example shows how to use the update_frame() method to directly
-push frames to the VisionPro, giving you full control over when and
-how frames are generated.
-"""
+"""Visualize hand tracking data in 2D using direct frame updates with update_frame()."""
 
 from avp_stream.streamer import VisionProStreamer
 import cv2

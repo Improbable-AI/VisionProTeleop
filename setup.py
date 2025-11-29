@@ -9,7 +9,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         'numpy', 'grpcio', 'grpcio-tools', 'matplotlib', 'opencv-python', 
-        'aiortc', 'av', 'requests', 'pyyaml', 'mujoco', 'tqdm', 'scipy', 
+        'aiortc', 'av', 'requests', 'pyyaml', 'mujoco', 'tqdm', 'scipy', 'pydub',
     ],
     extras_require={
     },

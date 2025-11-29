@@ -1,15 +1,4 @@
-"""
-Example: MuJoCo Simulation Streaming to Vision Pro
-
-This example demonstrates how to stream a MuJoCo simulation to the Vision Pro
-using the VisionProStreamer API. It replays pre-recorded robot trajectories.
-
-The simulation poses are streamed via WebRTC data channel for low latency,
-while the USDZ model file is sent via gRPC (one-time transfer).
-
-Example:
-    python examples/09_mujoco_streaming.py --viewer ar --ip 10.29.239.70
-"""
+"""Stream MuJoCo simulation to Vision Pro, replaying pre-recorded robot trajectories."""
 
 import numpy as np
 from tqdm import trange

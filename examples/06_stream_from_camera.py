@@ -1,13 +1,5 @@
 #!/usr/bin/env python3
-"""
-Example script demonstrating video streaming from Python to VisionOS.
-
-Usage:
-1. Launch the VisionOS app on Vision Pro
-2. Press "Start" with video streaming toggled ON
-3. Run this script: python example_video_streaming.py
-4. The video feed should appear in the VisionOS app
-"""
+"""Stream video from a local camera to Vision Pro via WebRTC."""
 
 from avp_stream.streamer import VisionProStreamer
 import time

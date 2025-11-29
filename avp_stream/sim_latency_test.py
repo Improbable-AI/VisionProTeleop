@@ -782,8 +782,8 @@ def run_roundtrip_test(args):
             mujoco.mj_step(model, data)
             streamer.update_sim()
             
-            # Wait for benchmark echo
-            event = streamer.wait_for_benchmark_event(current_seq, timeout=0.5)
+            # Wait for benchmark echo (use source="sim" for sim-poses channel)
+            event = streamer.wait_for_benchmark_event(current_seq, timeout=0.5, source="sim")
             
             if event and event.get("round_trip_ms") is not None:
                 latencies.append(event["round_trip_ms"])

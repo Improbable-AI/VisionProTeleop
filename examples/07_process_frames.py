@@ -1,9 +1,4 @@
-"""
-Example: Using custom frame processing with VisionProStreamer
-
-This example shows how to register a callback function to process
-video frames before they are sent via WebRTC to the Vision Pro.
-"""
+"""Apply custom frame processing (overlays, filters) to camera video before streaming."""
 
 from avp_stream.streamer import VisionProStreamer
 import cv2

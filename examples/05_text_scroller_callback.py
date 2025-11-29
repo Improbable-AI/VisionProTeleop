@@ -1,10 +1,4 @@
-"""
-Example: Text scroller using frame callbacks
-
-This example shows how to use register_frame_callback() to create
-a scrolling text animation. The callback is invoked automatically
-by the video streaming system.
-"""
+"""Stream animated graphics (text scroller, gradient, shapes) using frame callbacks."""
 
 from avp_stream.streamer import VisionProStreamer
 import cv2

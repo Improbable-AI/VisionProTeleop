@@ -1,13 +1,4 @@
-"""
-Example 7: Stereo Vision with Depth Perception
-
-This example creates a synthetic stereo video stream that uses binocular disparity
-to create depth perception. The hand tracking visualization uses the Z-axis position
-to create different disparities between left and right eye views, making objects
-appear at different depths in 3D space.
-
-This demonstrates how stereo vision can enhance spatial awareness in VR/AR applications.
-"""
+"""Visualize hand tracking with stereo depth perception using binocular disparity."""
 
 from avp_stream.streamer import VisionProStreamer
 import cv2

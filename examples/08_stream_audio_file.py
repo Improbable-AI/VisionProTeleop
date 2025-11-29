@@ -1,13 +1,6 @@
-"""
-Example 6: Stream audio file (MP3/WAV) with hand tracking visualization
+"""Stream an audio file (MP3/WAV) in a loop while displaying hand tracking visualization.
 
-This example shows how to stream an audio file in a loop to Vision Pro
-while displaying hand tracking visualization. Useful for playing background
-music, instructions, or any pre-recorded audio.
-
-Requirements:
-- pydub: pip install pydub
-- ffmpeg: brew install ffmpeg (on macOS)
+Requires: pydub (pip install pydub), ffmpeg (brew install ffmpeg)
 """
 
 from avp_stream.streamer import VisionProStreamer

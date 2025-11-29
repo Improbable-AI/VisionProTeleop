@@ -1,13 +1,4 @@
-"""
-Example: Hand tracking visualization with audio feedback
-
-This example visualizes hand tracking data and plays a beep sound
-whenever a pinch gesture is detected on either hand. The audio is
-generated programmatically and streamed in real-time to Vision Pro.
-
-Audio/Video synchronization is achieved using the MediaClock system,
-which ensures both tracks share a common timing reference.
-"""
+"""Visualize hand tracking with audio feedback that beeps on pinch gestures."""
 
 from avp_stream.streamer import VisionProStreamer
 import cv2

@@ -200,7 +200,7 @@ def _create_processed_audio_track_class(streamer_instance):
                 self.player = MediaPlayer(audio_device, format=fmt, options={})
                 self.audio_track = self.player.audio
                 channels = "stereo" if stereo else "mono"
-                self._streamer._log(f"🎤 Audio initialized from device: {audio_device} ({channels})")
+                self._streamer._log(f"[AUDIO] Initialized from device: {audio_device} ({channels})")
             else:
                 # Generate frames programmatically
                 self.player = None
@@ -209,7 +209,7 @@ def _create_processed_audio_track_class(streamer_instance):
                 self.samples_per_frame = max(1, int(self.sample_rate * frame_duration_s))
                 channels = "stereo" if stereo else "mono"
                 self._streamer._log(
-                    "🎤 Synthetic audio initialized "
+                    "[AUDIO] Synthetic audio initialized "
                     f"({self.sample_rate}Hz, {self.samples_per_frame} samples/frame, {channels}, 20ms frames)"
                 )
         
@@ -227,7 +227,7 @@ def _create_processed_audio_track_class(streamer_instance):
                         processed_frame = self.callback(frame)
                         return processed_frame
                     except Exception as e:
-                        self._streamer._log(f"⚠️  Audio callback error: {e}", force=True)
+                        self._streamer._log(f"[AUDIO] Callback error: {e}", force=True)
                         return frame
                 else:
                     return frame
@@ -251,7 +251,7 @@ def _create_processed_audio_track_class(streamer_instance):
                 # Log first few frames
                 if self._sample_count < self.samples_per_frame * 3:
                     frame_num = self._sample_count // self.samples_per_frame
-                    self._streamer._log(f"🎤 Generated audio frame #{frame_num}: {self.samples_per_frame} samples, {frame.sample_rate}Hz, {layout}")
+                    self._streamer._log(f"[AUDIO] Generated frame #{frame_num}: {self.samples_per_frame} samples, {frame.sample_rate}Hz, {layout}")
                 
                 # Use MediaClock for precise timing
                 sleep_time = clock.wait_until_audio_time(
@@ -265,7 +265,7 @@ def _create_processed_audio_track_class(streamer_instance):
                 elif sleep_time < -0.05:  # More than 50ms behind
                     self._drift_corrections += 1
                     if self._drift_corrections <= 3:
-                        self._streamer._log(f"⚠️  Audio drift: {-sleep_time*1000:.0f}ms behind (correction #{self._drift_corrections})")
+                        self._streamer._log(f"[AUDIO] Drift warning: {-sleep_time*1000:.0f}ms behind (correction #{self._drift_corrections})")
                 
                 # Apply callback if registered (callback should generate audio)
                 if self.callback is not None:
@@ -273,10 +273,10 @@ def _create_processed_audio_track_class(streamer_instance):
                         processed_frame = self.callback(frame)
                         self._sample_count += self.samples_per_frame
                         if self._sample_count == self.samples_per_frame * 10:
-                            self._streamer._log(f"🎤 Audio streaming normally (~20ms per frame, synced with MediaClock)")
+                            self._streamer._log(f"[AUDIO] Streaming normally (~20ms per frame, synced with MediaClock)")
                         return processed_frame
                     except Exception as e:
-                        self._streamer._log(f"⚠️  Audio callback error: {e}", force=True)
+                        self._streamer._log(f"[AUDIO] Callback error: {e}", force=True)
                         if self._streamer.verbose:
                             traceback.print_exc()
                         self._sample_count += self.samples_per_frame
@@ -321,7 +321,7 @@ def _create_processed_video_track_class(streamer_instance):
                 }
                 self.player = MediaPlayer(device, format=fmt, options=opts)
                 self.video_track = self.player.video
-                self._streamer._log("🎥 Camera initialized, warming up encoder...")
+                self._streamer._log("[VIDEO] Camera initialized, warming up encoder...")
             else:
                 # Generate frames programmatically
                 self.player = None
@@ -332,10 +332,10 @@ def _create_processed_video_track_class(streamer_instance):
         def set_resolution(self, resolution):
             width, height = resolution
             if width <= 0 or height <= 0:
-                self._streamer._log(f"⚠️  Ignoring invalid resolution update: {width}x{height}", force=True)
+                self._streamer._log(f"[VIDEO] Warning: Ignoring invalid resolution update: {width}x{height}", force=True)
                 return
             self.width, self.height = width, height
-            self._streamer._log(f"🔧 ProcessedVideoTrack target resolution set to {width}x{height}")
+            self._streamer._log(f"[VIDEO] ProcessedVideoTrack target resolution set to {width}x{height}")
             
         async def recv(self):
             # Ensure MediaClock is started
@@ -375,7 +375,7 @@ def _create_processed_video_track_class(streamer_instance):
                 if self.warmup_frames < 10:
                     self.warmup_frames += 1
                     if self.warmup_frames == 10:
-                        self._streamer._log("✅ Encoder warmed up - optimal encoding should begin")
+                        self._streamer._log("[VIDEO] Encoder warmed up - optimal encoding should begin")
                 
                 # Apply user callback if registered
                 if self.callback is not None:
@@ -414,7 +414,7 @@ def _create_processed_video_track_class(streamer_instance):
                     # Track drift but don't reset clock (MediaClock is shared)
                     self._drift_corrections += 1
                     if self._drift_corrections <= 3:
-                        self._streamer._log(f"⚠️  Video drift: {-wait_time*1000:.0f}ms behind (correction #{self._drift_corrections})")
+                        self._streamer._log(f"[VIDEO] Drift warning: {-wait_time*1000:.0f}ms behind (correction #{self._drift_corrections})")
                 
                 # Check if user provided a frame override
                 if self._streamer.user_frame is not None:
@@ -586,7 +586,7 @@ class VisionProStreamer:
             transformations["right_wrist_roll"] = get_wrist_roll(transformations["right_wrist"])
             transformations["left_wrist_roll"] = get_wrist_roll(transformations["left_wrist"])
         except Exception as exc:
-            self._log(f"⚠️  Failed to process hand update from {source}: {exc}", force=True)
+            self._log(f"[HAND-TRACKING] Failed to process hand update from {source}: {exc}", force=True)
             return
 
         with self._latest_lock:
@@ -613,21 +613,24 @@ class VisionProStreamer:
             "swift_detected_ms": swift_detected_ms,
             "python_receive_ms": python_receive_ms,
             "round_trip_ms": None if sent_timestamp_ms is None else python_receive_ms - sent_timestamp_ms,
+            "source": "video"
         }
 
+        # Use namespaced key to avoid collision with sim benchmark
+        event_key = f"video:{sequence_id}"
         with self._benchmark_condition:
-            self._benchmark_events[sequence_id] = event
+            self._benchmark_events[event_key] = event
             self._benchmark_condition.notify_all()
 
         if not self.benchmark_quiet:
             if event["round_trip_ms"] is not None:
-                self._log(f"🧪 Benchmark seq={sequence_id} round-trip={event['round_trip_ms']} ms")
+                self._log(f"[BENCHMARK] seq={sequence_id} round-trip={event['round_trip_ms']} ms")
             else:
-                self._log(f"🧪 Benchmark seq={sequence_id} received (missing sent timestamp)")
+                self._log(f"[BENCHMARK] seq={sequence_id} received (missing sent timestamp)")
 
     def _handle_webrtc_hand_message(self, message):
         if isinstance(message, str):
-            self._log("⚠️  Received text message on hand data channel; ignoring")
+            self._log("[WEBRTC] Warning: Received text message on hand data channel; ignoring")
             return
 
         if isinstance(message, memoryview):
@@ -637,12 +640,12 @@ class VisionProStreamer:
         try:
             update.ParseFromString(message)
         except Exception as exc:
-            self._log(f"⚠️  Could not decode hand update from WebRTC data channel: {exc}", force=True)
+            self._log(f"[WEBRTC] Error: Could not decode hand update from data channel: {exc}", force=True)
             return
 
         self._process_hand_update(update, source="webrtc")
         if not self._webrtc_hand_ready:
-            self._log("🟢 WebRTC hand data flow established")
+            self._log("[WEBRTC] Hand data flow established", force=True)
             self._webrtc_hand_ready = True
 
     def _register_webrtc_data_channel(self, channel):
@@ -650,11 +653,11 @@ class VisionProStreamer:
 
         @channel.on("open")
         def _on_open():
-            self._log("🟢 WebRTC hand data channel opened")
+            self._log("[WEBRTC] Hand data channel opened", force=True)
 
         @channel.on("close")
         def _on_close():
-            self._log("🔴 WebRTC hand data channel closed")
+            self._log("[WEBRTC] Hand data channel closed", force=True)
             self._webrtc_hand_ready = False
             self._webrtc_hand_channel = None
 
@@ -668,7 +671,7 @@ class VisionProStreamer:
 
         @channel.on("open")
         def _on_open():
-            self._log("🟢 WebRTC sim-poses data channel opened")
+            self._log("[WEBRTC] Sim-poses data channel opened", force=True)
             self._webrtc_sim_ready = True
             # Start pose streaming once channel is ready
             if self._sim_config is not None:
@@ -676,7 +679,7 @@ class VisionProStreamer:
 
         @channel.on("close")
         def _on_close():
-            self._log("🔴 WebRTC sim-poses data channel closed")
+            self._log("[WEBRTC] Sim-poses data channel closed", force=True)
             self._webrtc_sim_ready = False
             self._webrtc_sim_channel = None
 
@@ -712,12 +715,14 @@ class VisionProStreamer:
                         "source": "sim-poses"
                     }
                     
+                    # Use namespaced key to avoid collision with video benchmark
+                    event_key = f"sim:{sequence_id}"
                     with self._benchmark_condition:
-                        self._benchmark_events[sequence_id] = event
+                        self._benchmark_events[event_key] = event
                         self._benchmark_condition.notify_all()
                     
                     if not self.benchmark_quiet:
-                        self._log(f"🧪 Sim benchmark seq={sequence_id} round-trip={event['round_trip_ms']} ms")
+                        self._log(f"[BENCHMARK] Sim seq={sequence_id} round-trip={event['round_trip_ms']} ms")
         except (json.JSONDecodeError, ValueError, TypeError):
             pass  # Not a benchmark message, ignore
 
@@ -769,9 +774,9 @@ class VisionProStreamer:
                     # Wait for channel to be ready
                     self._log(f"  Waiting for channel to be ready (timeout: 5s)...")
                     grpc.channel_ready_future(channel).result(timeout=5)
-                    self._log("✓ gRPC channel ready")
+                    self._log("[GRPC] Channel ready")
                 except Exception as channel_error:
-                    self._log(f"⚠️  Channel not ready: {type(channel_error).__name__}: {channel_error}")
+                    self._log(f"[GRPC] Warning: Channel not ready: {type(channel_error).__name__}: {channel_error}")
                     channel.close()
                     if attempt < max_retries - 1:
                         time.sleep(retry_delay)
@@ -788,10 +793,10 @@ class VisionProStreamer:
                     # Encode WebRTC info in metadata
                     webrtc_data = f"{msg.Head.m01}|{msg.Head.m02}|{msg.Head.m03}|{msg.Head.m10}|{msg.Head.m11}"
                     metadata.append(('webrtc-info', webrtc_data))
-                    self._log(f"📤 Adding WebRTC info to gRPC metadata: {webrtc_data}")
+                    self._log(f"[GRPC] Adding WebRTC info to metadata: {webrtc_data}")
                 
                 responses = stub.StreamHandUpdates(request, metadata=metadata if metadata else None)
-                self._log("✓ Stream established, waiting for responses...")
+                self._log("[GRPC] Stream established, waiting for responses...")
                 
                 for response in responses:
                     self._process_hand_update(response, source="grpc")
@@ -802,11 +807,11 @@ class VisionProStreamer:
                     
             except grpc.RpcError as e:
                 if attempt < max_retries - 1:
-                    self._log(f"⚠️  Connection failed: {e.code()}. Retrying in {retry_delay}s...")
+                    self._log(f"[GRPC] Connection failed: {e.code()}. Retrying in {retry_delay}s...")
                     time.sleep(retry_delay)
                     retry_delay *= 2  # Exponential backoff
                 else:
-                    self._log(f"❌ Failed to connect after {max_retries} attempts", force=True)
+                    self._log(f"[GRPC] Failed to connect after {max_retries} attempts", force=True)
                     self._log(f"Error: {e}", force=True)
                     self._log("\nMake sure:", force=True)
                     self._log("  1. VisionOS app is running", force=True)
@@ -817,7 +822,7 @@ class VisionProStreamer:
             except Exception as e:
                 error_type = type(e).__name__
                 error_msg = str(e) if str(e) else "(no error message)"
-                self._log(f"❌ An unexpected error occurred: {error_type}: {error_msg}", force=True)
+                self._log(f"[GRPC] Unexpected error: {error_type}: {error_msg}", force=True)
                 if self.verbose:
                     import traceback
                     traceback.print_exc()
@@ -901,7 +906,7 @@ class VisionProStreamer:
         if origin not in {"avp", "sim"}:
             raise ValueError(f"Unsupported origin '{origin}'. Expected 'avp' or 'sim'.")
         self.origin = origin
-        self._log(f"✓ Origin set to '{origin}'")
+        self._log(f"[CONFIG] Origin set to '{origin}'")
     
     def get_sync_timestamp(self) -> Dict[str, Any]:
         """Get synchronized timestamp for use in audio/video callbacks.
@@ -992,7 +997,7 @@ class VisionProStreamer:
             streamer.start_streaming(device=None, stereo_video=True, size="2000x1000")
         """
         self.frame_callback = callback
-        self._log(f"✓ Frame callback registered: {callback.__name__ if hasattr(callback, '__name__') else 'anonymous function'}")
+        self._log(f"[CONFIG] Frame callback registered: {callback.__name__ if hasattr(callback, '__name__') else 'anonymous function'}")
     
     def register_audio_callback(self, callback):
         """
@@ -1023,7 +1028,7 @@ class VisionProStreamer:
             streamer.start_streaming(device=None, stereo_audio=True)
         """
         self.audio_callback = callback
-        self._log(f"✓ Audio callback registered: {callback.__name__ if hasattr(callback, '__name__') else 'anonymous function'}")
+        self._log(f"[CONFIG] Audio callback registered: {callback.__name__ if hasattr(callback, '__name__') else 'anonymous function'}")
     
     def update_frame(self, user_frame):
         """
@@ -1097,7 +1102,7 @@ class VisionProStreamer:
             "height": height,
         }
         
-        self._log(f"✓ Video configured: {size} @ {fps}fps (device={device}, stereo={stereo})")
+        self._log(f"[CONFIG] Video configured: {size} @ {fps}fps (device={device}, stereo={stereo})")
     
     def configure_audio(
         self,
@@ -1135,7 +1140,7 @@ class VisionProStreamer:
             "stereo": stereo,
         }
         
-        self._log(f"✓ Audio configured: {effective_sample_rate}Hz (device={device}, stereo={stereo})")
+        self._log(f"[CONFIG] Audio configured: {effective_sample_rate}Hz (device={device}, stereo={stereo})")
     
     def configure_sim(
         self,
@@ -1219,7 +1224,7 @@ class VisionProStreamer:
         # Automatically switch to simulation-relative coordinates
         self.set_origin("sim")
         
-        self._log(f"✓ Simulation configured: {xml_path} ({len(self._mujoco_bodies)} bodies)")
+        self._log(f"[CONFIG] Simulation configured: {xml_path} ({len(self._mujoco_bodies)} bodies)")
         if attach_to:
             self._log(f"  Position: [{attach_to[0]:.2f}, {attach_to[1]:.2f}, {attach_to[2]:.2f}]")
     
@@ -1237,7 +1242,7 @@ class VisionProStreamer:
                 streamer.update_sim()
         """
         if self._mujoco_model is None or self._mujoco_data is None:
-            self._log("⚠️  No simulation configured. Call configure_sim() first.", force=True)
+            self._log("[SIM] Warning: No simulation configured. Call configure_sim() first.", force=True)
             return
         
         if not self._pose_stream_running:
@@ -1276,11 +1281,11 @@ class VisionProStreamer:
     def _start_pose_streaming(self):
         """Start pose streaming via WebRTC data channel."""
         if self._pose_stream_running:
-            self._log("⚠️ Pose streaming already running")
+            self._log("[SIM] Warning: Pose streaming already running")
             return
         
         if self._sim_config is None:
-            self._log("⚠️ No simulation configured")
+            self._log("[SIM] Warning: No simulation configured")
             return
         
         # If WebRTC channel is already ready, start streaming
@@ -1288,14 +1293,14 @@ class VisionProStreamer:
             self._start_pose_streaming_webrtc()
         else:
             # Streaming will start when the WebRTC channel opens
-            self._log("⏳ Waiting for WebRTC sim-poses channel to open...")
+            self._log("[SIM] Waiting for WebRTC sim-poses channel to open...", force=True)
     
     def _start_pose_streaming_webrtc(self):
         """Start the actual pose streaming loop via WebRTC."""
         if self._pose_stream_running:
             return
         
-        self._log("🔄 Starting pose streaming via WebRTC data channel...")
+        self._log("[SIM] Starting pose streaming via WebRTC data channel...", force=True)
         self._pose_stream_running = True
         self._pose_stream_thread = Thread(target=self._pose_streaming_loop_webrtc, daemon=True)
         self._pose_stream_thread.start()
@@ -1305,14 +1310,14 @@ class VisionProStreamer:
         if not self._pose_stream_running:
             return
         
-        self._log("🛑 Stopping pose streaming...")
+        self._log("[SIM] Stopping pose streaming...")
         self._pose_stream_running = False
         if self._pose_stream_thread:
             self._pose_stream_thread.join(timeout=2.0)
     
     def _pose_streaming_loop_webrtc(self):
         """Background thread to stream poses via WebRTC data channel."""
-        self._log("✅ Pose streaming via WebRTC started!")
+        self._log("[SIM] Pose streaming via WebRTC started!", force=True)
         frame_count = 0
         
         try:
@@ -1364,20 +1369,20 @@ class VisionProStreamer:
                                 self._webrtc_sim_channel.send(message)
                             frame_count += 1
                             if frame_count == 1:
-                                self._log(f"📤 First sim pose sent via WebRTC ({len(pose_dict)} bodies)")
+                                self._log(f"[SIM] First sim pose sent via WebRTC ({len(pose_dict)} bodies)")
                             elif frame_count % 500 == 0:
-                                self._log(f"📤 Sent {frame_count} sim pose updates")
+                                self._log(f"[SIM] Sent {frame_count} sim pose updates")
                         except Exception as e:
-                            self._log(f"⚠️ Failed to send pose via WebRTC: {e}")
+                            self._log(f"[SIM] Warning: Failed to send pose via WebRTC: {e}")
                 
                 time.sleep(0.008)  # ~120 Hz (faster than gRPC was)
         
         except Exception as e:
             if self._pose_stream_running:
-                self._log(f"❌ Pose streaming error: {e}", force=True)
+                self._log(f"[SIM] Error: Pose streaming error: {e}", force=True)
             self._pose_stream_running = False
         
-        self._log(f"🔴 Pose streaming stopped (sent {frame_count} updates)")
+        self._log(f"[SIM] Pose streaming stopped (sent {frame_count} updates)")
     
     def _load_and_send_scene(self):
         """Load USDZ scene and send to VisionPro via gRPC."""
@@ -1395,7 +1400,7 @@ class VisionProStreamer:
             try:
                 usdz_path = self._convert_to_usdz(xml_path)
             except Exception as e:
-                self._log(f"⚠️ Local USDZ conversion failed: {e}")
+                self._log(f"[USDZ] Warning: Local conversion failed: {e}")
                 # Try external converter
                 try:
                     from avp_stream.mujoco_msg.upload_xml import convert_and_download
@@ -1405,7 +1410,7 @@ class VisionProStreamer:
                         out_dir=Path(xml_path).parent
                     )
                 except Exception as e2:
-                    self._log(f"❌ External USDZ conversion also failed: {e2}", force=True)
+                    self._log(f"[USDZ] Error: External conversion also failed: {e2}", force=True)
                     return False
         
         # Send USDZ to VisionPro
@@ -1429,7 +1434,7 @@ class VisionProStreamer:
         usdex.core.saveStage(stage, comment="modified after conversion")
         
         UsdUtils.CreateNewUsdzPackage(asset.path, usdz_output_path)
-        self._log(f"✅ USDZ file created: {usdz_output_path}")
+        self._log(f"[USDZ] File created: {usdz_output_path}")
         
         return usdz_output_path
     
@@ -1459,7 +1464,7 @@ class VisionProStreamer:
                 
                 usdz_filename = os.path.basename(usdz_path)
                 file_size_mb = len(usdz_data) / (1024 * 1024)
-                self._log(f"📊 USDZ file size: {file_size_mb:.2f} MB")
+                self._log(f"[USDZ] File size: {file_size_mb:.2f} MB")
                 
                 # Prepare attach_to parameters
                 attach_position = None
@@ -1475,17 +1480,17 @@ class VisionProStreamer:
                 
                 # Use chunked transfer for files larger than 2MB (more conservative)
                 if file_size_mb > 2.0:
-                    self._log("📦 Using chunked transfer for large file...")
+                    self._log("[USDZ] Using chunked transfer for large file...")
                     return self._send_usdz_chunked(stub, usdz_data, usdz_filename, attach_position, attach_rotation)
                 else:
-                    self._log(f"📤 Sending USDZ data as single message...")
+                    self._log(f"[USDZ] Sending data as single message...")
                     return self._send_usdz_single(stub, usdz_data, usdz_filename, attach_position, attach_rotation, file_size_mb)
                     
         except grpc.RpcError as e:
-            self._log(f"❌ gRPC Error sending USDZ: {e}", force=True)
+            self._log(f"[USDZ] Error: gRPC error sending USDZ: {e}", force=True)
             return False
         except Exception as e:
-            self._log(f"❌ Error sending USDZ: {e}", force=True)
+            self._log(f"[USDZ] Error: {e}", force=True)
             if self.verbose:
                 import traceback
                 traceback.print_exc()
@@ -1508,10 +1513,10 @@ class VisionProStreamer:
         response = stub.SendUsdzData(request, timeout=timeout)
         
         if response.success:
-            self._log(f"✅ USDZ sent successfully: {response.local_file_path}")
+            self._log(f"[USDZ] Sent successfully: {response.local_file_path}")
             return True
         else:
-            self._log(f"❌ Failed to send USDZ: {response.message}", force=True)
+            self._log(f"[USDZ] Error: Failed to send: {response.message}", force=True)
             return False
     
     def _send_usdz_chunked(self, stub, usdz_data: bytes, filename: str,
@@ -1521,7 +1526,7 @@ class VisionProStreamer:
         total_size = len(usdz_data)
         total_chunks = (total_size + chunk_size - 1) // chunk_size
         
-        self._log(f"📦 Sending {total_size} bytes in {total_chunks} chunks of {chunk_size} bytes each")
+        self._log(f"[USDZ] Sending {total_size} bytes in {total_chunks} chunks of {chunk_size} bytes each")
         
         def chunk_generator():
             for i in range(total_chunks):
@@ -1544,20 +1549,20 @@ class VisionProStreamer:
                     chunk_request.attach_to_position.CopyFrom(attach_position)
                     chunk_request.attach_to_rotation.CopyFrom(attach_rotation)
                 
-                self._log(f"📤 Sending chunk {i+1}/{total_chunks} ({len(chunk_data)} bytes)")
+                self._log(f"[USDZ] Sending chunk {i+1}/{total_chunks} ({len(chunk_data)} bytes)")
                 yield chunk_request
         
         try:
             response = stub.SendUsdzDataChunked(chunk_generator(), timeout=120.0)
             
             if response.success:
-                self._log(f"✅ Chunked USDZ sent successfully: {response.local_file_path}")
+                self._log(f"[USDZ] Chunked transfer successful: {response.local_file_path}")
                 return True
             else:
-                self._log(f"❌ Failed to send chunked USDZ: {response.message}", force=True)
+                self._log(f"[USDZ] Error: Failed to send chunked: {response.message}", force=True)
                 return False
         except grpc.RpcError as e:
-            self._log(f"❌ gRPC Error in chunked transfer: {e}", force=True)
+            self._log(f"[USDZ] Error: gRPC error in chunked transfer: {e}", force=True)
             return False
     
     def serve(self, port: int = 9999):
@@ -1592,13 +1597,13 @@ class VisionProStreamer:
         
         # Start simulation streaming if configured
         if self._sim_config is not None:
-            self._log("🎮 Starting MuJoCo simulation streaming...")
+            self._log("[SIM] Starting MuJoCo simulation streaming...")
             if self._load_and_send_scene():
                 self._start_pose_streaming()
         
         # Check if anything is configured
         if self._video_config is None and self._audio_config is None and self._sim_config is None:
-            self._log("⚠️ No video/audio/simulation configured. Call configure_*() first.", force=True)
+            self._log("[CONFIG] Warning: No video/audio/simulation configured. Call configure_*() first.", force=True)
             return
         
         # Extract configuration
@@ -1620,7 +1625,7 @@ class VisionProStreamer:
         
         # Get local IP
         local_ip = self.get_local_ip()
-        self._log(f"Starting WebRTC server on {local_ip}:{port}")
+        self._log(f"[WEBRTC] Starting server on {local_ip}:{port}", force=True)
         
         # Determine what is enabled based on whether configure_* was called
         video_enabled = self._video_config is not None
@@ -1640,7 +1645,7 @@ class VisionProStreamer:
         }
         
         # Send WebRTC server info via gRPC
-        self._log(f"📤 Sending WebRTC server info via gRPC...")
+        self._log(f"[WEBRTC] Sending server info via gRPC...", force=True)
         self._send_webrtc_info_via_grpc(
             local_ip, port, 
             stereo_video=stereo_video, 
@@ -1668,7 +1673,7 @@ class VisionProStreamer:
                 from aiortc import RTCPeerConnection, RTCSessionDescription, RTCConfiguration, RTCIceServer
                 
                 client_addr = writer.get_extra_info('peername')
-                streamer_instance._log(f"🔗 VisionOS client connected from {client_addr}")
+                streamer_instance._log(f"[WEBRTC] VisionOS client connected from {client_addr}", force=True)
                 
                 # Configure RTCPeerConnection for low latency
                 config = RTCConfiguration(
@@ -1678,9 +1683,9 @@ class VisionProStreamer:
                 
                 @pc.on("iceconnectionstatechange")
                 async def on_ice_state_change():
-                    streamer_instance._log(f"ICE state ({client_addr}): {pc.iceConnectionState}")
+                    streamer_instance._log(f"[WEBRTC] ICE state ({client_addr}): {pc.iceConnectionState}", force=True)
                     if pc.iceConnectionState == "connected":
-                        streamer_instance._log(f"🎥 WebRTC connection established ({client_addr}) - video should flow now", force=True)
+                        streamer_instance._log(f"[WEBRTC] Connection established ({client_addr}) - video should flow now", force=True)
                     if pc.iceConnectionState in ("failed", "closed"):
                         await pc.close()
                         writer.close()
@@ -1688,7 +1693,7 @@ class VisionProStreamer:
                 
                 @pc.on("track")
                 def on_track(track):
-                    streamer_instance._log(f"📹 Track received: {track.kind}")
+                    streamer_instance._log(f"[WEBRTC] Track received: {track.kind}")
                 
                 # Create video track if video is configured
                 if streamer_instance._video_config is not None:
@@ -1696,7 +1701,7 @@ class VisionProStreamer:
                         if device is None:
                             streamer_instance._log("Creating synthetic video stream (no camera)...")
                             if streamer_instance.frame_callback is None:
-                                streamer_instance._log("⚠️  WARNING: No frame callback registered. Stream will be blank.", force=True)
+                                streamer_instance._log("[VIDEO] Warning: No frame callback registered. Stream will be blank.", force=True)
                                 streamer_instance._log("   Use register_frame_callback() to generate frames.", force=True)
                         else:
                             streamer_instance._log(f"Opening video device: {device}...")
@@ -1713,14 +1718,14 @@ class VisionProStreamer:
                         streamer_instance.camera = processed_track
                         
                         if device is None:
-                            streamer_instance._log(f"✓ Synthetic video track created ({size} @ {fps}fps)")
+                            streamer_instance._log(f"[VIDEO] Synthetic video track created ({size} @ {fps}fps)")
                         else:
-                            streamer_instance._log(f"✓ Camera track created for device: {device}")
+                            streamer_instance._log(f"[VIDEO] Camera track created for device: {device}")
                         
                         if streamer_instance.frame_callback:
-                            streamer_instance._log("✓ Frame processing enabled")
+                            streamer_instance._log("[VIDEO] Frame processing enabled")
                         else:
-                            streamer_instance._log("✓ Frame processing disabled (identity)")
+                            streamer_instance._log("[VIDEO] Frame processing disabled (identity)")
                         
                         pc.addTrack(processed_track)
                     except Exception as e:
@@ -1728,7 +1733,7 @@ class VisionProStreamer:
                         if streamer_instance.verbose:
                             traceback.print_exc()
                 else:
-                    streamer_instance._log("📡 No video configured, WebRTC will only use data channels")
+                    streamer_instance._log("[WEBRTC] No video configured, using data channels only")
                 
                 # Create hand tracking data channel if using WebRTC backend
                 if streamer_instance.ht_backend == "webrtc":
@@ -1742,10 +1747,10 @@ class VisionProStreamer:
                     @pc.on("datachannel")
                     def _on_remote_datachannel(channel):
                         if channel.label == "hand-tracking":
-                            streamer_instance._log("🔁 Remote hand data channel detected")
+                            streamer_instance._log("[WEBRTC] Remote hand data channel detected")
                             streamer_instance._register_webrtc_data_channel(channel)
                         elif channel.label == "sim-poses":
-                            streamer_instance._log("🔁 Remote sim-poses data channel detected")
+                            streamer_instance._log("[WEBRTC] Remote sim-poses data channel detected")
                             streamer_instance._register_webrtc_sim_channel(channel)
                 
                 # Create sim-poses data channel if simulation is configured
@@ -1756,7 +1761,7 @@ class VisionProStreamer:
                         maxRetransmits=0,
                     )
                     streamer_instance._register_webrtc_sim_channel(sim_channel)
-                    streamer_instance._log("📡 Created sim-poses WebRTC data channel")
+                    streamer_instance._log("[WEBRTC] Created sim-poses data channel")
 
                 # Create audio track if audio is configured (configure_audio was called)
                 if streamer_instance._audio_config is not None:
@@ -1771,11 +1776,11 @@ class VisionProStreamer:
                         pc.addTrack(processed_audio_track)
                         channels = "stereo" if stereo_audio else "mono"
                         if audio_device:
-                            streamer_instance._log(f"🎤 Audio track added from device: {audio_device} ({channels})")
+                            streamer_instance._log(f"[AUDIO] Track added from device: {audio_device} ({channels})")
                         else:
-                            streamer_instance._log(f"🎤 Synthetic audio track added ({channels}, callback-generated)")
+                            streamer_instance._log(f"[AUDIO] Synthetic track added ({channels}, callback-generated)")
                     except Exception as e:
-                        streamer_instance._log(f"⚠️  Could not create audio track: {e}", force=True)
+                        streamer_instance._log(f"[AUDIO] Warning: Could not create audio track: {e}", force=True)
                         streamer_instance._log(f"    Continuing with video only...")
                         if streamer_instance.verbose:
                             traceback.print_exc()
@@ -1831,7 +1836,7 @@ class VisionProStreamer:
                 )
                 
                 await pc.setRemoteDescription(answer)
-                streamer_instance._log("WebRTC connection established!")
+                streamer_instance._log("[WEBRTC] Connection established!", force=True)
                 
                 # Keep connection alive
                 try:
@@ -1849,7 +1854,7 @@ class VisionProStreamer:
                     run_peer_custom, "0.0.0.0", port,
                     start_serving=True, reuse_address=True, reuse_port=True
                 )
-                streamer_instance._log(f"WebRTC server listening on 0.0.0.0:{port}")
+                streamer_instance._log(f"[WEBRTC] Server listening on 0.0.0.0:{port}", force=True)
                 async with server:
                     await server.serve_forever()
             
@@ -1861,19 +1866,19 @@ class VisionProStreamer:
         # Wait a bit for server to start
         time.sleep(0.5)
         
-        self._log(f"✓ WebRTC server ready at {local_ip}:{port}", force=True)
-        self._log(f"✓ VisionOS can query http://{local_ip}:8888/webrtc_info to get connection details")
+        self._log(f"[WEBRTC] Server ready at {local_ip}:{port}", force=True)
+        self._log(f"[WEBRTC] VisionOS can query http://{local_ip}:8888/webrtc_info to get connection details", force=True)
         
         self._server_running = True
 
         # Wait for WebRTC sim-poses channel to be ready
         if self._sim_config is None:
             return
-        self._log("⏳ Waiting for WebRTC connection...")
+        self._log("[WEBRTC] Waiting for connection...", force=True)
         if not self.wait_for_sim_channel(timeout=30):
-            self._log("❌ Failed to establish WebRTC sim-poses channel", force=True)
+            self._log("[WEBRTC] Error: Failed to establish sim-poses channel", force=True)
             return
-        self._log("✅ WebRTC sim-poses channel ready!", force=True)
+        self._log("[WEBRTC] Sim-poses channel ready!", force=True)
 
     def start_webrtc(self, port: int = 9999):
         """
@@ -1918,13 +1923,13 @@ class VisionProStreamer:
                     streamer.update_sim()
         """
         if self._sim_config is None:
-            self._log("⚠️ No simulation configured")
+            self._log("[SIM] Warning: No simulation configured")
             return False
         
         start_time = time.time()
         while not self._webrtc_sim_ready:
             if time.time() - start_time > timeout:
-                self._log(f"⚠️ Timeout waiting for sim-poses channel (waited {timeout}s)", force=True)
+                self._log(f"[WEBRTC] Warning: Timeout waiting for sim-poses channel (waited {timeout}s)", force=True)
                 return False
             time.sleep(0.1)
         
@@ -1961,9 +1966,9 @@ class VisionProStreamer:
         self._sim_benchmark_enabled = enabled
         if enabled:
             self._sim_benchmark_seq = 0
-            self._log("🧪 Sim benchmark mode enabled")
+            self._log("[BENCHMARK] Sim benchmark mode enabled")
         else:
-            self._log("🧪 Sim benchmark mode disabled")
+            self._log("[BENCHMARK] Sim benchmark mode disabled")
 
     def update_stream_resolution(self, size):
         """Request the video track to emit frames at a new resolution.
@@ -1975,13 +1980,13 @@ class VisionProStreamer:
             streamer.update_stream_resolution("1024x768")
         """
         if self.camera is None:
-            self._log("⚠️  Cannot update stream resolution before starting video streaming", force=True)
+            self._log("[VIDEO] Warning: Cannot update stream resolution before starting video streaming", force=True)
             return
 
         try:
             width, height = map(int, size.lower().split("x", 1))
         except ValueError:
-            self._log(f"⚠️  Invalid resolution '{size}' (expected WIDTHxHEIGHT)", force=True)
+            self._log(f"[VIDEO] Warning: Invalid resolution '{size}' (expected WIDTHxHEIGHT)", force=True)
             return
 
         if hasattr(self.camera, "set_resolution"):
@@ -1990,19 +1995,30 @@ class VisionProStreamer:
         if self.webrtc_info is not None:
             self.webrtc_info["size"] = size
 
-        self._log(f"🔄 Updated WebRTC stream resolution to {width}x{height}")
+        self._log(f"[VIDEO] Updated stream resolution to {width}x{height}")
 
-    def wait_for_benchmark_event(self, sequence_id, timeout=2.0):
+    def wait_for_benchmark_event(self, sequence_id, timeout=2.0, source="video"):
+        """Wait for a benchmark event with the given sequence ID.
+        
+        Args:
+            sequence_id: The sequence ID to wait for
+            timeout: Maximum time to wait in seconds
+            source: Either "video" or "sim" to specify which benchmark type
+            
+        Returns:
+            The benchmark event dict, or None if timeout
+        """
+        event_key = f"{source}:{sequence_id}"
         deadline = time.perf_counter() + timeout
         with self._benchmark_condition:
             while True:
-                event = self._benchmark_events.pop(sequence_id, None)
+                event = self._benchmark_events.pop(event_key, None)
                 if event is not None:
                     return event
                 remaining = deadline - time.perf_counter()
                 if remaining <= 0:
                     # Drop any stale data for this sequence if it arrives late.
-                    self._benchmark_events.pop(sequence_id, None)
+                    self._benchmark_events.pop(event_key, None)
                     return None
                 self._benchmark_condition.wait(timeout=remaining)
     
@@ -2019,23 +2035,23 @@ class VisionProStreamer:
         class InfoHandler(BaseHTTPRequestHandler):
             def do_GET(handler_self):
                 client_ip = handler_self.client_address[0]
-                self._log(f"📥 [HTTP] Request from {client_ip}: {handler_self.path}")
+                self._log(f"[HTTP] Request from {client_ip}: {handler_self.path}")
                 
                 if handler_self.path == '/webrtc_info':
                     if streamer_instance.webrtc_info:
-                        self._log(f"✅ [HTTP] Sending WebRTC info to {client_ip}: {streamer_instance.webrtc_info}")
+                        self._log(f"[HTTP] Sending WebRTC info to {client_ip}: {streamer_instance.webrtc_info}")
                         handler_self.send_response(200)
                         handler_self.send_header('Content-type', 'application/json')
                         handler_self.end_headers()
                         handler_self.wfile.write(json.dumps(streamer_instance.webrtc_info).encode())
                     else:
-                        self._log(f"⚠️ [HTTP] WebRTC not started yet, sending 404 to {client_ip}")
+                        self._log(f"[HTTP] Warning: WebRTC not started yet, sending 404 to {client_ip}")
                         handler_self.send_response(404)
                         handler_self.send_header('Content-type', 'application/json')
                         handler_self.end_headers()
                         handler_self.wfile.write(json.dumps({"error": "WebRTC not started"}).encode())
                 else:
-                    self._log(f"❌ [HTTP] Unknown path from {client_ip}: {handler_self.path}")
+                    self._log(f"[HTTP] Error: Unknown path from {client_ip}: {handler_self.path}")
                     handler_self.send_response(404)
                     handler_self.end_headers()
             
@@ -2136,7 +2152,7 @@ class VisionProStreamer:
         try:
             ip_parts = host.split('.')
             
-            self._log(f"📤 Opening new gRPC connection to send WebRTC info (video={video_enabled}, audio={audio_enabled}, sim={sim_enabled})...")
+            self._log(f"[GRPC] Opening new connection to send WebRTC info (video={video_enabled}, audio={audio_enabled}, sim={sim_enabled})...")
             
             # Create a new connection just to send WebRTC server info
             with grpc.insecure_channel(f"{self.ip}:12345") as channel:
@@ -2165,12 +2181,12 @@ class VisionProStreamer:
                     # Just start the stream but don't consume responses
                     next(responses)  # Get first response to ensure message was sent
                     
-                    self._log(f"✓ WebRTC info sent via gRPC: {host}:{port} (video={video_enabled}, audio={audio_enabled}, sim={sim_enabled})")
+                    self._log(f"[GRPC] WebRTC info sent: {host}:{port} (video={video_enabled}, audio={audio_enabled}, sim={sim_enabled})")
                 except Exception as e:
-                    self._log(f"⚠️  Error sending WebRTC info via gRPC: {e}")
+                    self._log(f"[GRPC] Warning: Error sending WebRTC info: {e}")
                     
         except Exception as e:
-            self._log(f"❌ Error in _send_webrtc_info_via_grpc: {e}", force=True)
+            self._log(f"[GRPC] Error in _send_webrtc_info_via_grpc: {e}", force=True)
     
 
 if __name__ == "__main__": 

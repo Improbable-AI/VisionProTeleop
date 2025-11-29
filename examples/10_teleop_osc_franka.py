@@ -1,27 +1,4 @@
-"""
-Example: Teleoperation of Franka Panda using Operational Space Control
-
-This example demonstrates real-time teleoperation of a Franka Panda robot
-using hand tracking from the Vision Pro. The robot follows the user's hand
-pose using an Operational Space Controller (OSC).
-
-The hand pose is computed from thumb and index finger positions to create
-a natural grasping pose that the robot end-effector follows.
-
-Features:
-- Real-time hand tracking to robot control
-- Operational Space Controller with impedance control
-- MuJoCo simulation streaming to Vision Pro
-- Block pushing task with success detection
-
-Example:
-    python examples/10_teleop_osc_franka.py --ip 192.168.86.21
-
-Requirements:
-    - MuJoCo
-    - scipy
-    - Vision Pro with Tracking Streamer app running
-"""
+"""Teleoperate a Franka Panda robot using Operational Space Control with hand tracking."""
 
 import mujoco
 import numpy as np

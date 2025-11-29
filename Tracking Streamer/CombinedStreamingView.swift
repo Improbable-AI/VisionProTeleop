@@ -203,8 +203,22 @@ struct CombinedStreamingView: View {
                     skyBox.isEnabled = !videoMinimized
                     
                     if !hasFrames {
-                        hasFrames = true
-                        tryAutoMinimize()
+                        // Mark that we received the first frame
+                        // Use Task to ensure state updates are properly committed
+                        Task { @MainActor in
+                            if !hasFrames {  // Double-check to avoid duplicate triggers
+                                hasFrames = true
+                                // Audio comes with the same WebRTC connection, so mark it as ready too
+                                if dataManager.audioEnabled {
+                                    hasAudio = true
+                                }
+                                print("🎬 [CombinedStreamingView] First video frame received, hasFrames=\(hasFrames)")
+                                // Small delay to ensure state is fully committed
+                                try? await Task.sleep(nanoseconds: 100_000_000)  // 100ms
+                                print("🎬 [CombinedStreamingView] Checking auto-minimize after delay")
+                                tryAutoMinimize()
+                            }
+                        }
                     }
                     
                     let isStereo = DataManager.shared.stereoEnabled
@@ -335,6 +349,14 @@ struct CombinedStreamingView: View {
         .onAppear {
             print("🚀 [CombinedStreamingView] View appeared, starting services")
             
+            // Reset auto-minimize state on view appear (fresh start)
+            hasAutoMinimized = false
+            userInteracted = false
+            hasFrames = false
+            hasAudio = false
+            hasSimPoses = false
+            print("🔄 [CombinedStreamingView] Reset auto-minimize state: hasAutoMinimized=\(hasAutoMinimized), userInteracted=\(userInteracted)")
+            
             // Setup WebRTC sim-poses callback BEFORE starting video stream
             videoStreamManager.onSimPosesReceived = { [self] poses in
                 // Convert WebRTC JSON format [x,y,z,qx,qy,qz,qw] to MuJoCo poses
@@ -427,7 +449,22 @@ struct CombinedStreamingView: View {
                 hasAutoMinimized = false
                 fixedWorldTransform = nil
                 mujocoManager.poseStreamingViaWebRTC = false
+                mujocoManager.simEnabled = false
                 videoStreamManager.stop()
+                
+                // Remove MuJoCo assets
+                mujocoEntity?.removeFromParent()
+                mujocoEntity = nil
+                mujocoBodyEntities.removeAll()
+                initialLocalTransforms.removeAll()
+                pythonToSwiftNameMap.removeAll()
+                pythonToSwiftTargets.removeAll()
+                entityPathByObjectID.removeAll()
+                nameMappingInitialized = false
+                mujocoFinalTransforms.removeAll()
+                mujocoUsdzURL = nil
+                attachToPosition = nil
+                attachToRotation = nil
             }
         }
         .onChange(of: dataManager.webrtcGeneration) { oldValue, newValue in
@@ -440,7 +477,22 @@ struct CombinedStreamingView: View {
                 videoMinimized = false
                 fixedWorldTransform = nil
                 mujocoManager.poseStreamingViaWebRTC = false
+                mujocoManager.simEnabled = false
                 videoStreamManager.stop()
+                
+                // Remove MuJoCo assets on WebRTC disconnect
+                mujocoEntity?.removeFromParent()
+                mujocoEntity = nil
+                mujocoBodyEntities.removeAll()
+                initialLocalTransforms.removeAll()
+                pythonToSwiftNameMap.removeAll()
+                pythonToSwiftTargets.removeAll()
+                entityPathByObjectID.removeAll()
+                nameMappingInitialized = false
+                mujocoFinalTransforms.removeAll()
+                mujocoUsdzURL = nil
+                attachToPosition = nil
+                attachToRotation = nil
             } else if newValue > 0 && oldValue != newValue {
                 mujocoManager.poseStreamingViaWebRTC = false
                 hasSimPoses = false  // Reset sim poses on new connection
@@ -448,6 +500,34 @@ struct CombinedStreamingView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     videoStreamManager.start(imageData: imageData)
                 }
+            }
+        }
+        .onChange(of: hasFrames) { oldValue, newValue in
+            if newValue && !oldValue {
+                print("🎬 [CombinedStreamingView] Video frames arrived, attempting auto-minimize")
+                tryAutoMinimize()
+            }
+        }
+        .onChange(of: dataManager.videoEnabled) { _, newValue in
+            print("🔧 [CombinedStreamingView] videoEnabled changed to \(newValue)")
+            // Re-check auto-minimize in case frames arrived before config
+            if newValue {
+                tryAutoMinimize()
+            }
+        }
+        .onChange(of: dataManager.audioEnabled) { _, newValue in
+            print("🔧 [CombinedStreamingView] audioEnabled changed to \(newValue)")
+            // If we have video frames and audio is now enabled, mark audio as ready
+            if newValue && hasFrames {
+                hasAudio = true
+                tryAutoMinimize()
+            }
+        }
+        .onChange(of: dataManager.simEnabled) { _, newValue in
+            print("🔧 [CombinedStreamingView] simEnabled changed to \(newValue)")
+            // Re-check auto-minimize in case sim poses arrived before config
+            if newValue {
+                tryAutoMinimize()
             }
         }
         .onChange(of: dataManager.videoPlaneFixedToWorld) { oldValue, isFixed in
@@ -470,6 +550,13 @@ struct CombinedStreamingView: View {
                 fixedWorldTransform = nil
             }
         }
+        .onChange(of: userInteracted) { oldValue, newValue in
+            print("⚠️ [CombinedStreamingView] userInteracted changed from \(oldValue) to \(newValue)")
+            // Print stack trace to see who changed it
+            if newValue {
+                Thread.callStackSymbols.prefix(10).forEach { print("  \($0)") }
+            }
+        }
         .onDisappear {
             print("🛑 [CombinedStreamingView] View disappeared, stopping services")
             videoStreamManager.stop()
@@ -484,7 +571,11 @@ struct CombinedStreamingView: View {
     
     /// Check if all required streams are ready and auto-minimize if conditions are met
     private func tryAutoMinimize() {
-        guard !hasAutoMinimized && !userInteracted else { return }
+        print("🔍 [AutoMinimize] Checking... hasAutoMinimized=\(hasAutoMinimized), userInteracted=\(userInteracted)")
+        guard !hasAutoMinimized && !userInteracted else { 
+            print("🔍 [AutoMinimize] Early exit: already minimized or user interacted")
+            return 
+        }
         
         let dm = DataManager.shared
         
@@ -493,9 +584,12 @@ struct CombinedStreamingView: View {
         let audioRequired = dm.audioEnabled
         let simRequired = dm.simEnabled
         
+        print("🔍 [AutoMinimize] Config: video=\(videoRequired), audio=\(audioRequired), sim=\(simRequired)")
+        print("🔍 [AutoMinimize] State: hasFrames=\(hasFrames), hasAudio=\(hasAudio), hasSimPoses=\(hasSimPoses)")
+        
         // Check if all required streams are ready
         let videoReady = !videoRequired || hasFrames
-        let audioReady = !audioRequired || hasAudio  // For now, assume audio is ready if we have video (same WebRTC connection)
+        let audioReady = !audioRequired || hasAudio
         let simReady = !simRequired || hasSimPoses
         
         // Special case: if audio is required but video is also enabled, audio comes with video
@@ -507,11 +601,16 @@ struct CombinedStreamingView: View {
         let somethingConfigured = videoRequired || audioRequired || simRequired
         let somethingReady = hasFrames || hasAudio || hasSimPoses
         
+        print("🔍 [AutoMinimize] Ready: video=\(videoReady), audio=\(audioEffectivelyReady), sim=\(simReady), all=\(allReady)")
+        print("🔍 [AutoMinimize] somethingConfigured=\(somethingConfigured), somethingReady=\(somethingReady)")
+        
         if allReady && somethingConfigured && somethingReady {
             print("✅ [AutoMinimize] All required streams ready (video=\(videoRequired)/\(hasFrames), audio=\(audioRequired)/\(hasAudio), sim=\(simRequired)/\(hasSimPoses))")
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 1_000_000_000)  // 1 second delay
+                print("✅ [AutoMinimize] After delay: hasAutoMinimized=\(hasAutoMinimized), userInteracted=\(userInteracted)")
                 if !hasAutoMinimized && !userInteracted {
+                    print("✅ [AutoMinimize] Minimizing status view now!")
                     withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
                         isMinimized = true
                         hasAutoMinimized = true

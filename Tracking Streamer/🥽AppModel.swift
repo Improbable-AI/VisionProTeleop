@@ -267,7 +267,9 @@ extension 🥽AppModel {
             // print("processHandUpates is running.")
             switch handAnchor.chirality {
             case .left:
-                DataManager.shared.latestHandTrackingData.leftWrist = handAnchor.originFromAnchorTransform
+                if handAnchor.isTracked {
+                    DataManager.shared.latestHandTrackingData.leftWrist = handAnchor.originFromAnchorTransform
+                }
                 // print(handAnchor.originFromAnchorTransform)
                 
 
@@ -291,7 +293,10 @@ extension 🥽AppModel {
                 // Repeat for right hand and other fingers as needed
 
             case .right:
-                DataManager.shared.latestHandTrackingData.rightWrist = handAnchor.originFromAnchorTransform
+            
+                if handAnchor.isTracked {
+                    DataManager.shared.latestHandTrackingData.rightWrist = handAnchor.originFromAnchorTransform
+                }
                 // print(handAnchor.originFromAnchorTransform)
                 
                 let jointTypes: [HandSkeleton.JointName] = [

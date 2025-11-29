@@ -1,10 +1,4 @@
-"""
-Example: Generating synthetic video streams without a camera
-
-This example shows how to create video streams programmatically
-without any physical camera device. The frame callback is called
-at the specified FPS to generate each frame.
-"""
+"""Visualize hand tracking data in 2D using frame callbacks."""
 
 from avp_stream.streamer import VisionProStreamer
 import cv2

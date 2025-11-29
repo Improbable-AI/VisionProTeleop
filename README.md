@@ -22,7 +22,7 @@ VisionProTeleop
 
 
 
-This VisionOS app and python library streams your Head + Wrist + Hand Tracking result via gRPC over a WiFi network, so any robots connected to the same wifi network can subscribe and use. **It can also stream stereo (or mono) video / audio feeds from your robot, back to the Vision Pro.**
+This VisionOS app and python library streams your Head + Wrist + Hand Tracking result via gRPC over a WiFi network, so any robots connected to the same wifi network can subscribe and use. **It can also stream stereo (or mono) video / audio feeds from your robot, back to the Vision Pro.** 
 
 > **For a more detailed explanation, check out this short [paper](./assets/short_paper_new.pdf).*
 
@@ -32,6 +32,7 @@ This VisionOS app and python library streams your Head + Wrist + Hand Tracking r
 - [x] Video Streaming
 - [x] Audio Streaming
 - [x] MuJoCo Environment Streaming in AR
+- [x] Wired/Wireless Connection 
 
 
 ## Latency Benchmark Results
