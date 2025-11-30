@@ -43,6 +43,8 @@
 		C1EAF9742ED7E66600549580 /* mujoco_ar.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EAF96E2ED7E66600549580 /* mujoco_ar.pb.swift */; };
 		C1EAF9752ED7E66600549580 /* mujoco_ar.grpc.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EAF96D2ED7E66600549580 /* mujoco_ar.grpc.swift */; };
 		C1EAF9772ED7EC9000549580 /* CombinedStreamingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EAF9762ED7EC9000549580 /* CombinedStreamingView.swift */; };
+		C1EAF9792EDBA73600549580 /* UVCCameraManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EAF9782EDBA73600549580 /* UVCCameraManager.swift */; };
+		C1EAF97F2EDBB9C700549580 /* RecordingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EAF97E2EDBB9C700549580 /* RecordingManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -87,6 +89,8 @@
 		C1EAF96F2ED7E66600549580 /* MuJoCoGRPCServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MuJoCoGRPCServer.swift; sourceTree = "<group>"; };
 		C1EAF9702ED7E66600549580 /* MuJoCoStreamingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MuJoCoStreamingView.swift; sourceTree = "<group>"; };
 		C1EAF9762ED7EC9000549580 /* CombinedStreamingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CombinedStreamingView.swift; sourceTree = "<group>"; };
+		C1EAF9782EDBA73600549580 /* UVCCameraManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UVCCameraManager.swift; sourceTree = "<group>"; };
+		C1EAF97E2EDBB9C700549580 /* RecordingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -171,11 +175,13 @@
 				C1EAF9762ED7EC9000549580 /* CombinedStreamingView.swift */,
 				C1E05F7A2ECD850B0018C506 /* ImmersiveView.swift */,
 				C1E05F7B2ECD850B0018C506 /* WebRTCClient.swift */,
+				C1EAF97E2EDBB9C700549580 /* RecordingManager.swift */,
 				C1EAF96B2ED7E13400549580 /* GRPCServer.swift */,
 				16688DE52B59F35F004CE12B /* 🥽AppModel.swift */,
 				1642FAB82B4D6CAA0084F9ED /* 🌐RealityView.swift */,
 				C1DA80C32ECE377600B55CC2 /* StatusView.swift */,
 				C1DA80C62ECE8C6F00B55CC2 /* ViewControlSettings.swift */,
+				C1EAF9782EDBA73600549580 /* UVCCameraManager.swift */,
 				16EE5E982B576DA800D354ED /* 🧩Name.swift */,
 				16EE5E9A2B576DB000D354ED /* 🧩Model.swift */,
 				160ED7972B4B74C5002AD987 /* 🧑HeadTrackingComponent&System.swift */,
@@ -250,7 +256,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1520;
+				LastSwiftUpdateCheck = 2610;
 				LastUpgradeCheck = 1530;
 				TargetAttributes = {
 					165ADB462B4B71B0008A756F = {
@@ -325,11 +331,13 @@
 				C1EAF9722ED7E66600549580 /* MuJoCoStreamingView.swift in Sources */,
 				C1EAF9732ED7E66600549580 /* MuJoCoGRPCServer.swift in Sources */,
 				C1EAF9742ED7E66600549580 /* mujoco_ar.pb.swift in Sources */,
+				C1EAF97F2EDBB9C700549580 /* RecordingManager.swift in Sources */,
 				C1EAF9752ED7E66600549580 /* mujoco_ar.grpc.swift in Sources */,
 				C1E05F7E2ECD850B0018C506 /* WebRTCClient.swift in Sources */,
 				C1893C762B93C1AC00F2269D /* handtracking.grpc.swift in Sources */,
 				C1893C772B93C1AC00F2269D /* handtracking.pb.swift in Sources */,
 				16C95AE32B5E75D800CF0FED /* 🛠️Panel.swift in Sources */,
+				C1EAF9792EDBA73600549580 /* UVCCameraManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -491,6 +499,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
+				XROS_DEPLOYMENT_TARGET = 2.1;
 			};
 			name = Debug;
 		};
@@ -528,6 +537,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
+				XROS_DEPLOYMENT_TARGET = 2.1;
 			};
 			name = Release;
 		};

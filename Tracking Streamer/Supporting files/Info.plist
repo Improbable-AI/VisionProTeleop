@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSCameraUsageDescription</key>
+	<string>VisionProTeleop needs camera access to display video from connected USB cameras (UVC devices).</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
@@ -18,5 +20,25 @@
 		<key>UISceneConfigurations</key>
 		<dict/>
 	</dict>
+	
+	<!-- Make iCloud container visible in Finder -->
+	<key>NSUbiquitousContainers</key>
+	<dict>
+		<key>iCloud.com.younghyopark.VisionProTeleop</key>
+		<dict>
+			<key>NSUbiquitousContainerIsDocumentScopePublic</key>
+			<true/>
+			<key>NSUbiquitousContainerName</key>
+			<string>VisionProTeleop Recordings</string>
+			<key>NSUbiquitousContainerSupportedFolderLevels</key>
+			<string>Any</string>
+		</dict>
+	</dict>
+	
+	<!-- Also enable local Documents folder sharing (backup option) -->
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 </dict>
 </plist>

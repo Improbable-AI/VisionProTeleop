@@ -3,6 +3,7 @@ import RealityKit
 import LiveKitWebRTC
 import CoreImage
 import Accelerate
+import AVFoundation
 import AVFAudio
 import RealityKitContent
 import GRPCCore
@@ -13,11 +14,14 @@ import simd
 /// Combined Streaming View that supports:
 /// - Video/Audio streaming via WebRTC (from ImmersiveView)
 /// - MuJoCo simulation streaming via gRPC (from MuJoCoStreamingView)
+/// - UVC camera streaming (USB cameras via Developer Strap)
 struct CombinedStreamingView: View {
     @EnvironmentObject var imageData: ImageData
     @StateObject private var videoStreamManager = VideoStreamManager()
     @StateObject private var appModel = 🥽AppModel()
     @StateObject private var mujocoManager = CombinedMuJoCoManager()
+    @StateObject private var uvcCameraManager = UVCCameraManager.shared
+    @StateObject private var recordingManager = RecordingManager.shared
     @ObservedObject private var dataManager = DataManager.shared
     
     // Video state
@@ -37,6 +41,8 @@ struct CombinedStreamingView: View {
     @State private var previewStatusActive = false
     @State private var stereoMaterialEntity: Entity? = nil
     @State private var fixedWorldTransform: Transform? = nil
+    @State private var uvcFrame: UIImage? = nil  // UVC camera frame
+    @State private var currentVideoFrame: UIImage? = nil  // Current frame for recording
     
     // MuJoCo state
     @State private var mujocoEntity: Entity? = nil
@@ -185,10 +191,42 @@ struct CombinedStreamingView: View {
                     previewEntity?.isEnabled = false
                 }
                 
-                // Update video texture
-                if let imageLeft = imageData.left, let imageRight = imageData.right, let skyBox = skyBoxEntity {
-                    let imageWidth = imageRight.size.width
-                    let imageHeight = imageRight.size.height
+                // Determine video source and get appropriate frame
+                let isUVCMode = dataManager.videoSource == .uvcCamera
+                let networkFrameAvailable = imageData.left != nil && imageData.right != nil
+                let uvcFrameAvailable = uvcFrame != nil && isUVCMode
+                let hasVideoFrame = isUVCMode ? uvcFrameAvailable : networkFrameAvailable
+                
+                // Update video texture based on source
+                if hasVideoFrame, let skyBox = skyBoxEntity {
+                    let displayImage: UIImage
+                    let imageWidth: CGFloat
+                    let imageHeight: CGFloat
+                    
+                    if isUVCMode, let uvc = uvcFrame {
+                        // Use UVC camera frame
+                        displayImage = uvc
+                        imageWidth = displayImage.size.width
+                        imageHeight = displayImage.size.height
+                    } else if let imageRight = imageData.right {
+                        // Use network stream frame
+                        displayImage = imageRight
+                        imageWidth = imageRight.size.width
+                        imageHeight = imageRight.size.height
+                    } else {
+                        skyBoxEntity?.isEnabled = false
+                        return
+                    }
+                    
+                    // Store current frame for recording
+                    currentVideoFrame = displayImage
+                    
+                    // Record frame if recording is active (video-driven recording)
+                    // Each new video frame captures the latest tracking data
+                    if recordingManager.isRecording {
+                        recordingManager.recordVideoFrame(displayImage)
+                    }
+                    
                     let aspectRatio = Float(imageWidth / imageHeight)
                     
                     if currentAspectRatio == nil || abs(currentAspectRatio! - aspectRatio) > 0.01 {
@@ -209,10 +247,10 @@ struct CombinedStreamingView: View {
                             if !hasFrames {  // Double-check to avoid duplicate triggers
                                 hasFrames = true
                                 // Audio comes with the same WebRTC connection, so mark it as ready too
-                                if dataManager.audioEnabled {
+                                if dataManager.audioEnabled && !isUVCMode {
                                     hasAudio = true
                                 }
-                                print("🎬 [CombinedStreamingView] First video frame received, hasFrames=\(hasFrames)")
+                                print("🎬 [CombinedStreamingView] First video frame received (source: \(isUVCMode ? "UVC" : "Network")), hasFrames=\(hasFrames)")
                                 // Small delay to ensure state is fully committed
                                 try? await Task.sleep(nanoseconds: 100_000_000)  // 100ms
                                 print("🎬 [CombinedStreamingView] Checking auto-minimize after delay")
@@ -221,9 +259,10 @@ struct CombinedStreamingView: View {
                         }
                     }
                     
-                    let isStereo = DataManager.shared.stereoEnabled
+                    // UVC camera is always mono, network can be stereo
+                    let isStereo = !isUVCMode && DataManager.shared.stereoEnabled
                     
-                    if isStereo {
+                    if isStereo, let imageLeft = imageData.left, let imageRight = imageData.right {
                         do {
                             guard let sphereEntity = stereoMaterialEntity,
                                   var stereoMaterial = sphereEntity.components[ModelComponent.self]?.materials.first as? ShaderGraphMaterial else {
@@ -247,11 +286,12 @@ struct CombinedStreamingView: View {
                             print("❌ ERROR: Failed to load stereo textures: \(error)")
                         }
                     } else {
+                        // Mono mode (either UVC or network mono)
                         var skyBoxMaterial = UnlitMaterial()
                         do {
                             var textureOptions = TextureResource.CreateOptions(semantic: .hdrColor)
                             textureOptions.mipmapsMode = .none
-                            let texture = try TextureResource.generate(from: imageRight.cgImage!, options: textureOptions)
+                            let texture = try TextureResource.generate(from: displayImage.cgImage!, options: textureOptions)
                             skyBoxMaterial.color = .init(texture: .init(texture))
                             skyBox.components[ModelComponent.self]?.materials = [skyBoxMaterial]
                         } catch {
@@ -260,7 +300,10 @@ struct CombinedStreamingView: View {
                     }
                 } else {
                     skyBoxEntity?.isEnabled = false
-                    hasFrames = false
+                    // Only reset hasFrames if we were showing frames before
+                    if hasFrames && !isUVCMode {
+                        hasFrames = false
+                    }
                 }
             }
             
@@ -341,7 +384,77 @@ struct CombinedStreamingView: View {
             }
         }
         .onReceive(imageData.$left) { _ in
+            // Only trigger update for network source
+            if dataManager.videoSource == .network {
+                updateTrigger.toggle()
+            }
+        }
+        .onReceive(uvcCameraManager.$currentFrame) { frame in
+            // Update UVC frame and trigger view update
+            if dataManager.videoSource == .uvcCamera {
+                uvcFrame = frame
+                updateTrigger.toggle()
+            }
+        }
+        .onChange(of: dataManager.videoSource) { oldValue, newValue in
+            print("📹 [CombinedStreamingView] Video source changed from \(oldValue.rawValue) to \(newValue.rawValue)")
+            
+            // Reset frame state when switching sources
+            hasFrames = false
+            currentAspectRatio = nil
+            
+            if newValue == .uvcCamera {
+                // Start UVC capture if a device is selected
+                if uvcCameraManager.selectedDevice != nil {
+                    print("📹 [CombinedStreamingView] Starting UVC capture with selected device: \(uvcCameraManager.selectedDevice?.name ?? "unknown")")
+                    uvcCameraManager.startCapture()
+                } else if let firstDevice = uvcCameraManager.availableDevices.first {
+                    print("📹 [CombinedStreamingView] Selecting first available device: \(firstDevice.name)")
+                    uvcCameraManager.selectDevice(firstDevice)
+                    // Wait a moment for device to be configured, then start capture
+                    Task {
+                        try? await Task.sleep(nanoseconds: 200_000_000) // 200ms
+                        await MainActor.run {
+                            uvcCameraManager.startCapture()
+                        }
+                    }
+                } else {
+                    print("📹 [CombinedStreamingView] No UVC devices available")
+                }
+            } else {
+                // Stop UVC capture when switching to network
+                uvcCameraManager.stopCapture()
+                uvcFrame = nil
+            }
+            
             updateTrigger.toggle()
+        }
+        // Auto-start UVC capture when a device becomes available while in UVC mode
+        .onChange(of: uvcCameraManager.availableDevices) { oldDevices, newDevices in
+            if dataManager.videoSource == .uvcCamera && !newDevices.isEmpty && oldDevices.isEmpty {
+                print("📹 [CombinedStreamingView] UVC device connected while in UVC mode, auto-starting capture")
+                if let firstDevice = newDevices.first {
+                    uvcCameraManager.selectDevice(firstDevice)
+                    Task {
+                        try? await Task.sleep(nanoseconds: 200_000_000) // 200ms
+                        await MainActor.run {
+                            uvcCameraManager.startCapture()
+                        }
+                    }
+                }
+            }
+        }
+        // Auto-start capture when device selection changes
+        .onChange(of: uvcCameraManager.selectedDevice) { oldDevice, newDevice in
+            if dataManager.videoSource == .uvcCamera && newDevice != nil && !uvcCameraManager.isCapturing {
+                print("📹 [CombinedStreamingView] UVC device selected, starting capture")
+                Task {
+                    try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                    await MainActor.run {
+                        uvcCameraManager.startCapture()
+                    }
+                }
+            }
         }
         .task { appModel.run() }
         .task { await appModel.processDeviceAnchorUpdates() }
@@ -388,6 +501,32 @@ struct CombinedStreamingView: View {
             // Auto-start MuJoCo gRPC server for USDZ transfer
             Task {
                 await mujocoManager.startServer()
+            }
+            
+            // Initialize UVC camera if it's the selected source
+            if dataManager.videoSource == .uvcCamera {
+                print("📹 [CombinedStreamingView] UVC mode active on appear, initializing camera")
+                Task {
+                    let granted = await uvcCameraManager.requestCameraAccess()
+                    if granted {
+                        await MainActor.run {
+                            if uvcCameraManager.selectedDevice != nil {
+                                print("📹 [CombinedStreamingView] Starting capture with existing device")
+                                uvcCameraManager.startCapture()
+                            } else if let firstDevice = uvcCameraManager.availableDevices.first {
+                                print("📹 [CombinedStreamingView] Selecting and starting first device: \(firstDevice.name)")
+                                uvcCameraManager.selectDevice(firstDevice)
+                            }
+                        }
+                        // Wait for device setup then start capture
+                        try? await Task.sleep(nanoseconds: 300_000_000) // 300ms
+                        await MainActor.run {
+                            if !uvcCameraManager.isCapturing && uvcCameraManager.selectedDevice != nil {
+                                uvcCameraManager.startCapture()
+                            }
+                        }
+                    }
+                }
             }
             
             // Load stereo material
@@ -560,6 +699,7 @@ struct CombinedStreamingView: View {
         .onDisappear {
             print("🛑 [CombinedStreamingView] View disappeared, stopping services")
             videoStreamManager.stop()
+            uvcCameraManager.stopCapture()
             fixedWorldTransform = nil
             Task {
                 await mujocoManager.stopServer()

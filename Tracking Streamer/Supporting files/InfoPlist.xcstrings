@@ -38,7 +38,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "This app might use your cameras to sense the surrounding environments. "
+            "value" : "VisionProTeleop needs camera access to display video from connected USB cameras (UVC devices)."
           }
         }
       }

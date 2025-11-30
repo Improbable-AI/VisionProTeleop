@@ -1,6 +1,7 @@
 import SwiftUI
 import RealityKit
 import Network
+import AVFoundation
 import GRPCCore
 import GRPCNIOTransportHTTP2
 import GRPCProtobuf
@@ -41,6 +42,15 @@ class NetworkInfoManager: ObservableObject {
     }
 }
 
+/// Enum to track which settings panel is currently expanded
+enum ExpandedPanel: Equatable {
+    case none
+    case videoSource
+    case viewControls
+    case recording
+    case statusPosition
+}
+
 /// A floating status display that shows network connection info and follows the user's head
 struct StatusOverlay: View {
     @Binding var hasFrames: Bool
@@ -56,12 +66,14 @@ struct StatusOverlay: View {
     @Binding var previewStatusActive: Bool
     var mujocoManager: (any MuJoCoManager)?  // Optional MuJoCo manager for combined streaming
     @ObservedObject var dataManager = DataManager.shared
+    @StateObject private var uvcCameraManager = UVCCameraManager.shared
+    @StateObject private var recordingManager = RecordingManager.shared
     @State private var ipAddresses: [(name: String, address: String)] = []
     @State private var pythonConnected: Bool = false
     @State private var pythonIP: String = "Not connected"
     @State private var webrtcConnected: Bool = false
     @State private var hidePreviewTask: Task<Void, Never>?
-    @State private var showStatusPositionControls: Bool = false
+    @State private var expandedPanel: ExpandedPanel = .none
     @State private var showLocalExitConfirmation: Bool = false
     @State private var mujocoStatusUpdateTrigger: Bool = false  // Trigger for MuJoCo status updates
     
@@ -142,114 +154,175 @@ struct StatusOverlay: View {
     }
     
     private var minimizedView: some View {
-        HStack(spacing: 16) {
-            if showLocalExitConfirmation {
-                // Confirmation mode
-                Text("Exit?")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                
-                Button {
-                    print("❌ [StatusView] Exiting app now")
-                    exit(0)
-                } label: {
-                    ZStack {
-                        Circle()
-                            .fill(Color.red)
-                            .frame(width: 60, height: 60)
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 24, weight: .bold))
-                            .foregroundColor(.white)
-                    }
+        VStack(spacing: 12) {
+            // Recording timer (show above buttons when recording)
+            if recordingManager.isRecording {
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 12, height: 12)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.red.opacity(0.5), lineWidth: 2)
+                                .scaleEffect(1.5)
+                                .opacity(0.8)
+                        )
+                    Text("REC")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.red)
+                    Text(recordingManager.formatDuration(recordingManager.recordingDuration))
+                        .font(.system(size: 16, weight: .bold, design: .monospaced))
+                        .foregroundColor(.white)
+                    Text("•")
+                        .foregroundColor(.white.opacity(0.5))
+                    Text("\(recordingManager.frameCount) frames")
+                        .font(.system(size: 12))
+                        .foregroundColor(.white.opacity(0.7))
                 }
-                .buttonStyle(.plain)
-                
-                Button {
-                    withAnimation {
-                        showLocalExitConfirmation = false
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Color.black.opacity(0.8))
+                .cornerRadius(20)
+            }
+            
+            HStack(spacing: 16) {
+                if showLocalExitConfirmation {
+                    // Confirmation mode
+                    Text("Exit?")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                    
+                    Button {
+                        print("❌ [StatusView] Exiting app now")
+                        exit(0)
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(Color.red)
+                                .frame(width: 60, height: 60)
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundColor(.white)
+                        }
                     }
-                } label: {
-                    ZStack {
-                        Circle()
-                            .fill(Color.gray.opacity(0.5))
-                            .frame(width: 60, height: 60)
-                        Image(systemName: "xmark")
-                            .font(.system(size: 24, weight: .bold))
-                            .foregroundColor(.white)
+                    .buttonStyle(.plain)
+                    
+                    Button {
+                        withAnimation {
+                            showLocalExitConfirmation = false
+                        }
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(Color.gray.opacity(0.5))
+                                .frame(width: 60, height: 60)
+                            Image(systemName: "xmark")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundColor(.white)
+                        }
                     }
-                }
-                .buttonStyle(.plain)
-            } else {
-                // Normal mode
-                // Expand button
-                Button {
-                    withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
-                        isMinimized = false
-                        userInteracted = true  // Mark that user has interacted
-                    }
-                } label: {
-                    ZStack {
-                        Circle()
-                            .fill(Color.white.opacity(0.3))
-                            .frame(width: 60, height: 60)
-                        Image(systemName: "arrow.up.left.and.arrow.down.right")
-                            .font(.system(size: 24, weight: .bold))
-                            .foregroundColor(.white)
-                    }
-                }
-                .buttonStyle(.plain)
-                
-                // Video minimize/maximize button (only show if video streaming mode is enabled)
-                if showVideoStatus {
+                    .buttonStyle(.plain)
+                } else {
+                    // Normal mode
+                    // Expand button
                     Button {
                         withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
-                            videoMinimized.toggle()
+                            isMinimized = false
+                            userInteracted = true  // Mark that user has interacted
                         }
                     } label: {
                         ZStack {
                             Circle()
-                                .fill(Color.blue.opacity(0.8))
+                                .fill(Color.white.opacity(0.3))
                                 .frame(width: 60, height: 60)
-                            Image(systemName: videoMinimized ? "video.fill" : "video.slash.fill")
+                            Image(systemName: "arrow.up.left.and.arrow.down.right")
                                 .font(.system(size: 24, weight: .bold))
                                 .foregroundColor(.white)
                         }
                     }
                     .buttonStyle(.plain)
-
-                    // Toggle world-fixed mode for the video panel
+                    
+                    // Recording button
                     Button {
-                        videoFixed.toggle()
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            if recordingManager.isRecording {
+                                recordingManager.stopRecording()
+                            } else {
+                                recordingManager.startRecording()
+                            }
+                        }
                     } label: {
                         ZStack {
                             Circle()
-                                .fill(videoFixed ? Color.orange.opacity(0.8) : Color.white.opacity(0.3))
+                                .fill(recordingManager.isRecording ? Color.red : Color.red.opacity(0.8))
                                 .frame(width: 60, height: 60)
-                            Image(systemName: videoFixed ? "lock.fill" : "lock.open.fill")
-                                .font(.system(size: 24, weight: .bold))
+                            if recordingManager.isRecording {
+                                // Stop icon (square)
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(Color.white)
+                                    .frame(width: 22, height: 22)
+                            } else {
+                                // Record icon (circle)
+                                Circle()
+                                    .fill(Color.white)
+                                    .frame(width: 24, height: 24)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    
+                    // Video minimize/maximize button (only show if video streaming mode is enabled)
+                    if showVideoStatus {
+                        Button {
+                            withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                                videoMinimized.toggle()
+                            }
+                        } label: {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.blue.opacity(0.8))
+                                    .frame(width: 60, height: 60)
+                                Image(systemName: videoMinimized ? "video.fill" : "video.slash.fill")
+                                    .font(.system(size: 24, weight: .bold))
+                                    .foregroundColor(.white)
+                            }
+                        }
+                        .buttonStyle(.plain)
+
+                        // Toggle world-fixed mode for the video panel
+                        Button {
+                            videoFixed.toggle()
+                        } label: {
+                            ZStack {
+                                Circle()
+                                    .fill(videoFixed ? Color.orange.opacity(0.8) : Color.white.opacity(0.3))
+                                    .frame(width: 60, height: 60)
+                                Image(systemName: videoFixed ? "lock.fill" : "lock.open.fill")
+                                    .font(.system(size: 24, weight: .bold))
+                                    .foregroundColor(.white)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    
+                    // Exit button
+                    Button {
+                        print("🔴 [StatusView] Exit button tapped (minimized)")
+                        withAnimation {
+                            showLocalExitConfirmation = true
+                        }
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(Color.red)
+                                .frame(width: 60, height: 60)
+                            Text("✕")
+                                .font(.system(size: 27, weight: .bold))
                                 .foregroundColor(.white)
                         }
                     }
                     .buttonStyle(.plain)
                 }
-                
-                // Exit button
-                Button {
-                    print("🔴 [StatusView] Exit button tapped (minimized)")
-                    withAnimation {
-                        showLocalExitConfirmation = true
-                    }
-                } label: {
-                    ZStack {
-                        Circle()
-                            .fill(Color.red)
-                            .frame(width: 60, height: 60)
-                        Text("✕")
-                            .font(.system(size: 27, weight: .bold))
-                            .foregroundColor(.white)
-                    }
-                }
-                .buttonStyle(.plain)
             }
         }
         .padding(30)
@@ -358,18 +431,49 @@ struct StatusOverlay: View {
         HStack(spacing: 0) {
             // Video column
             VStack(spacing: 6) {
-                // Title badge
-                Text("Video")
+                // Title badge - show source type
+                let isUVCMode = dataManager.videoSource == .uvcCamera
+                let videoActive = isUVCMode ? uvcCameraManager.isCapturing : dataManager.videoEnabled
+                
+                Text(isUVCMode ? "USB Cam" : "Video")
                     .font(.caption2)
                     .fontWeight(.semibold)
-                    .foregroundColor(dataManager.videoEnabled ? .blue : .gray)
+                    .foregroundColor(videoActive ? .blue : .gray)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
-                    .background((dataManager.videoEnabled ? Color.blue : Color.gray).opacity(0.2))
+                    .background((videoActive ? Color.blue : Color.gray).opacity(0.2))
                     .cornerRadius(8)
                 
-                if dataManager.videoEnabled {
-                    // Status
+                if isUVCMode {
+                    // UVC camera info
+                    if uvcCameraManager.isCapturing {
+                        Text("Mono")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.9))
+                        
+                        if uvcCameraManager.frameWidth > 0 {
+                            Text("\(uvcCameraManager.frameWidth)×\(uvcCameraManager.frameHeight)")
+                                .font(.caption2)
+                                .foregroundColor(.white.opacity(0.7))
+                                .monospacedDigit()
+                        }
+                        if uvcCameraManager.fps > 0 {
+                            Text("\(uvcCameraManager.fps) fps")
+                                .font(.caption2)
+                                .foregroundColor(.white.opacity(0.7))
+                                .monospacedDigit()
+                        }
+                    } else if uvcCameraManager.selectedDevice != nil {
+                        Text("Starting...")
+                            .font(.caption)
+                            .foregroundColor(.yellow)
+                    } else {
+                        Text("No Device")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                    }
+                } else if dataManager.videoEnabled {
+                    // Network video info
                     if dataManager.stereoEnabled {
                         Text("Stereo")
                             .font(.caption)
@@ -509,104 +613,16 @@ struct StatusOverlay: View {
     }
 
     private var expandedView: some View {
-            VStack(alignment: .leading, spacing: 15) {
-                headerSection
-                
-                Divider()
-                .background(Color.white.opacity(0.3))
+        HStack(alignment: .top, spacing: 0) {
+            // Left column - Main status panel
+            leftColumnView
             
-                networkInfoSection
-                
-                // Show detailed track information when connected
-                if showVideoStatus && webrtcConnected {
-                    Divider()
-                        .background(Color.white.opacity(0.2))
-                    
-                    streamDetailsSection
-                }
-            
-            // Show waiting message when no frames are available (only for video mode)
-            if showVideoStatus && !hasFrames {
-                Divider()
-                    .background(Color.white.opacity(0.3))
-                
-                HStack {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        .scaleEffect(1.0)
-                    Text(dataManager.connectionStatus)
-                        .foregroundColor(.white.opacity(0.9))
-                        .font(.body)
-                        .fontWeight(.medium)
-                        .lineLimit(2)
-                }
-            }
-            
-            // View controls section (expandable)
-            if showVideoStatus {
-                if showViewControls {
-                    Divider()
-                        .background(Color.white.opacity(0.3))
-                    
-                    viewControlsSection
-                } else {
-                    // Show expand button when collapsed
-                    Divider()
-                        .background(Color.white.opacity(0.3))
-                    
-                    Button {
-                        withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
-                            showViewControls = true
-                        }
-                    } label: {
-                        HStack {
-                            Image(systemName: "slider.horizontal.3")
-                                .font(.system(size: 17, weight: .medium))
-                            Text("Modify Video View")
-                                .font(.body)
-                                .fontWeight(.medium)
-                            Spacer()
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 14, weight: .bold))
-                        }
-                        .foregroundColor(.white.opacity(0.9))
-                        .padding(.vertical, 10)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            
-            // Status position controls section (collapsible, separate from video controls)
-            Divider()
-                .background(Color.white.opacity(0.3))
-            
-            if showStatusPositionControls {
-                statusPositionControlsSection
-            } else {
-                // Show expand button when collapsed
-                Button {
-                    withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
-                        showStatusPositionControls = true
-                    }
-                } label: {
-                    HStack {
-                        Image(systemName: "move.3d")
-                            .font(.system(size: 17, weight: .medium))
-                        Text("Modify Controller Position")
-                            .font(.body)
-                            .fontWeight(.medium)
-                        Spacer()
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 14, weight: .bold))
-                    }
-                    .foregroundColor(.white.opacity(0.9))
-                    .padding(.vertical, 10)
-                }
-                .buttonStyle(.plain)
+            // Right column - Expanded settings panel (if any)
+            if expandedPanel != .none {
+                rightColumnView
             }
         }
-        .padding(24)
-        .frame(width: 360)
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: expandedPanel)
         .overlay(
             Group {
                 if showLocalExitConfirmation {
@@ -650,169 +666,436 @@ struct StatusOverlay: View {
                             }
                         }
                     }
+                    .cornerRadius(16)
                 }
             }
         )
+    }
+    
+    private var leftColumnView: some View {
+        VStack(alignment: .leading, spacing: 15) {
+            headerSection
+            
+            Divider()
+                .background(Color.white.opacity(0.3))
+            
+            networkInfoSection
+            
+            // Show detailed track information when connected (either WebRTC or UVC camera)
+            let showStreamDetails = showVideoStatus && (webrtcConnected || (dataManager.videoSource == .uvcCamera && uvcCameraManager.isCapturing))
+            if showStreamDetails {
+                Divider()
+                    .background(Color.white.opacity(0.2))
+                
+                streamDetailsSection
+            }
+            
+            // Show waiting message when no frames are available (only for video mode)
+            // Don't show waiting for UVC if a camera is capturing
+            let isUVCActive = dataManager.videoSource == .uvcCamera && uvcCameraManager.isCapturing
+            if showVideoStatus && !hasFrames && !isUVCActive {
+                Divider()
+                    .background(Color.white.opacity(0.3))
+                
+                HStack {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(1.0)
+                    Text(dataManager.videoSource == .uvcCamera ?
+                         (uvcCameraManager.selectedDevice == nil ? "No USB camera detected" : "Waiting for camera...") :
+                         dataManager.connectionStatus)
+                        .foregroundColor(.white.opacity(0.9))
+                        .font(.body)
+                        .fontWeight(.medium)
+                        .lineLimit(2)
+                }
+            }
+            
+            // Menu items section
+            if showVideoStatus {
+                Divider()
+                    .background(Color.white.opacity(0.3))
+                
+                // Video Source menu item
+                menuItem(
+                    icon: dataManager.videoSource.icon,
+                    title: "Video Source",
+                    subtitle: dataManager.videoSource.rawValue,
+                    isExpanded: expandedPanel == .videoSource,
+                    accentColor: .blue
+                ) {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        expandedPanel = expandedPanel == .videoSource ? .none : .videoSource
+                    }
+                }
+                
+                // Modify Video View menu item
+                menuItem(
+                    icon: "slider.horizontal.3",
+                    title: "Modify Video View",
+                    subtitle: "\(String(format: "%.1f", -dataManager.videoPlaneZDistance))m",
+                    isExpanded: expandedPanel == .viewControls,
+                    accentColor: .green
+                ) {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        if expandedPanel == .viewControls {
+                            expandedPanel = .none
+                            previewZDistance = nil
+                            previewActive = false
+                            hidePreviewTask?.cancel()
+                        } else {
+                            expandedPanel = .viewControls
+                        }
+                    }
+                }
+            }
+            
+            Divider()
+                .background(Color.white.opacity(0.3))
+            
+            // Recording menu item
+            menuItem(
+                icon: recordingManager.isRecording ? "record.circle.fill" : "record.circle",
+                title: "Recording",
+                subtitle: recordingManager.isRecording ? recordingManager.formatDuration(recordingManager.recordingDuration) : recordingManager.storageLocation.rawValue,
+                isExpanded: expandedPanel == .recording,
+                accentColor: .red,
+                iconColor: recordingManager.isRecording ? .red : nil
+            ) {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    expandedPanel = expandedPanel == .recording ? .none : .recording
+                }
+            }
+            
+            Divider()
+                .background(Color.white.opacity(0.3))
+            
+            // Controller Position menu item
+            menuItem(
+                icon: "move.3d",
+                title: "Controller Position",
+                subtitle: nil,
+                isExpanded: expandedPanel == .statusPosition,
+                accentColor: .purple
+            ) {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    if expandedPanel == .statusPosition {
+                        expandedPanel = .none
+                        previewStatusPosition = nil
+                        previewStatusActive = false
+                        hidePreviewTask?.cancel()
+                    } else {
+                        expandedPanel = .statusPosition
+                    }
+                }
+            }
+        }
+        .padding(24)
+        .frame(width: 352)
         .background(Color.black.opacity(0.7))
         .cornerRadius(16)
     }
     
-    private var viewControlsSection: some View {
-        VStack(alignment: .leading, spacing: 15) {
-            Button {
-                withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
-                    showViewControls = false
+    private func menuItem(icon: String, title: String, subtitle: String?, isExpanded: Bool, accentColor: Color, iconColor: Color? = nil, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack {
+                Image(systemName: icon)
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundColor(iconColor ?? (isExpanded ? accentColor : .white.opacity(0.9)))
+                    .frame(width: 24)
+                Text(title)
+                    .font(.body)
+                    .fontWeight(.medium)
+                Spacer()
+                if let subtitle = subtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundColor(isExpanded ? accentColor : .white.opacity(0.6))
                 }
-                previewZDistance = nil
-                previewActive = false
-                hidePreviewTask?.cancel()
+                Image(systemName: isExpanded ? "chevron.right" : "chevron.right")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(isExpanded ? accentColor : .white.opacity(0.5))
+            }
+            .foregroundColor(isExpanded ? accentColor : .white.opacity(0.9))
+            .padding(.vertical, 8)
+            .padding(.horizontal, 4)
+            .background(isExpanded ? accentColor.opacity(0.15) : Color.clear)
+            .cornerRadius(8)
+        }
+        .buttonStyle(.plain)
+    }
+    
+    private var rightColumnView: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Panel header
+            HStack {
+                Text(panelTitle)
+                    .font(.body)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                Spacer()
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        expandedPanel = .none
+                        previewZDistance = nil
+                        previewActive = false
+                        previewStatusPosition = nil
+                        previewStatusActive = false
+                        hidePreviewTask?.cancel()
+                    }
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(Color.white.opacity(0.2))
+                            .frame(width: 44, height: 44)
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.white)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+            
+            Divider()
+                .background(Color.white.opacity(0.3))
+            
+            // Panel content
+            switch expandedPanel {
+            case .videoSource:
+                videoSourcePanelContent
+            case .viewControls:
+                viewControlsPanelContent
+            case .recording:
+                recordingPanelContent
+            case .statusPosition:
+                statusPositionPanelContent
+            case .none:
+                EmptyView()
+            }
+        }
+        .padding(24)
+        .frame(width: 300)
+        .background(Color.black.opacity(0.7))
+        .cornerRadius(16)
+        .padding(.leading, 8)
+    }
+    
+    private var panelTitle: String {
+        switch expandedPanel {
+        case .videoSource: return "Video Source"
+        case .viewControls: return "Video View"
+        case .recording: return "Recording"
+        case .statusPosition: return "Controller Position"
+        case .none: return ""
+        }
+    }
+    
+    // MARK: - Right Panel Content Views
+    
+    private var videoSourcePanelContent: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Network Stream option
+            Button {
+                withAnimation {
+                    dataManager.videoSource = .network
+                }
             } label: {
                 HStack {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 17, weight: .medium))
-                    Text("Modify Video View")
-                        .font(.body)
-                        .fontWeight(.medium)
+                    Image(systemName: "wifi")
+                        .font(.system(size: 14))
+                        .frame(width: 20)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Network Stream")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                        Text("WebRTC from Python")
+                            .font(.caption2)
+                            .foregroundColor(.white.opacity(0.5))
+                    }
                     Spacer()
-                    Image(systemName: "chevron.up")
-                        .font(.system(size: 14, weight: .bold))
+                    if dataManager.videoSource == .network {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(.green)
+                    }
                 }
-                .foregroundColor(.white.opacity(0.9))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(dataManager.videoSource == .network ? Color.blue.opacity(0.3) : Color.white.opacity(0.1))
+                .cornerRadius(8)
+                .foregroundColor(.white)
             }
             .buttonStyle(.plain)
             
-            // Distance control
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Distance (Z-axis)")
-                    .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.7))
-                
-                HStack {
-                    Text("\(String(format: "%.1f", -dataManager.videoPlaneZDistance))m")
-                        .font(.system(size: 15, weight: .medium, design: .monospaced))
-                        .foregroundColor(.white)
-                        .frame(width: 50, alignment: .leading)
-                     
-                    Slider(value: Binding(
-                        get: { -dataManager.videoPlaneZDistance },
-                        set: { positiveValue in
-                            let negativeValue = -positiveValue
-                            dataManager.videoPlaneZDistance = negativeValue
-                            previewZDistance = negativeValue
-                            
-                            // Cancel any existing hide task
-                            hidePreviewTask?.cancel()
-                            
-                            // Schedule hiding the preview after 3 seconds of inactivity
-                            hidePreviewTask = Task { @MainActor in
-                                try? await Task.sleep(nanoseconds: 3_000_000_000)
-                                if !Task.isCancelled {
-                                    previewZDistance = nil
-                                }
+            // USB Camera option
+            Button {
+                Task {
+                    let granted = await uvcCameraManager.requestCameraAccess()
+                    if granted {
+                        await MainActor.run {
+                            withAnimation {
+                                dataManager.videoSource = .uvcCamera
                             }
                         }
-                    ), in: 2.0...20.0, step: 0.5)
-                    .tint(.blue)
+                    }
                 }
-                
+            } label: {
                 HStack {
-                    Text("Near (2m)")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.5))
+                    Image(systemName: "cable.connector")
+                        .font(.system(size: 14))
+                        .frame(width: 20)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("USB Camera")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                        Text("UVC via Developer Strap")
+                            .font(.caption2)
+                            .foregroundColor(.white.opacity(0.5))
+                    }
                     Spacer()
-                    Text("Far (20m)")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.5))
+                    if dataManager.videoSource == .uvcCamera {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(.green)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(dataManager.videoSource == .uvcCamera ? Color.blue.opacity(0.3) : Color.white.opacity(0.1))
+                .cornerRadius(8)
+                .foregroundColor(.white)
+            }
+            .buttonStyle(.plain)
+            
+            // Available cameras section (show only when USB selected)
+            if dataManager.videoSource == .uvcCamera && !uvcCameraManager.availableDevices.isEmpty {
+                Divider()
+                    .background(Color.white.opacity(0.3))
+                
+                Text("Available Cameras")
+                    .font(.caption2)
+                    .foregroundColor(.white.opacity(0.5))
+                
+                ForEach(uvcCameraManager.availableDevices.prefix(2)) { device in
+                    Button {
+                        uvcCameraManager.selectDevice(device)
+                        Task {
+                            try? await Task.sleep(nanoseconds: 200_000_000)
+                            await MainActor.run { uvcCameraManager.startCapture() }
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: "video.fill")
+                                .font(.system(size: 12))
+                                .frame(width: 16)
+                            Text(device.name)
+                                .font(.caption)
+                                .lineLimit(1)
+                            Spacer()
+                            if uvcCameraManager.selectedDevice?.id == device.id && uvcCameraManager.isCapturing {
+                                Circle()
+                                    .fill(Color.green)
+                                    .frame(width: 6, height: 6)
+                            }
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(uvcCameraManager.selectedDevice?.id == device.id ? Color.green.opacity(0.2) : Color.white.opacity(0.1))
+                        .cornerRadius(8)
+                        .foregroundColor(.white.opacity(0.9))
+                    }
+                    .buttonStyle(.plain)
                 }
             }
-            
-            Divider()
-                .background(Color.white.opacity(0.2))
+        }
+    }
+    
+    private var viewControlsPanelContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // Distance control
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("Distance")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.7))
+                    Spacer()
+                    Text("\(String(format: "%.1f", -dataManager.videoPlaneZDistance))m")
+                        .font(.caption)
+                        .foregroundColor(.white)
+                        .monospacedDigit()
+                }
+                
+                Slider(value: Binding(
+                    get: { -dataManager.videoPlaneZDistance },
+                    set: { positiveValue in
+                        let negativeValue = -positiveValue
+                        dataManager.videoPlaneZDistance = negativeValue
+                        previewZDistance = negativeValue
+                        hidePreviewTask?.cancel()
+                        hidePreviewTask = Task { @MainActor in
+                            try? await Task.sleep(nanoseconds: 3_000_000_000)
+                            if !Task.isCancelled { previewZDistance = nil }
+                        }
+                    }
+                ), in: 2.0...20.0, step: 0.5)
+                .tint(.blue)
+            }
             
             // Height control
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Height (Y-axis)")
-                    .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.7))
-                
+            VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text("\(String(format: "%.2f", dataManager.videoPlaneYPosition))m")
-                        .font(.system(size: 15, weight: .medium, design: .monospaced))
-                        .foregroundColor(.white)
-                        .frame(width: 50, alignment: .leading)
-                    
-                    Slider(value: Binding(
-                        get: { dataManager.videoPlaneYPosition },
-                        set: { newValue in
-                            dataManager.videoPlaneYPosition = newValue
-                            // Show preview when adjusting
-                            previewActive = true
-                            
-                            // Cancel any existing hide task
-                            hidePreviewTask?.cancel()
-                            
-                            // Schedule hiding the preview after 3 seconds of inactivity
-                            hidePreviewTask = Task { @MainActor in
-                                try? await Task.sleep(nanoseconds: 3_000_000_000)
-                                if !Task.isCancelled {
-                                    previewActive = false
-                                }
-                            }
-                        }
-                    ), in: -2.0...2.0, step: 0.1)
-                    .tint(.green)
-                }
-                
-                HStack {
-                    Text("Down (2m)")
+                    Text("Height")
                         .font(.caption)
-                        .foregroundColor(.white.opacity(0.5))
+                        .foregroundColor(.white.opacity(0.7))
                     Spacer()
-                    Text("Up (2m)")
+                    Text("\(String(format: "%.2f", dataManager.videoPlaneYPosition))m")
                         .font(.caption)
-                        .foregroundColor(.white.opacity(0.5))
+                        .foregroundColor(.white)
+                        .monospacedDigit()
                 }
+                
+                Slider(value: Binding(
+                    get: { dataManager.videoPlaneYPosition },
+                    set: { newValue in
+                        dataManager.videoPlaneYPosition = newValue
+                        previewActive = true
+                        hidePreviewTask?.cancel()
+                        hidePreviewTask = Task { @MainActor in
+                            try? await Task.sleep(nanoseconds: 3_000_000_000)
+                            if !Task.isCancelled { previewActive = false }
+                        }
+                    }
+                ), in: -2.0...2.0, step: 0.1)
+                .tint(.green)
             }
             
-            Divider()
-                .background(Color.white.opacity(0.2))
-            
+            // Lock to world toggle
             HStack {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Lock To World")
-                        .font(.subheadline)
-                        .foregroundColor(.white.opacity(0.7))
-                    Text("Keep panel stationary")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.5))
-                }
+                Text("Lock To World")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.8))
                 Spacer()
                 Toggle("", isOn: $videoFixed)
                     .labelsHidden()
                     .tint(.orange)
-                    .scaleEffect(1.2)
             }
             
-            HStack(spacing: 15) {
-                Spacer()
-                
-                // Video minimize/maximize button
+            // Action buttons
+            HStack(spacing: 8) {
                 Button {
-                    withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
-                        videoMinimized.toggle()
-                    }
+                    withAnimation { videoMinimized.toggle() }
                 } label: {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 4) {
                         Image(systemName: videoMinimized ? "eye.fill" : "eye.slash.fill")
-                            .font(.system(size: 14, weight: .bold))
-                        Text(videoMinimized ? "Show Video" : "Hide Video")
-                            .font(.subheadline)
+                            .font(.system(size: 10, weight: .bold))
+                        Text(videoMinimized ? "Show" : "Hide")
+                            .font(.caption2)
                     }
                     .foregroundColor(.blue)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
                     .background(Color.white.opacity(0.15))
-                    .cornerRadius(8)
+                    .cornerRadius(6)
                 }
                 .buttonStyle(.plain)
                 
@@ -822,7 +1105,6 @@ struct StatusOverlay: View {
                     dataManager.videoPlaneAutoPerpendicular = false
                     previewZDistance = -10.0
                     previewActive = true
-                    
                     hidePreviewTask?.cancel()
                     hidePreviewTask = Task { @MainActor in
                         try? await Task.sleep(nanoseconds: 3_000_000_000)
@@ -832,181 +1114,214 @@ struct StatusOverlay: View {
                         }
                     }
                 } label: {
-                    Text("Reset All")
-                        .font(.subheadline)
+                    Text("Reset")
+                        .font(.caption2)
                         .foregroundColor(.blue)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
                         .background(Color.white.opacity(0.15))
-                        .cornerRadius(8)
+                        .cornerRadius(6)
                 }
                 .buttonStyle(.plain)
-                Spacer()
             }
-            
-            Text("💡 Adjust position and orientation of the video plane")
-                .font(.caption)
-                .foregroundColor(.white.opacity(0.5))
-                .multilineTextAlignment(.leading)
         }
     }
     
-    private var statusPositionControlsSection: some View {
-        VStack(alignment: .leading, spacing: 15) {
-            Button {
-                withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
-                    showStatusPositionControls = false
-                }
-                previewStatusPosition = nil
-                previewStatusActive = false
-                hidePreviewTask?.cancel()
-            } label: {
+    private var recordingPanelContent: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if recordingManager.isRecording {
+                // Active recording display
                 HStack {
-                    Image(systemName: "move.3d")
-                        .font(.system(size: 17, weight: .medium))
-                    Text("Modify Controller Position")
-                        .font(.body)
-                        .fontWeight(.medium)
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 10, height: 10)
+                    Text(recordingManager.formatDuration(recordingManager.recordingDuration))
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.red)
+                        .monospacedDigit()
+                    Text("• \(recordingManager.frameCount) frames")
+                        .font(.caption2)
+                        .foregroundColor(.white.opacity(0.6))
                     Spacer()
-                    Image(systemName: "chevron.up")
-                        .font(.system(size: 14, weight: .bold))
-                }
-                .foregroundColor(.white.opacity(0.9))
-            }
-            .buttonStyle(.plain)
-            
-            // X position control
-            VStack(alignment: .leading, spacing: 10) {
-                Text("X Position (Left-Right)")
-                    .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.7))
-                
-                HStack {
-                    Text("\(String(format: "%.2f", dataManager.statusMinimizedXPosition))m")
-                        .font(.system(size: 15, weight: .medium, design: .monospaced))
-                        .foregroundColor(.white)
-                        .frame(width: 50, alignment: .leading)
-                    
-                    Slider(value: Binding(
-                        get: { dataManager.statusMinimizedXPosition },
-                        set: { newValue in
-                            print("🎚️ [StatusView] X slider changed to: \(newValue)")
-                            dataManager.statusMinimizedXPosition = newValue
-                            previewStatusPosition = (x: newValue, y: dataManager.statusMinimizedYPosition)
-                            previewStatusActive = true
-                            print("🎚️ [StatusView] Set previewStatusPosition to: \(String(describing: previewStatusPosition)), previewStatusActive: \(previewStatusActive)")
-                            
-                            // Cancel any existing hide task
-                            hidePreviewTask?.cancel()
-                            
-                            // Schedule hiding the preview after 3 seconds of inactivity
-                            hidePreviewTask = Task { @MainActor in
-                                try? await Task.sleep(nanoseconds: 3_000_000_000)
-                                if !Task.isCancelled {
-                                    previewStatusPosition = nil
-                                    previewStatusActive = false
-                                }
-                            }
-                        }
-                    ), in: -0.5...0.5, step: 0.05)
-                    .tint(.purple)
                 }
                 
-                HStack {
-                    Text("Left (0.5m)")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.5))
-                    Spacer()
-                    Text("Right (0.5m)")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.5))
-                }
-            }
-            
-            Divider()
-                .background(Color.white.opacity(0.2))
-            
-            // Y position control
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Y Position (Up-Down)")
-                    .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.7))
-                
-                HStack {
-                    Text("\(String(format: "%.2f", dataManager.statusMinimizedYPosition))m")
-                        .font(.system(size: 15, weight: .medium, design: .monospaced))
-                        .foregroundColor(.white)
-                        .frame(width: 50, alignment: .leading)
-                    
-                    Slider(value: Binding(
-                        get: { dataManager.statusMinimizedYPosition },
-                        set: { newValue in
-                            print("🎚️ [StatusView] Y slider changed to: \(newValue)")
-                            dataManager.statusMinimizedYPosition = newValue
-                            previewStatusPosition = (x: dataManager.statusMinimizedXPosition, y: newValue)
-                            previewStatusActive = true
-                            print("🎚️ [StatusView] Set previewStatusPosition to: \(String(describing: previewStatusPosition)), previewStatusActive: \(previewStatusActive)")
-                            
-                            // Cancel any existing hide task
-                            hidePreviewTask?.cancel()
-                            
-                            // Schedule hiding the preview after 3 seconds of inactivity
-                            hidePreviewTask = Task { @MainActor in
-                                try? await Task.sleep(nanoseconds: 3_000_000_000)
-                                if !Task.isCancelled {
-                                    previewStatusPosition = nil
-                                    previewStatusActive = false
-                                }
-                            }
-                        }
-                    ), in: -0.5...0.5, step: 0.05)
-                    .tint(.purple)
-                }
-                
-                HStack {
-                    Text("Down (0.5m)")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.5))
-                    Spacer()
-                    Text("Up (0.5m)")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.5))
-                }
-            }
-            
-            HStack {
-                Spacer()
-                Button {
-                    dataManager.statusMinimizedXPosition = 0.0
-                    dataManager.statusMinimizedYPosition = -0.3
-                    previewStatusPosition = (x: 0.0, y: -0.3)
-                    previewStatusActive = true
-                    
-                    hidePreviewTask?.cancel()
-                    hidePreviewTask = Task { @MainActor in
-                        try? await Task.sleep(nanoseconds: 3_000_000_000)
-                        if !Task.isCancelled {
-                            previewStatusPosition = nil
-                            previewStatusActive = false
-                        }
+                Button { recordingManager.stopRecording() } label: {
+                    HStack {
+                        Image(systemName: "stop.fill")
+                            .font(.system(size: 12, weight: .bold))
+                        Text("Stop Recording")
+                            .font(.caption)
+                            .fontWeight(.semibold)
                     }
-                } label: {
-                    Text("Reset Position")
-                        .font(.subheadline)
-                        .foregroundColor(.purple)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(Color.white.opacity(0.15))
-                        .cornerRadius(8)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(Color.red)
+                    .cornerRadius(8)
                 }
                 .buttonStyle(.plain)
-                Spacer()
+            } else if recordingManager.isSaving {
+                HStack {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(0.6)
+                    Text("Saving...")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.8))
+                }
+            } else {
+                // Save location options
+                ForEach(RecordingStorageLocation.allCases, id: \.self) { location in
+                    Button { recordingManager.storageLocation = location } label: {
+                        HStack {
+                            Image(systemName: location.icon)
+                                .font(.system(size: 14))
+                                .frame(width: 20)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(location.rawValue)
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                Text(storageDescription(for: location))
+                                    .font(.caption2)
+                                    .foregroundColor(.white.opacity(0.5))
+                            }
+                            Spacer()
+                            if recordingManager.storageLocation == location {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.green)
+                            }
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(recordingManager.storageLocation == location ? Color.green.opacity(0.2) : Color.white.opacity(0.1))
+                        .cornerRadius(8)
+                        .foregroundColor(.white)
+                    }
+                    .buttonStyle(.plain)
+                }
+                
+                Button { recordingManager.startRecording() } label: {
+                    HStack {
+                        Image(systemName: "record.circle")
+                            .font(.system(size: 14, weight: .bold))
+                        Text("Start Recording")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(Color.red.opacity(0.8))
+                    .cornerRadius(8)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+    
+    private func storageDescription(for location: RecordingStorageLocation) -> String {
+        switch location {
+        case .local:
+            return "App-only storage"
+        case .iCloudDrive:
+            return "Syncs across devices"
+        case .documentsFolder:
+            return "Accessible via Files app"
+        }
+    }
+    
+    private var statusPositionPanelContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // X position control
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("X (Left-Right)")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.7))
+                    Spacer()
+                    Text("\(String(format: "%.2f", dataManager.statusMinimizedXPosition))m")
+                        .font(.caption)
+                        .foregroundColor(.white)
+                        .monospacedDigit()
+                }
+                
+                Slider(value: Binding(
+                    get: { dataManager.statusMinimizedXPosition },
+                    set: { newValue in
+                        dataManager.statusMinimizedXPosition = newValue
+                        previewStatusPosition = (x: newValue, y: dataManager.statusMinimizedYPosition)
+                        previewStatusActive = true
+                        hidePreviewTask?.cancel()
+                        hidePreviewTask = Task { @MainActor in
+                            try? await Task.sleep(nanoseconds: 3_000_000_000)
+                            if !Task.isCancelled {
+                                previewStatusPosition = nil
+                                previewStatusActive = false
+                            }
+                        }
+                    }
+                ), in: -0.5...0.5, step: 0.05)
+                .tint(.purple)
             }
             
-            Text("💡 Preview will show where the minimized status will appear")
-                .font(.caption)
-                .foregroundColor(.white.opacity(0.5))
-                .multilineTextAlignment(.leading)
+            // Y position control
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("Y (Up-Down)")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.7))
+                    Spacer()
+                    Text("\(String(format: "%.2f", dataManager.statusMinimizedYPosition))m")
+                        .font(.caption)
+                        .foregroundColor(.white)
+                        .monospacedDigit()
+                }
+                
+                Slider(value: Binding(
+                    get: { dataManager.statusMinimizedYPosition },
+                    set: { newValue in
+                        dataManager.statusMinimizedYPosition = newValue
+                        previewStatusPosition = (x: dataManager.statusMinimizedXPosition, y: newValue)
+                        previewStatusActive = true
+                        hidePreviewTask?.cancel()
+                        hidePreviewTask = Task { @MainActor in
+                            try? await Task.sleep(nanoseconds: 3_000_000_000)
+                            if !Task.isCancelled {
+                                previewStatusPosition = nil
+                                previewStatusActive = false
+                            }
+                        }
+                    }
+                ), in: -0.5...0.5, step: 0.05)
+                .tint(.purple)
+            }
+            
+            Button {
+                dataManager.statusMinimizedXPosition = 0.0
+                dataManager.statusMinimizedYPosition = -0.3
+                previewStatusPosition = (x: 0.0, y: -0.3)
+                previewStatusActive = true
+                hidePreviewTask?.cancel()
+                hidePreviewTask = Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    if !Task.isCancelled {
+                        previewStatusPosition = nil
+                        previewStatusActive = false
+                    }
+                }
+            } label: {
+                Text("Reset")
+                    .font(.caption2)
+                    .foregroundColor(.purple)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.white.opacity(0.15))
+                    .cornerRadius(6)
+            }
+            .buttonStyle(.plain)
         }
     }
 }
@@ -1026,6 +1341,16 @@ struct StatusPreviewView: View {
                 Image(systemName: "arrow.up.left.and.arrow.down.right")
                     .font(.system(size: 24, weight: .bold))
                     .foregroundColor(.white)
+            }
+            
+            // Recording button (non-functional in preview)
+            ZStack {
+                Circle()
+                    .fill(Color.red.opacity(0.8))
+                    .frame(width: 60, height: 60)
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 24, height: 24)
             }
             
             // Video minimize/maximize button (only show if video streaming mode is enabled)

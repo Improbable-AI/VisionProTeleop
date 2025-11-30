@@ -97,6 +97,19 @@ final class BenchmarkEventDispatcher: @unchecked Sendable {
 /// Protocol to allow type erasure for RPCWriter
 protocol RPCWriterProtocol: Sendable {}
 
+/// Video source selection
+enum VideoSource: String, CaseIterable {
+    case network = "Network Stream"
+    case uvcCamera = "USB Camera"
+    
+    var icon: String {
+        switch self {
+        case .network: return "wifi"
+        case .uvcCamera: return "cable.connector"
+        }
+    }
+}
+
 class DataManager: ObservableObject {
     static let shared = DataManager()
     
@@ -110,6 +123,13 @@ class DataManager: ObservableObject {
     @Published var audioEnabled: Bool = false  // Whether audio track is present at all
     @Published var videoEnabled: Bool = false  // Whether video track is present at all
     @Published var simEnabled: Bool = false    // Whether simulation is enabled
+    
+    // Video source selection (persistent via UserDefaults)
+    @Published var videoSource: VideoSource {
+        didSet {
+            UserDefaults.standard.set(videoSource.rawValue, forKey: "videoSource")
+        }
+    }
     
     // Stream stats
     @Published var videoResolution: String = "Waiting..."
@@ -158,6 +178,13 @@ class DataManager: ObservableObject {
     @Published var showExitConfirmation: Bool = false
     
     private init() {
+        // Load saved video source or default to network
+        if let savedVideoSource = UserDefaults.standard.string(forKey: "videoSource"),
+           let source = VideoSource(rawValue: savedVideoSource) {
+            self.videoSource = source
+        } else {
+            self.videoSource = .network
+        }
         // Load saved z-distance or use default of -10.0
         self.videoPlaneZDistance = UserDefaults.standard.object(forKey: "videoPlaneZDistance") as? Float ?? -10.0
         // Load saved y-position or use default of 0.0
