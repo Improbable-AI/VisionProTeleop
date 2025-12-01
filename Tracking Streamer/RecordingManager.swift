@@ -66,6 +66,7 @@ struct RecordingMetadata: Codable {
     let videoSource: String  // "network" or "uvc"
     let averageFPS: Double
     let deviceInfo: DeviceInfo
+    let cameraCalibration: CameraCalibrationData?  // Intrinsic calibration if available
 }
 
 struct DeviceInfo: Codable {
@@ -101,6 +102,7 @@ struct VideoFrameData {
 
 /// Manages synchronized recording of tracking data and video frames.
 /// Recording is VIDEO-DRIVEN: each new video frame triggers a recording of the latest tracking data.
+/// Auto-recording: Recording starts automatically when video frames arrive and stops when disconnected.
 @MainActor
 class RecordingManager: ObservableObject {
     static let shared = RecordingManager()
@@ -117,6 +119,14 @@ class RecordingManager: ObservableObject {
     @Published var lastRecordingURL: URL? = nil
     @Published var recordingError: String? = nil
     @Published var isSaving: Bool = false
+    
+    // Auto-recording state
+    @Published var autoRecordingEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(autoRecordingEnabled, forKey: "autoRecordingEnabled")
+        }
+    }
+    @Published var isAutoRecording: Bool = false  // True if current recording was auto-started
     
     // MARK: - Private Properties
     private var recordingStartTime: Date?
@@ -153,6 +163,40 @@ class RecordingManager: ObservableObject {
         } else {
             self.storageLocation = .documentsFolder
         }
+        
+        // Load auto-recording preference (default to true for auto-record by default)
+        self.autoRecordingEnabled = UserDefaults.standard.object(forKey: "autoRecordingEnabled") as? Bool ?? true
+    }
+    
+    // MARK: - Auto-Recording Control
+    
+    /// Called when first video frame is received. Starts recording if auto-recording is enabled.
+    /// Video source can be UVC camera or network stream.
+    func onFirstVideoFrame() {
+        guard autoRecordingEnabled && !isRecording else { return }
+        
+        print("🔴 [RecordingManager] Auto-starting recording on first video frame")
+        isAutoRecording = true
+        startRecording()
+    }
+    
+    /// Called when video source is disconnected (UVC camera unplugged, Python client disconnected, or WebRTC disconnected).
+    /// Stops recording if it was auto-started.
+    func onVideoSourceDisconnected(reason: String) {
+        guard isRecording else { return }
+        
+        print("🔴 [RecordingManager] Stopping recording due to: \(reason)")
+        stopRecording()
+        isAutoRecording = false
+    }
+    
+    /// Explicitly stop recording (user action). This also clears auto-recording state.
+    func stopRecordingManually() {
+        guard isRecording else { return }
+        
+        print("🔴 [RecordingManager] User manually stopped recording")
+        stopRecording()
+        isAutoRecording = false
     }
     
     // MARK: - Recording Control
@@ -548,6 +592,13 @@ class RecordingManager: ObservableObject {
             recordingFolderURL = nil
             
             // Save metadata
+            // Load camera calibration if available (for UVC camera)
+            var calibrationData: CameraCalibrationData? = nil
+            if DataManager.shared.videoSource == .uvcCamera,
+               let deviceId = await MainActor.run(body: { UVCCameraManager.shared.selectedDevice?.id }) {
+                calibrationData = await MainActor.run { CameraCalibrationManager.shared.loadCalibration(for: deviceId) }
+            }
+            
             let metadata = RecordingMetadata(
                 createdAt: recordingStartTime ?? Date(),
                 duration: recordingDuration,
@@ -562,7 +613,8 @@ class RecordingManager: ObservableObject {
                     model: "Apple Vision Pro",
                     systemVersion: UIDevice.current.systemVersion,
                     appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-                )
+                ),
+                cameraCalibration: calibrationData
             )
             
             let metadataURL = recordingFolder.appendingPathComponent("metadata.json")

@@ -43,8 +43,9 @@ class UVCCameraManager: NSObject, ObservableObject {
     private var frameCount: Int = 0
     private var lastFPSUpdate: Date = Date()
     
-    // Frame callback for external consumers
+    // Frame callbacks for external consumers
     var onFrameReceived: ((UIImage) -> Void)?
+    var onPixelBufferReceived: ((CVPixelBuffer) -> Void)?
     
     // MARK: - Initialization
     
@@ -140,6 +141,11 @@ class UVCCameraManager: NSObject, ObservableObject {
             print("📷 [UVCCameraManager] Selected device disconnected")
             selectedDevice = nil
             stopCapture()
+            
+            // Notify recording manager about UVC disconnect for auto-stop
+            Task { @MainActor in
+                RecordingManager.shared.onVideoSourceDisconnected(reason: "UVC camera disconnected")
+            }
         }
     }
     
@@ -330,6 +336,13 @@ extension UVCCameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
             
             // Notify external consumers
             self.onFrameReceived?(uiImage)
+            if self.onPixelBufferReceived != nil {
+                // Debug: only log occasionally to avoid spam
+                if self.frameCount == 1 {
+                    print("📹 [UVCCameraManager] onPixelBufferReceived callback is set, calling with \(width)x\(height) buffer")
+                }
+                self.onPixelBufferReceived?(pixelBuffer)
+            }
         }
     }
     

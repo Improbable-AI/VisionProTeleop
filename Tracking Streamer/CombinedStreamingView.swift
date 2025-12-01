@@ -579,6 +579,10 @@ struct CombinedStreamingView: View {
         .onChange(of: dataManager.pythonClientIP) { oldValue, newValue in
             if newValue == nil {
                 print("🔌 [CombinedStreamingView] Python client disconnected")
+                
+                // Stop auto-recording when Python client disconnects
+                recordingManager.onVideoSourceDisconnected(reason: "Python client disconnected")
+                
                 imageData.left = nil
                 imageData.right = nil
                 hasFrames = false
@@ -608,6 +612,9 @@ struct CombinedStreamingView: View {
         }
         .onChange(of: dataManager.webrtcGeneration) { oldValue, newValue in
             if newValue < 0 {
+                // Stop auto-recording when WebRTC disconnects
+                recordingManager.onVideoSourceDisconnected(reason: "WebRTC disconnected")
+                
                 imageData.left = nil
                 imageData.right = nil
                 hasFrames = false

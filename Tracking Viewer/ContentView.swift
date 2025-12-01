@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var recordingsManager = RecordingsManager.shared
+    @StateObject private var httpServer = HTTPFileServer.shared
     @State private var isSelectionMode = false
     @State private var showExportSheet = false
     @State private var exportURLs: [URL] = []
@@ -16,6 +17,7 @@ struct ContentView: View {
     @State private var recordingToDelete: Recording?
     @State private var showDeleteSelectedConfirmation = false
     @State private var showExportAllSheet = false
+    @State private var showHTTPServer = false
     
     private let columns = [
         GridItem(.adaptive(minimum: 160, maximum: 200), spacing: 16)
@@ -36,10 +38,18 @@ struct ContentView: View {
             .navigationTitle("Recordings")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button(action: {
-                        Task { await recordingsManager.loadRecordings() }
-                    }) {
-                        Image(systemName: "arrow.clockwise")
+                    HStack {
+                        Button(action: {
+                            Task { await recordingsManager.loadRecordings() }
+                        }) {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        
+                        // HTTP Server button
+                        NavigationLink(destination: HTTPServerView()) {
+                            Image(systemName: httpServer.isRunning ? "antenna.radiowaves.left.and.right" : "antenna.radiowaves.left.and.right.slash")
+                                .foregroundColor(httpServer.isRunning ? .green : .gray)
+                        }
                     }
                 }
                 
@@ -199,6 +209,21 @@ struct ContentView: View {
             showExportSheet = true
         }) {
             Label("Export", systemImage: "square.and.arrow.up")
+        }
+        
+        // Copy download URL if server is running
+        if httpServer.isRunning, let url = httpServer.getDownloadURL(for: recording) {
+            Button(action: {
+                UIPasteboard.general.string = url
+            }) {
+                Label("Copy Download URL", systemImage: "link")
+            }
+            
+            Button(action: {
+                UIPasteboard.general.string = "curl -o \(recording.id).zip \"\(url)\""
+            }) {
+                Label("Copy curl Command", systemImage: "terminal")
+            }
         }
         
         Button(role: .destructive, action: {

@@ -45,7 +45,26 @@
 		C1EAF9772ED7EC9000549580 /* CombinedStreamingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EAF9762ED7EC9000549580 /* CombinedStreamingView.swift */; };
 		C1EAF9792EDBA73600549580 /* UVCCameraManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EAF9782EDBA73600549580 /* UVCCameraManager.swift */; };
 		C1EAF97F2EDBB9C700549580 /* RecordingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EAF97E2EDBB9C700549580 /* RecordingManager.swift */; };
+		C1EAFA222EDCF22A00549580 /* OpenCVWrapper.mm in Sources */ = {isa = PBXBuildFile; fileRef = C1EAFA202EDCF22A00549580 /* OpenCVWrapper.mm */; };
+		C1EAFA292EDCF5CF00549580 /* CameraCalibrationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EAFA272EDCF5CF00549580 /* CameraCalibrationManager.swift */; };
+		C1EAFA2A2EDCF5CF00549580 /* CameraCalibrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EAFA282EDCF5CF00549580 /* CameraCalibrationView.swift */; };
+		C1EAFA352EDCF80A00549580 /* opencv2.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = C1EAFA342EDCF80A00549580 /* opencv2.xcframework */; };
+		C1EAFA372EDD2C8D00549580 /* ExtrinsicCalibrationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EAFA362EDD2C8D00549580 /* ExtrinsicCalibrationManager.swift */; };
+		C1EAFA392EDD2EA600549580 /* ExtrinsicCalibrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EAFA382EDD2EA600549580 /* ExtrinsicCalibrationView.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		C1EAFA2F2EDCF63F00549580 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		160ED7972B4B74C5002AD987 /* 🧑HeadTrackingComponent&System.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "🧑HeadTrackingComponent&System.swift"; sourceTree = "<group>"; };
@@ -92,6 +111,13 @@
 		C1EAF9782EDBA73600549580 /* UVCCameraManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UVCCameraManager.swift; sourceTree = "<group>"; };
 		C1EAF97E2EDBB9C700549580 /* RecordingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingManager.swift; sourceTree = "<group>"; };
 		C1EAF9C72EDBF9C100549580 /* Tracking Viewer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Tracking Viewer.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		C1EAFA1F2EDCF22A00549580 /* OpenCVWrapper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OpenCVWrapper.h; sourceTree = "<group>"; };
+		C1EAFA202EDCF22A00549580 /* OpenCVWrapper.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = OpenCVWrapper.mm; sourceTree = "<group>"; };
+		C1EAFA272EDCF5CF00549580 /* CameraCalibrationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraCalibrationManager.swift; sourceTree = "<group>"; };
+		C1EAFA282EDCF5CF00549580 /* CameraCalibrationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraCalibrationView.swift; sourceTree = "<group>"; };
+		C1EAFA342EDCF80A00549580 /* opencv2.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = opencv2.xcframework; sourceTree = "<group>"; };
+		C1EAFA362EDD2C8D00549580 /* ExtrinsicCalibrationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtrinsicCalibrationManager.swift; sourceTree = "<group>"; };
+		C1EAFA382EDD2EA600549580 /* ExtrinsicCalibrationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtrinsicCalibrationView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -106,6 +132,7 @@
 				C14DAF532B7C375D00A7333E /* GRPCCore in Frameworks */,
 				C14DAF632B7C375D00A7333E /* GRPCNIOTransportHTTP2 in Frameworks */,
 				C14DAF732B7C375D00A7333E /* GRPCProtobuf in Frameworks */,
+				C1EAFA352EDCF80A00549580 /* opencv2.xcframework in Frameworks */,
 				C1DA80DC2ED0F61D00B55CC2 /* RealityKitContent in Frameworks */,
 				C1E05F782ECD84DF0018C506 /* LiveKitWebRTC in Frameworks */,
 			);
@@ -164,6 +191,7 @@
 				16267B532B57D387000CA8AD /* README.md */,
 				165ADB492B4B71B0008A756F /* Tracking Streamer */,
 				C1EAF9C82EDBF9C100549580 /* Tracking Viewer */,
+				C1EAFA2B2EDCF63F00549580 /* Frameworks */,
 				165ADB482B4B71B0008A756F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -184,6 +212,7 @@
 				C1GRPC032B93C1AC00F2269D /* Proto */,
 				165ADB4E2B4B71B0008A756F /* App.swift */,
 				165ADB502B4B71B0008A756F /* ContentView.swift */,
+				C1EAFA212EDCF22A00549580 /* OpenCV */,
 				C1EAF9712ED7E66600549580 /* MuJoCo */,
 				C1E05F792ECD850B0018C506 /* ImageData.swift */,
 				C1EAF9762ED7EC9000549580 /* CombinedStreamingView.swift */,
@@ -192,8 +221,12 @@
 				C1EAF97E2EDBB9C700549580 /* RecordingManager.swift */,
 				C1EAF96B2ED7E13400549580 /* GRPCServer.swift */,
 				16688DE52B59F35F004CE12B /* 🥽AppModel.swift */,
+				C1EAFA382EDD2EA600549580 /* ExtrinsicCalibrationView.swift */,
+				C1EAFA362EDD2C8D00549580 /* ExtrinsicCalibrationManager.swift */,
 				1642FAB82B4D6CAA0084F9ED /* 🌐RealityView.swift */,
 				C1DA80C32ECE377600B55CC2 /* StatusView.swift */,
+				C1EAFA272EDCF5CF00549580 /* CameraCalibrationManager.swift */,
+				C1EAFA282EDCF5CF00549580 /* CameraCalibrationView.swift */,
 				C1DA80C62ECE8C6F00B55CC2 /* ViewControlSettings.swift */,
 				C1EAF9782EDBA73600549580 /* UVCCameraManager.swift */,
 				16EE5E982B576DA800D354ED /* 🧩Name.swift */,
@@ -227,6 +260,23 @@
 			path = MuJoCo;
 			sourceTree = "<group>";
 		};
+		C1EAFA212EDCF22A00549580 /* OpenCV */ = {
+			isa = PBXGroup;
+			children = (
+				C1EAFA342EDCF80A00549580 /* opencv2.xcframework */,
+				C1EAFA1F2EDCF22A00549580 /* OpenCVWrapper.h */,
+				C1EAFA202EDCF22A00549580 /* OpenCVWrapper.mm */,
+			);
+			path = OpenCV;
+			sourceTree = "<group>";
+		};
+		C1EAFA2B2EDCF63F00549580 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		C1GRPC032B93C1AC00F2269D /* Proto */ = {
 			isa = PBXGroup;
 			children = (
@@ -246,6 +296,7 @@
 				165ADB432B4B71B0008A756F /* Sources */,
 				165ADB442B4B71B0008A756F /* Frameworks */,
 				165ADB452B4B71B0008A756F /* Resources */,
+				C1EAFA2F2EDCF63F00549580 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -360,7 +411,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				16EE5E992B576DA800D354ED /* 🧩Name.swift in Sources */,
+				C1EAFA392EDD2EA600549580 /* ExtrinsicCalibrationView.swift in Sources */,
 				160ED7982B4B74C5002AD987 /* 🧑HeadTrackingComponent&System.swift in Sources */,
+				C1EAFA222EDCF22A00549580 /* OpenCVWrapper.mm in Sources */,
 				1642FAB92B4D6CAA0084F9ED /* 🌐RealityView.swift in Sources */,
 				C1DA80C72ECE8C6F00B55CC2 /* ViewControlSettings.swift in Sources */,
 				1642FAB52B4D54A60084F9ED /* 🛠️SettingPanel.swift in Sources */,
@@ -374,6 +427,7 @@
 				C1EAF9772ED7EC9000549580 /* CombinedStreamingView.swift in Sources */,
 				C1E05F7C2ECD850B0018C506 /* ImmersiveView.swift in Sources */,
 				C1E05F7D2ECD850B0018C506 /* ImageData.swift in Sources */,
+				C1EAFA372EDD2C8D00549580 /* ExtrinsicCalibrationManager.swift in Sources */,
 				C1DA80C42ECE377600B55CC2 /* StatusView.swift in Sources */,
 				C1EAF9722ED7E66600549580 /* MuJoCoStreamingView.swift in Sources */,
 				C1EAF9732ED7E66600549580 /* MuJoCoGRPCServer.swift in Sources */,
@@ -385,6 +439,8 @@
 				C1893C772B93C1AC00F2269D /* handtracking.pb.swift in Sources */,
 				16C95AE32B5E75D800CF0FED /* 🛠️Panel.swift in Sources */,
 				C1EAF9792EDBA73600549580 /* UVCCameraManager.swift in Sources */,
+				C1EAFA292EDCF5CF00549580 /* CameraCalibrationManager.swift in Sources */,
+				C1EAFA2A2EDCF5CF00549580 /* CameraCalibrationView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -551,6 +607,7 @@
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SUPPORTED_PLATFORMS = "xros xrsimulator";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "Tracking Streamer/Tracking Streamer-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
 				XROS_DEPLOYMENT_TARGET = 2.1;
@@ -589,6 +646,7 @@
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SUPPORTED_PLATFORMS = "xros xrsimulator";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "Tracking Streamer/Tracking Streamer-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
 				XROS_DEPLOYMENT_TARGET = 2.1;

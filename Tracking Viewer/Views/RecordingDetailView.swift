@@ -16,6 +16,8 @@ struct RecordingDetailView: View {
     @State private var showShareSheet = false
     @State private var isDownloading = false
     @State private var downloadError: String?
+    @State private var showCopiedToast = false
+    @StateObject private var httpServer = HTTPFileServer.shared
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -136,6 +138,53 @@ struct RecordingDetailView: View {
                             .foregroundColor(.white)
                             .cornerRadius(12)
                     }
+                    
+                    // HTTP Download URL (if server is running)
+                    if httpServer.isRunning, let url = httpServer.getDownloadURL(for: recording) {
+                        VStack(spacing: 8) {
+                            Text("Download URL")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            HStack {
+                                Text(url)
+                                    .font(.system(.caption, design: .monospaced))
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                                
+                                Button(action: {
+                                    UIPasteboard.general.string = url
+                                    showCopiedToast = true
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                        showCopiedToast = false
+                                    }
+                                }) {
+                                    Image(systemName: "doc.on.doc")
+                                }
+                            }
+                            .padding(10)
+                            .background(Color(.secondarySystemBackground))
+                            .cornerRadius(8)
+                            
+                            Button(action: {
+                                UIPasteboard.general.string = "curl -o \(recording.id).zip \"\(url)\""
+                                showCopiedToast = true
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                    showCopiedToast = false
+                                }
+                            }) {
+                                Label("Copy curl Command", systemImage: "terminal")
+                                    .font(.subheadline)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(10)
+                                    .background(Color.orange.opacity(0.2))
+                                    .foregroundColor(.orange)
+                                    .cornerRadius(8)
+                            }
+                        }
+                        .padding(.top, 8)
+                    }
                 }
                 .padding(.top)
             }
@@ -146,6 +195,21 @@ struct RecordingDetailView: View {
         .sheet(isPresented: $showShareSheet) {
             ShareSheet(items: [recording.folderURL])
         }
+        .overlay(alignment: .bottom) {
+            if showCopiedToast {
+                Text("Copied to clipboard")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+                    .background(Color.black.opacity(0.8))
+                    .cornerRadius(25)
+                    .padding(.bottom, 30)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut, value: showCopiedToast)
     }
     
     private func loadVideo(from url: URL) async {
