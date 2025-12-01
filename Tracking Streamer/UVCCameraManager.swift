@@ -43,9 +43,8 @@ class UVCCameraManager: NSObject, ObservableObject {
     private var frameCount: Int = 0
     private var lastFPSUpdate: Date = Date()
     
-    // Frame callbacks for external consumers
+    // Frame callback for external consumers
     var onFrameReceived: ((UIImage) -> Void)?
-    var onPixelBufferReceived: ((CVPixelBuffer) -> Void)?
     
     // MARK: - Initialization
     
@@ -336,13 +335,6 @@ extension UVCCameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
             
             // Notify external consumers
             self.onFrameReceived?(uiImage)
-            if self.onPixelBufferReceived != nil {
-                // Debug: only log occasionally to avoid spam
-                if self.frameCount == 1 {
-                    print("📹 [UVCCameraManager] onPixelBufferReceived callback is set, calling with \(width)x\(height) buffer")
-                }
-                self.onPixelBufferReceived?(pixelBuffer)
-            }
         }
     }
     

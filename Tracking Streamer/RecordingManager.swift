@@ -66,7 +66,6 @@ struct RecordingMetadata: Codable {
     let videoSource: String  // "network" or "uvc"
     let averageFPS: Double
     let deviceInfo: DeviceInfo
-    let cameraCalibration: CameraCalibrationData?  // Intrinsic calibration if available
 }
 
 struct DeviceInfo: Codable {
@@ -592,13 +591,6 @@ class RecordingManager: ObservableObject {
             recordingFolderURL = nil
             
             // Save metadata
-            // Load camera calibration if available (for UVC camera)
-            var calibrationData: CameraCalibrationData? = nil
-            if DataManager.shared.videoSource == .uvcCamera,
-               let deviceId = await MainActor.run(body: { UVCCameraManager.shared.selectedDevice?.id }) {
-                calibrationData = await MainActor.run { CameraCalibrationManager.shared.loadCalibration(for: deviceId) }
-            }
-            
             let metadata = RecordingMetadata(
                 createdAt: recordingStartTime ?? Date(),
                 duration: recordingDuration,
@@ -613,8 +605,7 @@ class RecordingManager: ObservableObject {
                     model: "Apple Vision Pro",
                     systemVersion: UIDevice.current.systemVersion,
                     appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-                ),
-                cameraCalibration: calibrationData
+                )
             )
             
             let metadataURL = recordingFolder.appendingPathComponent("metadata.json")
