@@ -311,13 +311,92 @@ struct ExtrinsicCalibrationView: View {
                 )
                 .tint(.purple)
                 
+                // Stereo baseline (for stereo cameras)
+                VStack(spacing: 8) {
+                    HStack {
+                        Text("Stereo Baseline")
+                        Spacer()
+                        if let baseline = calibrationManager.knownStereoBaseline {
+                            Text("\(Int(baseline * 1000)) mm")
+                                .foregroundColor(.blue)
+                                .monospacedDigit()
+                        } else {
+                            Text("Not set")
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
+                    Slider(
+                        value: Binding(
+                            get: { (calibrationManager.knownStereoBaseline ?? 0.065) * 1000 },
+                            set: { calibrationManager.knownStereoBaseline = $0 / 1000 }
+                        ),
+                        in: 40...120,
+                        step: 1
+                    )
+                    .tint(.blue)
+                    
+                    HStack {
+                        Button(action: {
+                            calibrationManager.knownStereoBaseline = nil
+                        }) {
+                            Text("Disable")
+                                .font(.caption)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(calibrationManager.knownStereoBaseline == nil ? Color.gray.opacity(0.3) : Color.gray.opacity(0.1))
+                                .cornerRadius(4)
+                        }
+                        
+                        Button(action: {
+                            calibrationManager.knownStereoBaseline = 0.065  // 65mm default
+                        }) {
+                            Text("65mm")
+                                .font(.caption)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(calibrationManager.knownStereoBaseline == 0.065 ? Color.blue.opacity(0.3) : Color.blue.opacity(0.1))
+                                .cornerRadius(4)
+                        }
+                        
+                        Spacer()
+                        
+                        Text("For stereo cameras")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding()
+                .background(Color.blue.opacity(0.05))
+                .cornerRadius(8)
+                
                 // Marker IDs info
                 HStack {
-                    Text("Marker IDs")
+                    Text("OpenCV Marker IDs")
                     Spacer()
                     Text(calibrationManager.markerIds.map { String($0) }.joined(separator: ", "))
                         .foregroundColor(.secondary)
                 }
+                
+                // Marker IDs info
+                HStack {
+                    Text("Tracking Markers")
+                    Spacer()
+                    Text(calibrationManager.markerIds.map { String($0) }.joined(separator: ", "))
+                        .foregroundColor(.purple)
+                }
+                
+                // Min unique markers requirement
+                HStack {
+                    Text("Min Unique Markers")
+                    Spacer()
+                    Text("\(calibrationManager.minUniqueMarkers)")
+                        .foregroundColor(.orange)
+                }
+                
+                Text("⚠️ ARKit tracks ONE marker at a time. Place markers at different 3D locations and look at each one during calibration.")
+                    .font(.caption)
+                    .foregroundColor(.orange)
                 
                 // Min samples
                 HStack {
@@ -337,10 +416,11 @@ struct ExtrinsicCalibrationView: View {
                     .font(.subheadline)
                     .fontWeight(.medium)
                 
-                Text("1. Print ArUco markers using: python utils/generate_aruco_markers.py")
-                Text("2. Place markers in your environment (flat surface, good lighting)")
-                Text("3. Point camera at markers while moving your head")
-                Text("4. Collect samples from different viewpoints")
+                Text("1. Print ArUco markers: python utils/generate_aruco_markers.py")
+                Text("2. Place ≥\(calibrationManager.minUniqueMarkers) markers at DIFFERENT 3D locations (not on same plane)")
+                Text("3. Look at each marker while camera sees it")
+                Text("4. ARKit switches between markers as you look around")
+                Text("5. Collect samples from ALL markers for proper rotation")
             }
             .font(.caption)
             .foregroundColor(.secondary)
@@ -407,33 +487,60 @@ struct ExtrinsicCalibrationView: View {
             
             // Marker detection status
             VStack(alignment: .leading, spacing: 8) {
-                Text("ARKit Tracked Markers")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                // Remembered markers (persistent)
+                HStack {
+                    Text("Registered Markers")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(calibrationManager.rememberedMarkerPositions.count)/\(calibrationManager.minUniqueMarkers) needed")
+                        .font(.caption)
+                        .foregroundColor(calibrationManager.rememberedMarkerPositions.count >= calibrationManager.minUniqueMarkers ? .green : .orange)
+                }
                 
-                if calibrationManager.arkitTrackedMarkers.isEmpty {
-                    Text("None detected - point at ArUco markers")
+                if calibrationManager.rememberedMarkerPositions.isEmpty {
+                    Text("None yet - look at ArUco markers to register")
                         .font(.caption)
                         .foregroundColor(.orange)
                 } else {
-                    Text("IDs: \(calibrationManager.arkitTrackedMarkers.keys.sorted().map { String($0) }.joined(separator: ", "))")
+                    Text("IDs: \(calibrationManager.rememberedMarkerPositions.keys.sorted().map { String($0) }.joined(separator: ", "))")
                         .font(.caption)
                         .foregroundColor(.green)
                 }
                 
-                Text("Camera Detected Markers")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .padding(.top, 4)
+                // Active ARKit tracking
+                HStack {
+                    Text("ARKit Active")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    if calibrationManager.arkitTrackedMarkers.isEmpty {
+                        Text("—")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("\(calibrationManager.arkitTrackedMarkers.keys.sorted().map { String($0) }.joined(separator: ", "))")
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                    }
+                }
+                .padding(.top, 4)
                 
-                if calibrationManager.cameraDetectedMarkers.isEmpty {
-                    Text("None detected")
+                // Camera detection
+                HStack {
+                    Text("Camera Sees")
                         .font(.caption)
-                        .foregroundColor(.orange)
-                } else {
-                    Text("IDs: \(calibrationManager.cameraDetectedMarkers.keys.sorted().map { String($0) }.joined(separator: ", "))")
-                        .font(.caption)
-                        .foregroundColor(.green)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    if calibrationManager.cameraDetectedMarkers.isEmpty {
+                        Text("—")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("\(calibrationManager.cameraDetectedMarkers.keys.sorted().map { String($0) }.joined(separator: ", "))")
+                            .font(.caption)
+                            .foregroundColor(.purple)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

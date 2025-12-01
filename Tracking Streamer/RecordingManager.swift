@@ -66,6 +66,90 @@ struct RecordingMetadata: Codable {
     let videoSource: String  // "network" or "uvc"
     let averageFPS: Double
     let deviceInfo: DeviceInfo
+    // Calibration data
+    let intrinsicCalibration: [String: Any]?
+    let extrinsicCalibration: [String: Any]?
+    
+    enum CodingKeys: String, CodingKey {
+        case version, createdAt, duration, frameCount, hasVideo
+        case hasLeftHand, hasRightHand, hasHead, videoSource, averageFPS, deviceInfo
+        case intrinsicCalibration, extrinsicCalibration
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(version, forKey: .version)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(duration, forKey: .duration)
+        try container.encode(frameCount, forKey: .frameCount)
+        try container.encode(hasVideo, forKey: .hasVideo)
+        try container.encode(hasLeftHand, forKey: .hasLeftHand)
+        try container.encode(hasRightHand, forKey: .hasRightHand)
+        try container.encode(hasHead, forKey: .hasHead)
+        try container.encode(videoSource, forKey: .videoSource)
+        try container.encode(averageFPS, forKey: .averageFPS)
+        try container.encode(deviceInfo, forKey: .deviceInfo)
+        // Encode intrinsic calibration as JSON data
+        if let intrinsic = intrinsicCalibration {
+            let jsonData = try JSONSerialization.data(withJSONObject: intrinsic, options: [])
+            let jsonString = String(data: jsonData, encoding: .utf8) ?? "{}"
+            try container.encode(jsonString, forKey: .intrinsicCalibration)
+        }
+        // Encode extrinsic calibration as JSON data
+        if let extrinsic = extrinsicCalibration {
+            let jsonData = try JSONSerialization.data(withJSONObject: extrinsic, options: [])
+            let jsonString = String(data: jsonData, encoding: .utf8) ?? "{}"
+            try container.encode(jsonString, forKey: .extrinsicCalibration)
+        }
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        // version has default value
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        duration = try container.decode(Double.self, forKey: .duration)
+        frameCount = try container.decode(Int.self, forKey: .frameCount)
+        hasVideo = try container.decode(Bool.self, forKey: .hasVideo)
+        hasLeftHand = try container.decode(Bool.self, forKey: .hasLeftHand)
+        hasRightHand = try container.decode(Bool.self, forKey: .hasRightHand)
+        hasHead = try container.decode(Bool.self, forKey: .hasHead)
+        videoSource = try container.decode(String.self, forKey: .videoSource)
+        averageFPS = try container.decode(Double.self, forKey: .averageFPS)
+        deviceInfo = try container.decode(DeviceInfo.self, forKey: .deviceInfo)
+        // Decode intrinsic calibration from JSON string
+        if let jsonString = try container.decodeIfPresent(String.self, forKey: .intrinsicCalibration),
+           let jsonData = jsonString.data(using: .utf8),
+           let dict = try JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any] {
+            intrinsicCalibration = dict
+        } else {
+            intrinsicCalibration = nil
+        }
+        // Decode extrinsic calibration from JSON string
+        if let jsonString = try container.decodeIfPresent(String.self, forKey: .extrinsicCalibration),
+           let jsonData = jsonString.data(using: .utf8),
+           let dict = try JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any] {
+            extrinsicCalibration = dict
+        } else {
+            extrinsicCalibration = nil
+        }
+    }
+    
+    init(createdAt: Date, duration: Double, frameCount: Int, hasVideo: Bool, hasLeftHand: Bool,
+         hasRightHand: Bool, hasHead: Bool, videoSource: String, averageFPS: Double,
+         deviceInfo: DeviceInfo, intrinsicCalibration: [String: Any]? = nil, extrinsicCalibration: [String: Any]? = nil) {
+        self.createdAt = createdAt
+        self.duration = duration
+        self.frameCount = frameCount
+        self.hasVideo = hasVideo
+        self.hasLeftHand = hasLeftHand
+        self.hasRightHand = hasRightHand
+        self.hasHead = hasHead
+        self.videoSource = videoSource
+        self.averageFPS = averageFPS
+        self.deviceInfo = deviceInfo
+        self.intrinsicCalibration = intrinsicCalibration
+        self.extrinsicCalibration = extrinsicCalibration
+    }
 }
 
 struct DeviceInfo: Codable {
@@ -590,6 +674,22 @@ class RecordingManager: ObservableObject {
             isWriterSessionStarted = false
             recordingFolderURL = nil
             
+            // Get extrinsic calibration if available
+            let extrinsicCalibrationDict: [String: Any]?
+            if let currentCalibration = ExtrinsicCalibrationManager.shared.currentCalibration {
+                extrinsicCalibrationDict = currentCalibration.toMetadataDictionary()
+            } else {
+                extrinsicCalibrationDict = nil
+            }
+            
+            // Get intrinsic calibration if available
+            let intrinsicCalibrationDict: [String: Any]?
+            if let currentIntrinsic = CameraCalibrationManager.shared.currentCalibration {
+                intrinsicCalibrationDict = currentIntrinsic.toMetadataDictionary()
+            } else {
+                intrinsicCalibrationDict = nil
+            }
+            
             // Save metadata
             let metadata = RecordingMetadata(
                 createdAt: recordingStartTime ?? Date(),
@@ -605,7 +705,9 @@ class RecordingManager: ObservableObject {
                     model: "Apple Vision Pro",
                     systemVersion: UIDevice.current.systemVersion,
                     appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-                )
+                ),
+                intrinsicCalibration: intrinsicCalibrationDict,
+                extrinsicCalibration: extrinsicCalibrationDict
             )
             
             let metadataURL = recordingFolder.appendingPathComponent("metadata.json")

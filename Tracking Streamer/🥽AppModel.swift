@@ -175,6 +175,13 @@ class DataManager: ObservableObject {
         }
     }
     
+    // Upper limb (hand) visibility setting (persistent via UserDefaults)
+    @Published var upperLimbVisible: Bool {
+        didSet {
+            UserDefaults.standard.set(upperLimbVisible, forKey: "upperLimbVisible")
+        }
+    }
+    
     @Published var showExitConfirmation: Bool = false
     
     private init() {
@@ -196,6 +203,8 @@ class DataManager: ObservableObject {
         // Load saved minimized status position or use defaults
         self.statusMinimizedXPosition = UserDefaults.standard.object(forKey: "statusMinimizedXPosition") as? Float ?? 0.0
         self.statusMinimizedYPosition = UserDefaults.standard.object(forKey: "statusMinimizedYPosition") as? Float ?? -0.3
+        // Load saved upper limb visibility or default to true (visible)
+        self.upperLimbVisible = UserDefaults.standard.object(forKey: "upperLimbVisible") as? Bool ?? true
     }
 }
 

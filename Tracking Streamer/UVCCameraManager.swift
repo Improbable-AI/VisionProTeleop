@@ -46,6 +46,9 @@ class UVCCameraManager: NSObject, ObservableObject {
     // Frame callback for external consumers
     var onFrameReceived: ((UIImage) -> Void)?
     
+    // Raw pixel buffer callback for calibration and processing
+    var onPixelBufferReceived: ((CVPixelBuffer) -> Void)?
+    
     // MARK: - Initialization
     
     private override init() {
@@ -311,6 +314,12 @@ extension UVCCameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
         
         let width = CVPixelBufferGetWidth(pixelBuffer)
         let height = CVPixelBufferGetHeight(pixelBuffer)
+        
+        // Notify raw pixel buffer consumers (for calibration, etc.)
+        // This runs on the capture queue, not main actor
+        Task { @MainActor [pixelBuffer] in
+            self.onPixelBufferReceived?(pixelBuffer)
+        }
         
         // Convert to UIImage
         let ciImage = CIImage(cvPixelBuffer: pixelBuffer)

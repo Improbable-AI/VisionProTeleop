@@ -31,7 +31,7 @@ struct MuJoCoStreamingView: View {
     @State private var inputPort: String = "50051"
     @State private var isMinimized: Bool = false
     @Namespace private var minimizeNS
-    @State private var upperLimbVisible: Bool = false
+    @ObservedObject private var dataManager = DataManager.shared
     
     // Attachment offset state (ZUP coordinates)
     @State private var attachToPosition: SIMD3<Float>? = nil
@@ -116,7 +116,7 @@ struct MuJoCoStreamingView: View {
                 networkManager.updateConnectionStatus("Disconnected")
             }
         }
-        .upperLimbVisibility(upperLimbVisible ? .visible : .hidden)
+        .upperLimbVisibility(dataManager.upperLimbVisible ? .visible : .hidden)
     }
     
     // MARK: - Status Attachment View
@@ -211,8 +211,8 @@ struct MuJoCoStreamingView: View {
                         .font(.caption)
                         .foregroundColor(.primary)
                     Spacer()
-                    Toggle(isOn: $upperLimbVisible) {
-                        Text(upperLimbVisible ? "Visible" : "Hidden")
+                    Toggle(isOn: $dataManager.upperLimbVisible) {
+                        Text(dataManager.upperLimbVisible ? "Visible" : "Hidden")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }

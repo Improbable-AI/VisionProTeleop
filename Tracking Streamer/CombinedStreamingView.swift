@@ -712,6 +712,7 @@ struct CombinedStreamingView: View {
                 await mujocoManager.stopServer()
             }
         }
+        .upperLimbVisibility(dataManager.upperLimbVisible ? .visible : .hidden)
     }
     
     // MARK: - Auto-Minimize Logic

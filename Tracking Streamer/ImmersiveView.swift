@@ -471,6 +471,7 @@ struct ImmersiveView: View {
             videoStreamManager.stop()
             fixedWorldTransform = nil
         }
+        .upperLimbVisibility(dataManager.upperLimbVisible ? .visible : .hidden)
     }
 }
 

@@ -141,6 +141,7 @@ struct 🌐RealityView: View {
         .task { await self.model.processDeviceAnchorUpdates() }
         // .task { self.model.startserver() }
         .task(priority: .low) { await self.model.processReconstructionUpdates() }
+        .upperLimbVisibility(dataManager.upperLimbVisible ? .visible : .hidden)
     }
     static let resultLabelID: String = "resultLabel"
     static let statusAttachmentID: String = "status"
