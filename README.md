@@ -82,9 +82,6 @@ This app is officially on VisionOS App Store! You can search for **[Tracking Str
 
 After installation, click and open the app on Vision Pro. It should show something like this. Click **START with Video Streaming** if you want to stream back videos from your robot over webRTC. Otherwise, click the left button. That's it!  
 
-Vision Pro is now streaming the tracking data over your wifi network via gRPC, and ready to receive video stream via webRTC. 
-
-![](assets/app-screenshot.png)
 
 **Step 2. Install Python Library**
 
