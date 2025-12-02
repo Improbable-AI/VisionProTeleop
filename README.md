@@ -58,32 +58,16 @@ This VisionOS app and python library allows anyone to get Head + Wrist + Hand Tr
 
 1. **Bilateral Data Streams**: 
     - AVP → Python:  Wrist, Fingers and Head Tracking
-    - Python → AVP:  Video, Audio,  MuJoCo environments presented in AR with RealityKit
-      > Direct MuJoCo Environment streaming can offer an extremely realistic rendering / low latency streaming of simulated environments compared to the traditional render in MuJoCo + video streaming approach. 
+    - Python → AVP:  Low-Latency Streaming of Video, Audio,  MuJoCo environments presented in AR with RealityKit
 2. **Direct UVC Camera Connection**: It supports directly connecting a UVC camera to Vision Pro using its Developer Strap, which can be useful for: 
     - extremely low latency video streaming experience  
     - record **human manipulation videos with egocentric RGB video with accurate hand/head tracking data**, bypassing the limited access to RGB camera feeds on AVP.
-3. **Recording to iCloud Drive**: The app can record the incoming/outgoing data streams to personal iCloud Drive for easy data syncing and sharing. 
+3. **Recording to iCloud Drive**: The app can record the incoming/outgoing data streams (video + hand tracking) to personal iCloud Drive for easy data syncing and sharing. 
 4. **Wired Network Connection** : It also supports wired network connection with a computer that's running our Python client via Developer Strap for low latency communication. 
 
 ## Examples
 
-| Example | Description |
-|---------|-------------|
-| [00_hand_streaming.py](examples/00_hand_streaming.py) | Basic hand tracking data streaming |
-| [01_visualize_hand_callback.py](examples/01_visualize_hand_callback.py) | Visualize hands using callback |
-| [02_visualize_hand_direct.py](examples/02_visualize_hand_direct.py) | Direct hand visualization |
-| [03_visualize_hand_with_audio_callback.py](examples/03_visualize_hand_with_audio_callback.py) | Hand visualization with audio feedback |
-| [04_stereo_depth_visualization.py](examples/04_stereo_depth_visualization.py) | Stereo camera depth visualization |
-| [05_text_scroller_callback.py](examples/05_text_scroller_callback.py) | Text scroller overlay |
-| [06_stream_from_camera.py](examples/06_stream_from_camera.py) | Stream video from camera to Vision Pro |
-| [07_process_frames.py](examples/07_process_frames.py) | Process video frames with custom callback |
-| [08_stream_audio_file.py](examples/08_stream_audio_file.py) | Stream audio file to Vision Pro |
-| [09_mujoco_streaming.py](examples/09_mujoco_streaming.py) | Stream MuJoCo simulation to AR |
-| [10_teleop_osc_franka.py](examples/10_teleop_osc_franka.py) | Teleoperate Franka robot via OSC |
-| [11_diffik_aloha.py](examples/11_diffik_aloha.py) | Differential IK control for ALOHA |
-| [12_diffik_shadow_hand.py](examples/12_diffik_shadow_hand.py) | Differential IK for Shadow Hand |
-
+The best way to learn about this app is to go through the [examples](examples/) folder. It contains 13 examples covering hand tracking, video/audio streaming, and sample teleoperation script using AR simulation streaming feature. 
  
 
 ## Getting Started

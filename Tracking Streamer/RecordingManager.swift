@@ -26,31 +26,50 @@ struct RecordedFrame: Codable {
     let videoHeight: Int
 }
 
-/// Hand joint positions for all 26 joints
+/// Hand joint positions for all 25 joints tracked by ARKit HandSkeleton
+/// Joint order matches 🥽AppModel.swift jointTypes array:
+///   0: wrist
+///   1-4: thumb (knuckle, intermediateBase, intermediateTip, tip)
+///   5-9: index (metacarpal, knuckle, intermediateBase, intermediateTip, tip)
+///   10-14: middle (metacarpal, knuckle, intermediateBase, intermediateTip, tip)
+///   15-19: ring (metacarpal, knuckle, intermediateBase, intermediateTip, tip)
+///   20-24: little (metacarpal, knuckle, intermediateBase, intermediateTip, tip)
 struct HandJointData: Codable {
-    let wrist: [Float]  // 4x4 matrix flattened
-    let thumbCMC: [Float]
-    let thumbMP: [Float]
-    let thumbIP: [Float]
+    let wrist: [Float]  // 4x4 matrix flattened (index 0)
+    
+    // Thumb (4 joints, indices 1-4) - no metacarpal for thumb
+    let thumbKnuckle: [Float]          // thumbCMC equivalent
+    let thumbIntermediateBase: [Float] // thumbMP equivalent  
+    let thumbIntermediateTip: [Float]  // thumbIP equivalent
     let thumbTip: [Float]
-    let indexMCP: [Float]
-    let indexPIP: [Float]
-    let indexDIP: [Float]
+    
+    // Index finger (5 joints, indices 5-9)
+    let indexMetacarpal: [Float]
+    let indexKnuckle: [Float]          // indexMCP equivalent
+    let indexIntermediateBase: [Float] // indexPIP equivalent
+    let indexIntermediateTip: [Float]  // indexDIP equivalent
     let indexTip: [Float]
-    let middleMCP: [Float]
-    let middlePIP: [Float]
-    let middleDIP: [Float]
+    
+    // Middle finger (5 joints, indices 10-14)
+    let middleMetacarpal: [Float]
+    let middleKnuckle: [Float]
+    let middleIntermediateBase: [Float]
+    let middleIntermediateTip: [Float]
     let middleTip: [Float]
-    let ringMCP: [Float]
-    let ringPIP: [Float]
-    let ringDIP: [Float]
+    
+    // Ring finger (5 joints, indices 15-19)
+    let ringMetacarpal: [Float]
+    let ringKnuckle: [Float]
+    let ringIntermediateBase: [Float]
+    let ringIntermediateTip: [Float]
     let ringTip: [Float]
-    let littleMCP: [Float]
-    let littlePIP: [Float]
-    let littleDIP: [Float]
+    
+    // Little finger (5 joints, indices 20-24)
+    let littleMetacarpal: [Float]
+    let littleKnuckle: [Float]
+    let littleIntermediateBase: [Float]
+    let littleIntermediateTip: [Float]
     let littleTip: [Float]
-    let forearmWrist: [Float]?
-    let forearmArm: [Float]?
 }
 
 /// Metadata for the entire recording session
@@ -583,32 +602,51 @@ class RecordingManager: ObservableObject {
     
     nonisolated private func extractHandJointData(wrist: simd_float4x4, skeleton: Skeleton) -> HandJointData? {
         let joints = skeleton.joints
-        guard joints.count >= 21 else { return nil }
+        guard joints.count >= 25 else { return nil }
         
+        // Joint order from 🥽AppModel.swift:
+        //   0: wrist
+        //   1-4: thumb (knuckle, intermediateBase, intermediateTip, tip)
+        //   5-9: index (metacarpal, knuckle, intermediateBase, intermediateTip, tip)
+        //   10-14: middle (metacarpal, knuckle, intermediateBase, intermediateTip, tip)
+        //   15-19: ring (metacarpal, knuckle, intermediateBase, intermediateTip, tip)
+        //   20-24: little (metacarpal, knuckle, intermediateBase, intermediateTip, tip)
         return HandJointData(
             wrist: matrixToArray(wrist),
-            thumbCMC: matrixToArray(joints[1]),
-            thumbMP: matrixToArray(joints[2]),
-            thumbIP: matrixToArray(joints[3]),
+            
+            // Thumb (indices 1-4)
+            thumbKnuckle: matrixToArray(joints[1]),
+            thumbIntermediateBase: matrixToArray(joints[2]),
+            thumbIntermediateTip: matrixToArray(joints[3]),
             thumbTip: matrixToArray(joints[4]),
-            indexMCP: matrixToArray(joints[5]),
-            indexPIP: matrixToArray(joints[6]),
-            indexDIP: matrixToArray(joints[7]),
-            indexTip: matrixToArray(joints[8]),
-            middleMCP: matrixToArray(joints[9]),
-            middlePIP: matrixToArray(joints[10]),
-            middleDIP: matrixToArray(joints[11]),
-            middleTip: matrixToArray(joints[12]),
-            ringMCP: matrixToArray(joints[13]),
-            ringPIP: matrixToArray(joints[14]),
-            ringDIP: matrixToArray(joints[15]),
-            ringTip: matrixToArray(joints[16]),
-            littleMCP: matrixToArray(joints[17]),
-            littlePIP: matrixToArray(joints[18]),
-            littleDIP: matrixToArray(joints[19]),
-            littleTip: matrixToArray(joints[20]),
-            forearmWrist: joints.count > 21 ? matrixToArray(joints[21]) : nil,
-            forearmArm: joints.count > 22 ? matrixToArray(joints[22]) : nil
+            
+            // Index (indices 5-9)
+            indexMetacarpal: matrixToArray(joints[5]),
+            indexKnuckle: matrixToArray(joints[6]),
+            indexIntermediateBase: matrixToArray(joints[7]),
+            indexIntermediateTip: matrixToArray(joints[8]),
+            indexTip: matrixToArray(joints[9]),
+            
+            // Middle (indices 10-14)
+            middleMetacarpal: matrixToArray(joints[10]),
+            middleKnuckle: matrixToArray(joints[11]),
+            middleIntermediateBase: matrixToArray(joints[12]),
+            middleIntermediateTip: matrixToArray(joints[13]),
+            middleTip: matrixToArray(joints[14]),
+            
+            // Ring (indices 15-19)
+            ringMetacarpal: matrixToArray(joints[15]),
+            ringKnuckle: matrixToArray(joints[16]),
+            ringIntermediateBase: matrixToArray(joints[17]),
+            ringIntermediateTip: matrixToArray(joints[18]),
+            ringTip: matrixToArray(joints[19]),
+            
+            // Little (indices 20-24)
+            littleMetacarpal: matrixToArray(joints[20]),
+            littleKnuckle: matrixToArray(joints[21]),
+            littleIntermediateBase: matrixToArray(joints[22]),
+            littleIntermediateTip: matrixToArray(joints[23]),
+            littleTip: matrixToArray(joints[24])
         )
     }
     
