@@ -114,6 +114,7 @@ Stream your robot's video feed, audio, and even MuJoCo simulations back to Visio
 
 ```python
 from avp_stream import VisionProStreamer
+from time import sleep
 avp_ip = "10.31.181.201"   # Vision Pro IP (shown in the app)
 s = VisionProStreamer(ip = avp_ip)
 
@@ -124,6 +125,7 @@ s.start_webrtc()  # Start streaming to Vision Pro
 while True:
     r = s.latest
     print(r['head'], r['right_wrist'], r['right_fingers'])
+    sleep(0.01)  # avoid blocking the loop and let frames be sent
 ```
 
 **Example 1: Camera with custom processing:**
