@@ -114,6 +114,7 @@ Stream your robot's video feed, audio, and even MuJoCo simulations back to Visio
 
 ```python
 from avp_stream import VisionProStreamer
+from time import sleep
 avp_ip = "10.31.181.201"   # Vision Pro IP (shown in the app)
 s = VisionProStreamer(ip = avp_ip)
 
@@ -124,6 +125,7 @@ s.start_webrtc()  # Start streaming to Vision Pro
 while True:
     r = s.latest
     print(r['head'], r['right_wrist'], r['right_fingers'])
+    sleep(0.01)  # avoid blocking the loop and let frames be sent
 ```
 
 **Example 1: Camera with custom processing:**
@@ -252,7 +254,8 @@ s.set_origin("sim")  # Simulation's coordinate frame (relative to attach_to)
 **Note:** Finding the right combination of `device`, `format`, `size`, and `fps` can be tricky since cameras only support certain combinations. Use this script to find valid configurations:
 
 ```bash
-python test_video_devices.py --live
+python test_video_devices.py --live \
+  --device /dev/video0 --format v4l2 --size 640x480 --fps 30
 ``` 
 
 
