@@ -26,14 +26,13 @@ async def test_video_device(device, format="avfoundation", size="1280x720", fps=
     Args:
         device: Device identifier (e.g., "0:none", "0", "/dev/video0")
         format_name: Format string (e.g., "avfoundation", "v4l2", "dshow")
-        options: Dict of options (e.g., {"video_size": "640x480", "framerate": "30"})
+        size: Video resolution as "WIDTHxHEIGHT" (e.g., "1280x720")
+        fps: Frames per second (e.g., "30")
         mode: "test" (single frame), "live" (continuous display), or "save" (record video)
     
     Returns:
         bool: True if device opens successfully, False otherwise
     """
-    if options is None:
-        options = {}
     
     print(f"\n{'='*60}")
     print(f"Testing: {device}")
