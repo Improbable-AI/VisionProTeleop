@@ -254,7 +254,8 @@ s.set_origin("sim")  # Simulation's coordinate frame (relative to attach_to)
 **Note:** Finding the right combination of `device`, `format`, `size`, and `fps` can be tricky since cameras only support certain combinations. Use this script to find valid configurations:
 
 ```bash
-python test_video_devices.py --live
+python test_video_devices.py --live \
+  --device /dev/video0 --format v4l2 --size 640x480 --fps 30
 ``` 
 
 
