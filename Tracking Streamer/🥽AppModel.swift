@@ -245,8 +245,22 @@ class DataManager: ObservableObject {
         self.upperLimbVisible = UserDefaults.standard.object(forKey: "upperLimbVisible") as? Bool ?? true
         // Load saved head beam visibility or default to false (hidden)
         self.showHeadBeam = UserDefaults.standard.object(forKey: "showHeadBeam") as? Bool ?? false
-        // Load saved hand joints visibility or default to false (hidden)
-        self.showHandJoints = UserDefaults.standard.object(forKey: "showHandJoints") as? Bool ?? false
+        
+        // Check if this is a new install or update (version-based)
+        // Show hand joints by default on fresh install/update until user explicitly changes it
+        let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let lastVersionForHandJoints = UserDefaults.standard.string(forKey: "lastVersionForHandJointsDefault")
+        let isNewOrUpdated = lastVersionForHandJoints != currentVersion
+        
+        if isNewOrUpdated && UserDefaults.standard.object(forKey: "showHandJoints") == nil {
+            // Fresh install or update with no explicit user preference - default to true (visible)
+            self.showHandJoints = true
+            UserDefaults.standard.set(currentVersion, forKey: "lastVersionForHandJointsDefault")
+        } else {
+            // User has explicitly set a preference - respect it
+            self.showHandJoints = UserDefaults.standard.object(forKey: "showHandJoints") as? Bool ?? true
+        }
+        
         // Load saved hand joints opacity or default to 0.9 (90%)
         self.handJointsOpacity = UserDefaults.standard.object(forKey: "handJointsOpacity") as? Float ?? 0.9
     }

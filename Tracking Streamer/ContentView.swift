@@ -707,27 +707,6 @@ struct IOSAppSignInDetectedView: View {
             
             Spacer()
             
-            // iOS App Promo Section
-            VStack(spacing: 16) {
-                Text("Companion iOS App Features")
-                    .font(.headline)
-                    .foregroundColor(.secondary)
-                
-                HStack(spacing: 24) {
-                    FeatureChip(icon: "play.rectangle.fill", label: "Browse Recordings", color: .blue)
-                    FeatureChip(icon: "globe", label: "Share Publicly", color: .green)
-                    FeatureChip(icon: "person.2.fill", label: "Community Library", color: .purple)
-                    FeatureChip(icon: "camera.viewfinder", label: "Calibration", color: .orange)
-                }
-            }
-            .padding(.vertical, 24)
-            .padding(.horizontal, 40)
-            .background(Color.white.opacity(0.05))
-            .cornerRadius(16)
-            .padding(.horizontal, 40)
-            
-            Spacer()
-            
             // Get Started button and Remind me option - side by side
             HStack(spacing: 16) {
                 Button {

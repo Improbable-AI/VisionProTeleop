@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VisionProTeleop - The Super App for Roboticists</title>
+    <meta name="description"
+        content="The only open-source solution for egocentric video capture with global pose + hand tracking. Real-world teleoperation, AR simulation, and data collection in one app.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <!-- Gradient Background -->
+    <div class="gradient-bg"></div>
+
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="#" class="nav-logo">
+                <span class="logo-bar"></span>
+                <span class="logo-text">
+                    <span class="logo-title">VisionProTeleop</span>
+                    <span class="logo-apps">Tracking Streamer | Manager</span>
+                </span>
+            </a>
+            <div class="nav-links">
+                <a href="#methods">Methods</a>
+                <a href="#features">Features</a>
+                <a href="#components">Components</a>
+                <a href="#quickstart">Quick Start</a>
+                <a href="https://github.com/Improbable-AI/VisionProTeleop" class="nav-github" target="_blank">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path
+                            d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                    </svg>
+                    GitHub
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <header class="hero">
+        <div class="hero-content">
+            <div class="hero-badge">
+                <span class="badge-dot"></span>
+                The Super App for Roboticists
+            </div>
+            <h1 class="hero-title">
+                <span class="typing-wrapper">
+                    <span class="gradient-text typing-text"></span><span class="typing-cursor">|</span>
+                </span>
+                <br>
+                <span class="hero-suffix">with Apple Vision Pro</span>
+            </h1>
+            <p class="hero-subtitle">
+                The super app for roboticists — supporting real-world teleoperation, AR simulation,
+                egocentric video recording, and bidirectional streaming.
+            </p>
+            <div class="hero-buttons">
+                <a href="https://github.com/Improbable-AI/VisionProTeleop" class="btn btn-primary">
+                    Get Started
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12h14M12 5l7 7-7 7" />
+                    </svg>
+                </a>
+                <a href="https://apps.apple.com/us/app/tracking-streamer/id6478969032" class="btn btn-secondary">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                        <path
+                            d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
+                    </svg>
+                    App Store
+                </a>
+            </div>
+            <div class="hero-stats">
+                <div class="stat">
+                    <span class="stat-value">&lt;50ms</span>
+                    <span class="stat-label">Latency (Wired)</span>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat">
+                    <span class="stat-value">4K</span>
+                    <span class="stat-label">Stereo Streaming</span>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat">
+                    <span class="stat-value">MIT</span>
+                    <span class="stat-label">License</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Three Methods Section -->
+    <section id="methods" class="methods">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Three Methods</span>
+                <h2 class="section-title">Complete Robot Data Collection</h2>
+                <p class="section-subtitle">Supporting all major approaches to building robot learning datasets</p>
+            </div>
+            <div class="methods-grid">
+                <!-- Method 1: Real-World Teleoperation -->
+                <div class="method-card method-realworld">
+                    <div class="method-number">01</div>
+                    <div class="method-icon">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.5">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                            <path d="M12 8v4M12 16h.01" />
+                        </svg>
+                    </div>
+                    <h3 class="method-title">Real-World Robot Teleoperation</h3>
+                    <p class="method-description">
+                        Control physical robots with your hands. Stream precise hand tracking data while receiving
+                        low-latency stereo video and audio feedback from the robot's perspective.
+                    </p>
+                    <ul class="method-features">
+                        <li>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M20 6L9 17l-5-5" />
+                            </svg>
+                            Full hand skeleton tracking
+                        </li>
+                        <li>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M20 6L9 17l-5-5" />
+                            </svg>
+                            Low-latency stereo video streaming
+                        </li>
+                        <li>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M20 6L9 17l-5-5" />
+                            </svg>
+                            Spatial audio feedback
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Method 2: Simulation Teleoperation -->
+                <div class="method-card method-simulation">
+                    <div class="method-number">02</div>
+                    <div class="method-icon">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.5">
+                            <path
+                                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                            <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                            <line x1="12" y1="22.08" x2="12" y2="12" />
+                        </svg>
+                    </div>
+                    <h3 class="method-title">Simulation Robot Teleoperation</h3>
+                    <p class="method-description">
+                        View your MuJoCo simulation environment blended into your physical space as an AR environment.
+                        Interact with virtual robots using natural hand movements.
+                    </p>
+                    <ul class="method-features">
+                        <li>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M20 6L9 17l-5-5" />
+                            </svg>
+                            MuJoCo → RealityKit rendering
+                        </li>
+                        <li>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M20 6L9 17l-5-5" />
+                            </svg>
+                            Hand tracking in sim coordinates
+                        </li>
+                        <li>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M20 6L9 17l-5-5" />
+                            </svg>
+                            Configurable world placement
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Method 3: Egocentric Recording -->
+                <div class="method-card method-egocentric">
+                    <div class="method-number">03</div>
+                    <div class="method-icon">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.5">
+                            <circle cx="12" cy="12" r="10" />
+                            <circle cx="12" cy="12" r="3" />
+                            <path d="M12 2v2M12 20v2M2 12h2M20 12h2" />
+                        </svg>
+                    </div>
+                    <h3 class="method-title">Egocentric Human Video Recording</h3>
+                    <p class="method-description">
+                        Record human manipulation videos from the egocentric perspective with accurate tracking data —
+                        without requiring the robot to wear the headset.
+                    </p>
+                    <ul class="method-features">
+                        <li>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M20 6L9 17l-5-5" />
+                            </svg>
+                            Accurate head/hand tracking
+                        </li>
+                        <li>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M20 6L9 17l-5-5" />
+                            </svg>
+                            Global SLAM pose estimation
+                        </li>
+                        <li>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M20 6L9 17l-5-5" />
+                            </svg>
+                            Arbitrary camera setup via UVC
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Cloud Sync Features -->
+    <section id="features" class="features">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Data Management</span>
+                <h2 class="section-title">Seamless Cloud Sync & Sharing</h2>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
+                        </svg>
+                    </div>
+                    <h3>Personal Cloud Storage</h3>
+                    <p>Data logs directly to your iCloud, Google Drive, or Dropbox. No shared AWS infrastructure, no
+                        privacy concerns — it's your data on your accounts.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                            <path d="M12 18h.01" />
+                        </svg>
+                    </div>
+                    <h3>iPhone Companion App</h3>
+                    <p>Browse and review all your recorded sessions from the companion iOS app. View metadata, playback
+                        videos, and manage recordings on the go.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                            <polyline points="16 6 12 2 8 6" />
+                            <line x1="12" y1="2" x2="12" y2="15" />
+                        </svg>
+                    </div>
+                    <h3>Easy Data Export</h3>
+                    <p>One-click export to share recordings with collaborators. Public sharing option for datasets you
+                        want to make available to the community.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                        </svg>
+                    </div>
+                    <h3>Privacy First</h3>
+                    <p>No centralized data collection. Everything stays in your personal cloud accounts. You control
+                        access to your robot training data.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Components Section -->
+    <section id="components" class="components">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Architecture</span>
+                <h2 class="section-title">Three Pillars of the System</h2>
+            </div>
+            <div class="components-grid">
+                <!-- Tracking Streamer -->
+                <div class="component-card">
+                    <div class="component-header">
+                        <div class="component-badge visionos">visionOS</div>
+                        <div class="component-icon">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="1.5">
+                                <circle cx="12" cy="12" r="10" />
+                                <circle cx="12" cy="12" r="3" />
+                                <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+                            </svg>
+                        </div>
+                    </div>
+                    <h3 class="component-title">Tracking Streamer</h3>
+                    <p class="component-description">
+                        The core visionOS app running on Apple Vision Pro. Captures hand, wrist, and head tracking data
+                        with sub-frame precision and streams it to connected clients.
+                    </p>
+                    <ul class="component-features">
+                        <li>Real-time hand skeleton tracking</li>
+                        <li>Global SLAM pose estimation</li>
+                        <li>WebRTC video/audio reception</li>
+                        <li>AR simulation rendering</li>
+                        <li>UVC camera support</li>
+                    </ul>
+                    <a href="https://apps.apple.com/us/app/tracking-streamer/id6478969032" class="component-link">
+                        Download on App Store
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                            <polyline points="15 3 21 3 21 9" />
+                            <line x1="10" y1="14" x2="21" y2="3" />
+                        </svg>
+                    </a>
+                </div>
+
+                <!-- Tracking Manager -->
+                <div class="component-card">
+                    <div class="component-header">
+                        <div class="component-badge ios">iOS</div>
+                        <div class="component-icon">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="1.5">
+                                <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                                <path d="M12 18h.01" />
+                            </svg>
+                        </div>
+                    </div>
+                    <h3 class="component-title">Tracking Manager</h3>
+                    <p class="component-description">
+                        Companion iOS app for managing recordings, reviewing captured sessions, and syncing data
+                        across devices via iCloud, Google Drive, or Dropbox.
+                    </p>
+                    <ul class="component-features">
+                        <li>Browse recorded sessions</li>
+                        <li>Multi-cloud storage integration</li>
+                        <li>Metadata visualization</li>
+                        <li>Public recording sharing</li>
+                        <li>Video playback</li>
+                    </ul>
+                    <a href="#" class="component-link">
+                        Coming Soon
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <circle cx="12" cy="12" r="10" />
+                            <polyline points="12 6 12 12 16 14" />
+                        </svg>
+                    </a>
+                </div>
+
+                <!-- avp_stream -->
+                <div class="component-card">
+                    <div class="component-header">
+                        <div class="component-badge python">Python</div>
+                        <div class="component-icon">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="1.5">
+                                <polyline points="16 18 22 12 16 6" />
+                                <polyline points="8 6 2 12 8 18" />
+                            </svg>
+                        </div>
+                    </div>
+                    <h3 class="component-title">avp_stream</h3>
+                    <p class="component-description">
+                        Python client library that receives tracking data and sends video, audio, or MuJoCo simulations
+                        back to Vision Pro. Install with pip and start building.
+                    </p>
+                    <ul class="component-features">
+                        <li>Simple streaming API</li>
+                        <li>Frame callbacks for processing</li>
+                        <li>Stereo video support</li>
+                        <li>MuJoCo integration</li>
+                        <li>Coordinate frame transforms</li>
+                    </ul>
+                    <a href="https://pypi.org/project/avp_stream/" class="component-link">
+                        View on PyPI
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                            <polyline points="15 3 21 3 21 9" />
+                            <line x1="10" y1="14" x2="21" y2="3" />
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Quick Start Section -->
+    <section id="quickstart" class="quickstart">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Get Started</span>
+                <h2 class="section-title">Up and Running in Minutes</h2>
+            </div>
+            <div class="quickstart-content">
+                <div class="code-block">
+                    <div class="code-header">
+                        <div class="code-dots">
+                            <span></span><span></span><span></span>
+                        </div>
+                        <span class="code-lang">Python</span>
+                    </div>
+                    <pre><code><span class="code-comment"># Install the package</span>
+<span class="code-keyword">pip install</span> --upgrade avp_stream
+
+<span class="code-comment"># Basic usage</span>
+<span class="code-keyword">from</span> avp_stream <span class="code-keyword">import</span> VisionProStreamer
+
+avp_ip = <span class="code-string">"10.31.181.201"</span>  <span class="code-comment"># Your Vision Pro IP</span>
+s = VisionProStreamer(ip=avp_ip)
+
+<span class="code-keyword">while</span> <span class="code-builtin">True</span>:
+    r = s.latest
+    <span class="code-builtin">print</span>(r[<span class="code-string">'head'</span>], r[<span class="code-string">'right_wrist'</span>], r[<span class="code-string">'right_fingers'</span>])</code></pre>
+                </div>
+                <div class="quickstart-steps">
+                    <div class="step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <h4>Install the visionOS App</h4>
+                            <p>Download Tracking Streamer from the App Store on your Vision Pro.</p>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <h4>Install Python Package</h4>
+                            <p>Run <code>pip install avp_stream</code> on your development machine.</p>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <h4>Connect & Stream</h4>
+                            <p>Start the app, note the IP address, and connect from Python.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <span class="logo-icon">◈</span>
+                    <span>VisionProTeleop</span>
+                </div>
+                <p class="footer-text">
+                    Built by <a href="https://github.com/Improbable-AI" target="_blank">Improbable AI Lab</a> at MIT.
+                    Licensed under MIT.
+                </p>
+                <div class="footer-links">
+                    <a href="https://github.com/Improbable-AI/VisionProTeleop" target="_blank">GitHub</a>
+                    <a href="https://pypi.org/project/avp_stream/" target="_blank">PyPI</a>
+                    <a href="https://apps.apple.com/us/app/tracking-streamer/id6478969032" target="_blank">App Store</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
