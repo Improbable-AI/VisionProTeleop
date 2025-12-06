@@ -31,6 +31,12 @@ This VisionOS app and python library allows anyone to get Head + Wrist + Hand Tr
 ## Table of Contents
 
 - [Key Features](#key-features)
+- [Egocentric Video Dataset Recording](#egocentric-video-dataset-recording)
+  - [What Gets Recorded](#what-gets-recorded)
+  - [Why We Built This](#why-we-built-this)
+  - [Hardware Requirements](#hardware-requirements)
+  - [Camera Mounting](#camera-mounting)
+  - [Camera Calibration](#camera-calibration)
 - [Examples](#examples)
 - [Getting Started](#getting-started)
   - [Installation](#installation)
@@ -64,6 +70,64 @@ This VisionOS app and python library allows anyone to get Head + Wrist + Hand Tr
     - record **human manipulation videos with egocentric RGB video with accurate hand/head tracking data**, bypassing the limited access to RGB camera feeds on AVP.
 3. **Recording to iCloud Drive**: The app can record the incoming/outgoing data streams (video + hand tracking) to personal iCloud Drive for easy data syncing and sharing. 
 4. **Wired Network Connection** : It also supports wired network connection with a computer that's running our Python client via Developer Strap for low latency communication. 
+
+## Egocentric Video Dataset Recording
+
+One unique capability of this system is recording **egocentric human manipulation video datasets** with synchronized hand and head tracking data. This is particularly valuable for imitation learning, human behavior analysis, and robotics research.
+
+### What Gets Recorded
+
+When recording in egocentric video mode, the system captures:
+- **Video frames** from a connected UVC camera (egocentric RGB view)
+- **Hand tracking data** — full 25-joint hand skeleton for both hands
+- **Head tracking data** — 6-DoF head pose in world coordinates
+- **Wrist tracking data** — wrist poses and roll angles
+- **Timestamps** — for accurate synchronization between all modalities
+
+All data can be recorded directly to **iCloud Drive** for easy syncing and sharing.
+
+### Why We Built This
+
+Although Vision Pro has multiple high-quality RGB cameras built-in, **Apple does not grant individual developers access to these camera feeds**. Access requires an Apple Enterprise account with a complicated approval process, making it impractical for most researchers and developers.
+
+Similarly, **Meta's Project Aria glasses** offer egocentric recording capabilities, but they also require going through a complex approval process that's difficult to obtain unless you're officially affiliated with Meta.
+
+**Our solution bypasses these limitations** by using an external UVC camera connected via the Developer Strap. This approach offers several advantages:
+- **No approval process** — works with any standard UVC camera
+- **Camera flexibility** — use any camera that fits your research needs (wide-angle, high-resolution, stereo, etc.)
+- **Full control** — direct access to raw video frames for custom processing
+- **Synchronized data** — video frames are perfectly synced with Vision Pro's precise hand/head tracking
+
+### Hardware Requirements
+
+To record egocentric video datasets, you'll need three components:
+
+| Component | Description | 
+|-----------|-------------|
+| **1. UVC Camera** | Any USB Video Class compatible camera. We recommend compact cameras with wide field-of-view for capturing hand manipulation. |
+| **2. Developer Strap** | Apple's [Vision Pro Developer Strap](https://www.apple.com/shop/product/MW3N3LL/A/apple-vision-pro-developer-strap) provides the USB-C port needed to connect the camera. |
+| **3. 3D Printed Brackets** | Custom mounting brackets to attach the camera to the Developer Strap securely. |
+
+### Camera Mounting
+
+We provide CAD models for 3D printing camera mounting brackets in the [`assets/adapters/`](assets/adapters/) folder:
+
+| File | Description |
+|------|-------------|
+| `attachment_left.step` | Left-side camera mount bracket |
+| `attachment_right.step` | Right-side camera mount bracket |
+| `camera_head.step` | Camera head adapter |
+
+📺 **Video Tutorial**: Watch our [camera attachment tutorial on YouTube](https://youtu.be/vGd3XjLV0kw) for step-by-step assembly instructions.
+
+### Camera Calibration
+
+After mounting the camera, you'll need to calibrate it to accurately align the video frames with the tracking data. The calibration process includes:
+
+1. **Intrinsic Calibration** — Determines the camera's internal parameters (focal length, distortion coefficients)
+2. **Extrinsic Calibration** — Determines the camera's position and orientation relative to the Vision Pro head frame
+
+Both calibrations can be performed using the companion **iOS app (Tracking Manager)** or directly on the Vision Pro app. For detailed instructions, see the [Camera Calibration Guide](docs/camera_calibration.md).
 
 ## Examples
 
@@ -122,7 +186,7 @@ s.configure_video(device="/dev/video0", format="v4l2", size="640x480", fps=30)
 s.start_webrtc()  # Start streaming to Vision Pro
 
 while True:
-    r = s.latest
+    r = s.get_latest()
     print(r['head'], r['right_wrist'], r['right_fingers'])
 ```
 
