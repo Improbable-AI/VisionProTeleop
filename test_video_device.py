@@ -4,6 +4,8 @@ Simple script to test video device configurations before using with VisionProStr
 Helps you find the right video_device, format, and options for your system.
 
 Usage:
+    # Override default camera settings
+    python test_video_device.py --device /dev/video0 --format v4l2 --size 640x480 --fps 30
     python test_video_device.py           # Quick test (receive one frame)
     python test_video_device.py --live    # Live view (shows frames until Ctrl+C)
     python test_video_device.py --save    # Save 10 seconds of video
@@ -25,15 +27,14 @@ async def test_video_device(device, format="avfoundation", size="1280x720", fps=
     
     Args:
         device: Device identifier (e.g., "0:none", "0", "/dev/video0")
-        format_name: Format string (e.g., "avfoundation", "v4l2", "dshow")
-        options: Dict of options (e.g., {"video_size": "640x480", "framerate": "30"})
+        format: Format string (e.g., "avfoundation", "v4l2", "dshow")
+        size: Video resolution as "WIDTHxHEIGHT" (e.g., "1280x720")
+        fps: Frames per second (e.g., 30)
         mode: "test" (single frame), "live" (continuous display), or "save" (record video)
     
     Returns:
         bool: True if device opens successfully, False otherwise
     """
-    if options is None:
-        options = {}
     
     print(f"\n{'='*60}")
     print(f"Testing: {device}")
@@ -121,11 +122,11 @@ async def test_video_device(device, format="avfoundation", size="1280x720", fps=
                 
                 # Initialize video writer
                 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-                fps = int(options.get("framerate", "30"))
-                video_writer = cv2.VideoWriter(output_file, fourcc, fps, (width, height))
-                
+                writer_fps = int(fps)
+                video_writer = cv2.VideoWriter(output_file, fourcc, writer_fps, (width, height))
+
                 print(f"  Recording to: {output_file}")
-                print(f"  Resolution: {width}x{height} @ {fps}fps")
+                print(f"  Resolution: {width}x{height} @ {writer_fps}fps")
                 
                 # Write first frame
                 img = frame.to_ndarray(format="bgr24")
@@ -181,6 +182,28 @@ async def main():
         description="Test video device configurations for VisionProStreamer"
     )
     parser.add_argument(
+        "--device",
+        default="0:none",
+        help="Video device identifier (e.g., '/dev/video0', '0:none') (default: '0:none')"
+    )
+    parser.add_argument(
+        "--format",
+        dest="format_name",
+        default="avfoundation",
+        help="Input format string (e.g., 'v4l2', 'avfoundation', 'dshow') (default: 'avfoundation')"
+    )
+    parser.add_argument(
+        "--size",
+        default="1280x720",
+        help="Resolution as WIDTHxHEIGHT (default 1280x720)"
+    )
+    parser.add_argument(
+        "--fps",
+        type=float,
+        default=30,
+        help="Frames per second (default 30)"
+    )
+    parser.add_argument(
         "--live",
         action="store_true",
         help="Show live video feed (press Ctrl+C or 'q' to stop)"
@@ -200,12 +223,12 @@ async def main():
         mode = "save"
     else:
         mode = "test"
-    
+
     await test_video_device(
-        device="0:none", 
-        format="avfoundation", 
-        size="1280x720",
-        fps=30,
+        device=args.device,
+        format=args.format_name,
+        size=args.size,
+        fps=args.fps,
         mode=mode
     )
     
