@@ -30,6 +30,9 @@
 		C14DAF732B7C375D00A7333E /* GRPCProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = C14DAF722B7C375D00A7333E /* GRPCProtobuf */; };
 		C1893C762B93C1AC00F2269D /* handtracking.grpc.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1893C742B93C1AC00F2269D /* handtracking.grpc.swift */; };
 		C1893C772B93C1AC00F2269D /* handtracking.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1893C752B93C1AC00F2269D /* handtracking.pb.swift */; };
+		C1B6714D2EE220EF00574B6F /* GoogleDriveAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1B6714C2EE220EF00574B6F /* GoogleDriveAuthManager.swift */; };
+		C1B6714F2EE24C4300574B6F /* DropboxAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1B6714E2EE24C4300574B6F /* DropboxAuthManager.swift */; };
+		C1B671552EE3383A00574B6F /* VisionOSSettingsSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1B671542EE3383A00574B6F /* VisionOSSettingsSync.swift */; };
 		C1DA80C42ECE377600B55CC2 /* StatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1DA80C32ECE377600B55CC2 /* StatusView.swift */; };
 		C1DA80C72ECE8C6F00B55CC2 /* ViewControlSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1DA80C62ECE8C6F00B55CC2 /* ViewControlSettings.swift */; };
 		C1DA80DC2ED0F61D00B55CC2 /* RealityKitContent in Frameworks */ = {isa = PBXBuildFile; productRef = C1DA80DB2ED0F61D00B55CC2 /* RealityKitContent */; };
@@ -51,6 +54,15 @@
 		C1EAFA352EDCF80A00549580 /* opencv2.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = C1EAFA342EDCF80A00549580 /* opencv2.xcframework */; };
 		C1EAFA372EDD2C8D00549580 /* ExtrinsicCalibrationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EAFA362EDD2C8D00549580 /* ExtrinsicCalibrationManager.swift */; };
 		C1EAFA392EDD2EA600549580 /* ExtrinsicCalibrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EAFA382EDD2EA600549580 /* ExtrinsicCalibrationView.swift */; };
+		C1EAFA832EDF476A00549580 /* CloudStorageProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EAFA822EDF476A00549580 /* CloudStorageProvider.swift */; };
+		C1EAFA852EDF477200549580 /* DropboxUploader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EAFA842EDF477200549580 /* DropboxUploader.swift */; };
+		C1EAFA872EDF477900549580 /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EAFA862EDF477900549580 /* KeychainManager.swift */; };
+		C1EAFA8B2EDF528900549580 /* GoogleDriveUploader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EAFA8A2EDF528900549580 /* GoogleDriveUploader.swift */; };
+		C1EAFAAE2EE0898E00549580 /* opencv2.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = C1EAFA342EDCF80A00549580 /* opencv2.xcframework */; };
+		C1EAFAAF2EE089A200549580 /* OpenCVWrapper.mm in Sources */ = {isa = PBXBuildFile; fileRef = C1EAFA202EDCF22A00549580 /* OpenCVWrapper.mm */; };
+		C1EAFAB72EE0C33100549580 /* ExtrinsicCalibrationView_New.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EAFAB62EE0C33100549580 /* ExtrinsicCalibrationView_New.swift */; };
+		C1EAFABB2EE0CB1700549580 /* MultipeerCalibrationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EAFABA2EE0CB1700549580 /* MultipeerCalibrationManager.swift */; };
+		C1EAFABF2EE11B5D00549580 /* CameraCalibrationWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EAFABE2EE11B5D00549580 /* CameraCalibrationWizardView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -95,6 +107,9 @@
 		16EE5E9A2B576DB000D354ED /* 🧩Model.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "🧩Model.swift"; sourceTree = "<group>"; };
 		C1893C742B93C1AC00F2269D /* handtracking.grpc.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = handtracking.grpc.swift; sourceTree = "<group>"; };
 		C1893C752B93C1AC00F2269D /* handtracking.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = handtracking.pb.swift; sourceTree = "<group>"; };
+		C1B6714C2EE220EF00574B6F /* GoogleDriveAuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleDriveAuthManager.swift; sourceTree = "<group>"; };
+		C1B6714E2EE24C4300574B6F /* DropboxAuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DropboxAuthManager.swift; sourceTree = "<group>"; };
+		C1B671542EE3383A00574B6F /* VisionOSSettingsSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisionOSSettingsSync.swift; sourceTree = "<group>"; };
 		C1DA80C32ECE377600B55CC2 /* StatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusView.swift; sourceTree = "<group>"; };
 		C1DA80C52ECE821800B55CC2 /* VisionProTeleop.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VisionProTeleop.entitlements; sourceTree = "<group>"; };
 		C1DA80C62ECE8C6F00B55CC2 /* ViewControlSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewControlSettings.swift; sourceTree = "<group>"; };
@@ -118,6 +133,13 @@
 		C1EAFA342EDCF80A00549580 /* opencv2.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = opencv2.xcframework; sourceTree = "<group>"; };
 		C1EAFA362EDD2C8D00549580 /* ExtrinsicCalibrationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtrinsicCalibrationManager.swift; sourceTree = "<group>"; };
 		C1EAFA382EDD2EA600549580 /* ExtrinsicCalibrationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtrinsicCalibrationView.swift; sourceTree = "<group>"; };
+		C1EAFA822EDF476A00549580 /* CloudStorageProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudStorageProvider.swift; sourceTree = "<group>"; };
+		C1EAFA842EDF477200549580 /* DropboxUploader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DropboxUploader.swift; sourceTree = "<group>"; };
+		C1EAFA862EDF477900549580 /* KeychainManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainManager.swift; sourceTree = "<group>"; };
+		C1EAFA8A2EDF528900549580 /* GoogleDriveUploader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleDriveUploader.swift; sourceTree = "<group>"; };
+		C1EAFAB62EE0C33100549580 /* ExtrinsicCalibrationView_New.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtrinsicCalibrationView_New.swift; sourceTree = "<group>"; };
+		C1EAFABA2EE0CB1700549580 /* MultipeerCalibrationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultipeerCalibrationManager.swift; sourceTree = "<group>"; };
+		C1EAFABE2EE11B5D00549580 /* CameraCalibrationWizardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraCalibrationWizardView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -142,6 +164,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C1EAFAAE2EE0898E00549580 /* opencv2.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -219,13 +242,21 @@
 				C1E05F7A2ECD850B0018C506 /* ImmersiveView.swift */,
 				C1E05F7B2ECD850B0018C506 /* WebRTCClient.swift */,
 				C1EAF97E2EDBB9C700549580 /* RecordingManager.swift */,
+				C1EAFA822EDF476A00549580 /* CloudStorageProvider.swift */,
+				C1EAFABA2EE0CB1700549580 /* MultipeerCalibrationManager.swift */,
 				C1EAF96B2ED7E13400549580 /* GRPCServer.swift */,
+				C1EAFABE2EE11B5D00549580 /* CameraCalibrationWizardView.swift */,
 				16688DE52B59F35F004CE12B /* 🥽AppModel.swift */,
+				C1EAFA842EDF477200549580 /* DropboxUploader.swift */,
 				C1EAFA382EDD2EA600549580 /* ExtrinsicCalibrationView.swift */,
+				C1EAFA862EDF477900549580 /* KeychainManager.swift */,
+				C1B6714E2EE24C4300574B6F /* DropboxAuthManager.swift */,
 				C1EAFA362EDD2C8D00549580 /* ExtrinsicCalibrationManager.swift */,
 				1642FAB82B4D6CAA0084F9ED /* 🌐RealityView.swift */,
 				C1DA80C32ECE377600B55CC2 /* StatusView.swift */,
 				C1EAFA272EDCF5CF00549580 /* CameraCalibrationManager.swift */,
+				C1EAFA8A2EDF528900549580 /* GoogleDriveUploader.swift */,
+				C1B6714C2EE220EF00574B6F /* GoogleDriveAuthManager.swift */,
 				C1EAFA282EDCF5CF00549580 /* CameraCalibrationView.swift */,
 				C1DA80C62ECE8C6F00B55CC2 /* ViewControlSettings.swift */,
 				C1EAF9782EDBA73600549580 /* UVCCameraManager.swift */,
@@ -235,6 +266,8 @@
 				16253CFA2B4E2FCB0028F0E2 /* 📏Unit.swift */,
 				16C95ADF2B5E74FD00CF0FED /* 🛠️Menu */,
 				16267B4E2B57D148000CA8AD /* Supporting files */,
+				C1EAFAB62EE0C33100549580 /* ExtrinsicCalibrationView_New.swift */,
+				C1B671542EE3383A00574B6F /* VisionOSSettingsSync.swift */,
 			);
 			path = "Tracking Streamer";
 			sourceTree = "<group>";
@@ -410,27 +443,36 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C1B671552EE3383A00574B6F /* VisionOSSettingsSync.swift in Sources */,
 				16EE5E992B576DA800D354ED /* 🧩Name.swift in Sources */,
 				C1EAFA392EDD2EA600549580 /* ExtrinsicCalibrationView.swift in Sources */,
 				160ED7982B4B74C5002AD987 /* 🧑HeadTrackingComponent&System.swift in Sources */,
 				C1EAFA222EDCF22A00549580 /* OpenCVWrapper.mm in Sources */,
+				C1EAFABB2EE0CB1700549580 /* MultipeerCalibrationManager.swift in Sources */,
 				1642FAB92B4D6CAA0084F9ED /* 🌐RealityView.swift in Sources */,
 				C1DA80C72ECE8C6F00B55CC2 /* ViewControlSettings.swift in Sources */,
 				1642FAB52B4D54A60084F9ED /* 🛠️SettingPanel.swift in Sources */,
+				C1B6714D2EE220EF00574B6F /* GoogleDriveAuthManager.swift in Sources */,
 				16253CFB2B4E2FCB0028F0E2 /* 📏Unit.swift in Sources */,
 				165ADB512B4B71B0008A756F /* ContentView.swift in Sources */,
 				16EE5E9B2B576DB000D354ED /* 🧩Model.swift in Sources */,
 				16688DE62B59F35F004CE12B /* 🥽AppModel.swift in Sources */,
 				165ADB4F2B4B71B0008A756F /* App.swift in Sources */,
+				C1EAFA832EDF476A00549580 /* CloudStorageProvider.swift in Sources */,
 				C1EAF96C2ED7E13400549580 /* GRPCServer.swift in Sources */,
+				C1EAFABF2EE11B5D00549580 /* CameraCalibrationWizardView.swift in Sources */,
 				16C95AE52B5E762400CF0FED /* 🛠️MenuTop.swift in Sources */,
 				C1EAF9772ED7EC9000549580 /* CombinedStreamingView.swift in Sources */,
 				C1E05F7C2ECD850B0018C506 /* ImmersiveView.swift in Sources */,
+				C1EAFA8B2EDF528900549580 /* GoogleDriveUploader.swift in Sources */,
+				C1EAFA852EDF477200549580 /* DropboxUploader.swift in Sources */,
+				C1B6714F2EE24C4300574B6F /* DropboxAuthManager.swift in Sources */,
 				C1E05F7D2ECD850B0018C506 /* ImageData.swift in Sources */,
 				C1EAFA372EDD2C8D00549580 /* ExtrinsicCalibrationManager.swift in Sources */,
 				C1DA80C42ECE377600B55CC2 /* StatusView.swift in Sources */,
 				C1EAF9722ED7E66600549580 /* MuJoCoStreamingView.swift in Sources */,
 				C1EAF9732ED7E66600549580 /* MuJoCoGRPCServer.swift in Sources */,
+				C1EAFA872EDF477900549580 /* KeychainManager.swift in Sources */,
 				C1EAF9742ED7E66600549580 /* mujoco_ar.pb.swift in Sources */,
 				C1EAF97F2EDBB9C700549580 /* RecordingManager.swift in Sources */,
 				C1EAF9752ED7E66600549580 /* mujoco_ar.grpc.swift in Sources */,
@@ -440,6 +482,7 @@
 				16C95AE32B5E75D800CF0FED /* 🛠️Panel.swift in Sources */,
 				C1EAF9792EDBA73600549580 /* UVCCameraManager.swift in Sources */,
 				C1EAFA292EDCF5CF00549580 /* CameraCalibrationManager.swift in Sources */,
+				C1EAFAB72EE0C33100549580 /* ExtrinsicCalibrationView_New.swift in Sources */,
 				C1EAFA2A2EDCF5CF00549580 /* CameraCalibrationView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -448,6 +491,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C1EAFAAF2EE089A200549580 /* OpenCVWrapper.mm in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -584,7 +628,7 @@
 				CODE_SIGN_ENTITLEMENTS = "Tracking Streamer/VisionProTeleop.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = ATTMC2WVK2;
 				ENABLE_PREVIEWS = YES;
@@ -601,7 +645,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.41;
+				MARKETING_VERSION = 2.50;
 				PRODUCT_BUNDLE_IDENTIFIER = improbable.younghyo.DexTeleop2;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -623,7 +667,7 @@
 				CODE_SIGN_ENTITLEMENTS = "Tracking Streamer/VisionProTeleop.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = ATTMC2WVK2;
 				ENABLE_PREVIEWS = YES;
@@ -640,7 +684,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.41;
+				MARKETING_VERSION = 2.50;
 				PRODUCT_BUNDLE_IDENTIFIER = improbable.younghyo.DexTeleop2;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -660,33 +704,37 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "Tracking Viewer/Tracking Viewer.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = ATTMC2WVK2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "Tracking-Viewer-Info.plist";
+				INFOPLIST_FILE = "Tracking Viewer/Tracking-Viewer-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Tracking Manager";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "This app uses the local network to communicate with Vision Pro for real-time calibration synchronization.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "younghyo.Tracking-Viewer";
+				PRODUCT_BUNDLE_IDENTIFIER = "improbable.younghyo.Tracking-Viewer";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -700,33 +748,37 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "Tracking Viewer/Tracking Viewer.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = ATTMC2WVK2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "Tracking-Viewer-Info.plist";
+				INFOPLIST_FILE = "Tracking Viewer/Tracking-Viewer-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Tracking Manager";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "This app uses the local network to communicate with Vision Pro for real-time calibration synchronization.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "younghyo.Tracking-Viewer";
+				PRODUCT_BUNDLE_IDENTIFIER = "improbable.younghyo.Tracking-Viewer";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";

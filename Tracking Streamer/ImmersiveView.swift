@@ -388,6 +388,17 @@ struct ImmersiveView: View {
             print("DEBUG: ImmersiveView appeared, starting video stream")
             videoStreamManager.start(imageData: imageData)
             
+            // Set up simulation data recording
+            videoStreamManager.onSimPosesReceived = { timestamp, poses, qpos, ctrl in
+                RecordingManager.shared.recordSimulationData(
+                    timestamp: timestamp,
+                    poses: poses,
+                    qpos: qpos,
+                    ctrl: ctrl,
+                    trackingData: DataManager.shared.latestHandTrackingData
+                )
+            }
+            
             // Load the stereo material from RealityKitContent
             Task {
                 if let scene = try? await Entity(named: "Immersive", in: realityKitContentBundle) {
@@ -516,7 +527,7 @@ class VideoStreamManager: ObservableObject {
     
     /// Callback for sim-poses data channel messages (JSON format from Python)
     /// Format: {"body_name": [x,y,z,qx,qy,qz,qw], ...}
-    var onSimPosesReceived: (([String: [Float]]) -> Void)? {
+    var onSimPosesReceived: ((Double, [String: [Float]], [Float]?, [Float]?) -> Void)? {
         didSet {
             // Forward to webrtcClient if already connected
             webrtcClient?.onSimPosesReceived = onSimPosesReceived
@@ -597,6 +608,14 @@ class VideoStreamManager: ObservableObject {
                 // Connect to WebRTC server
                 let client = WebRTCClient()
                 self.webrtcClient = client
+                
+                // Handle connection state changes
+                client.onConnectionStateChanged = { [weak self] isConnected in
+                    if !isConnected {
+                        print("🔴 [VideoStreamManager] WebRTC disconnected")
+                        RecordingManager.shared.onVideoSourceDisconnected(reason: "WebRTC disconnected")
+                    }
+                }
                 
                 // Set up sim-poses callback if it was configured before connection
                 if let simCallback = self.onSimPosesReceived {
@@ -748,6 +767,20 @@ class VideoFrameRenderer: NSObject, LKRTCVideoRenderer {
             } else {
                 self.imageData?.left = uiImage
                 self.imageData?.right = uiImage
+            }
+            
+            // Trigger recording if needed
+            // We use the right image for recording in stereo mode (or the only image in mono)
+            if let recordingImage = self.imageData?.right {
+                // Check if we need to start auto-recording
+                if !RecordingManager.shared.isRecording && RecordingManager.shared.autoRecordingEnabled {
+                    RecordingManager.shared.onFirstVideoFrame()
+                }
+                
+                // Record the frame
+                if RecordingManager.shared.isRecording {
+                    RecordingManager.shared.recordVideoFrame(recordingImage)
+                }
             }
         }
     }

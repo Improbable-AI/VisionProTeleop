@@ -197,11 +197,17 @@ std::vector<cv::Point2f> nsArrayToCorners(NSArray<NSValue *> *array) {
     cv::Mat grayRight = gray(cv::Rect(halfWidth, 0, halfWidth, height));
 
     CheckerboardDetection *result = [[CheckerboardDetection alloc] init];
+    cv::Size rotatedBoardSize(_boardSize.height, _boardSize.width);
 
-    // Find corners in left image
+    // Find corners in left image - try both orientations
     std::vector<cv::Point2f> cornersLeft;
     int flags = cv::CALIB_CB_ADAPTIVE_THRESH | cv::CALIB_CB_NORMALIZE_IMAGE;
     result.foundLeft = cv::findChessboardCorners(grayLeft, _boardSize, cornersLeft, flags);
+    
+    // If not found, try rotated 90° (swapped dimensions)
+    if (!result.foundLeft) {
+        result.foundLeft = cv::findChessboardCorners(grayLeft, rotatedBoardSize, cornersLeft, flags);
+    }
 
     if (result.foundLeft) {
         cv::TermCriteria criteria(cv::TermCriteria::EPS | cv::TermCriteria::MAX_ITER, 30, 0.001);
@@ -209,9 +215,14 @@ std::vector<cv::Point2f> nsArrayToCorners(NSArray<NSValue *> *array) {
         result.leftCorners = cornersToNSArray(cornersLeft);
     }
 
-    // Find corners in right image
+    // Find corners in right image - try both orientations
     std::vector<cv::Point2f> cornersRight;
     result.foundRight = cv::findChessboardCorners(grayRight, _boardSize, cornersRight, flags);
+    
+    // If not found, try rotated 90° (swapped dimensions)
+    if (!result.foundRight) {
+        result.foundRight = cv::findChessboardCorners(grayRight, rotatedBoardSize, cornersRight, flags);
+    }
 
     if (result.foundRight) {
         cv::TermCriteria criteria(cv::TermCriteria::EPS | cv::TermCriteria::MAX_ITER, 30, 0.001);
@@ -240,7 +251,15 @@ std::vector<cv::Point2f> nsArrayToCorners(NSArray<NSValue *> *array) {
 
     std::vector<cv::Point2f> corners;
     int flags = cv::CALIB_CB_ADAPTIVE_THRESH | cv::CALIB_CB_NORMALIZE_IMAGE;
+    
+    // Try original orientation first
     result.foundLeft = cv::findChessboardCorners(gray, _boardSize, corners, flags);
+    
+    // If not found, try rotated 90° (swapped dimensions)
+    if (!result.foundLeft) {
+        cv::Size rotatedBoardSize(_boardSize.height, _boardSize.width);
+        result.foundLeft = cv::findChessboardCorners(gray, rotatedBoardSize, corners, flags);
+    }
 
     if (result.foundLeft) {
         cv::TermCriteria criteria(cv::TermCriteria::EPS | cv::TermCriteria::MAX_ITER, 30, 0.001);

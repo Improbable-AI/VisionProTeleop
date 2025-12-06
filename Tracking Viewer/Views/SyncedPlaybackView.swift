@@ -230,15 +230,23 @@ class PlaybackController: ObservableObject {
     @Published var duration: Double = 0
     @Published var currentFrameIndex: Int = 0
     @Published var currentFrame: RecordedFrame?
+    @Published var currentSimulationFrame: SimulationFrame?
     @Published var playbackSpeed: Float = 1.0
     
     private var frames: [RecordedFrame] = []
+    private var simulationFrames: [SimulationFrame] = []
     private var timeObserver: Any?
     private var cancellables = Set<AnyCancellable>()
+    private var loopObserver: NSObjectProtocol?
     
-    var totalFrames: Int { frames.count }
+    // Timer-based playback for simulation-only recordings (no video)
+    private var simulationTimer: Timer?
+    private var simulationStartTime: Date?
     
-    func setupPlayer(with url: URL) {
+    var totalFrames: Int { max(frames.count, simulationFrames.count) }
+    var totalSimulationFrames: Int { simulationFrames.count }
+    
+    func setupPlayer(with url: URL, loop: Bool = false) {
         let playerItem = AVPlayerItem(url: url)
         player = AVPlayer(playerItem: playerItem)
         
@@ -264,6 +272,21 @@ class PlaybackController: ObservableObject {
                 self?.isPlaying = status == .playing
             }
             .store(in: &cancellables)
+        
+        // Loop playback
+        if loop {
+            loopObserver = NotificationCenter.default.addObserver(
+                forName: .AVPlayerItemDidPlayToEndTime,
+                object: playerItem,
+                queue: .main
+            ) { [weak self] _ in
+                self?.player?.seek(to: .zero)
+                self?.player?.play()
+                if let speed = self?.playbackSpeed {
+                    self?.player?.rate = speed
+                }
+            }
+        }
     }
     
     func setTrackingData(_ data: [RecordedFrame]) {
@@ -276,6 +299,58 @@ class PlaybackController: ObservableObject {
         }
     }
     
+    func setSimulationData(_ data: [SimulationFrame]) {
+        simulationFrames = data.sorted { $0.timestamp < $1.timestamp }
+        if !simulationFrames.isEmpty {
+            currentSimulationFrame = simulationFrames[0]
+            // If we only have simulation data, use its duration
+            if frames.isEmpty, duration == 0, let lastFrame = simulationFrames.last {
+                duration = lastFrame.timestamp
+            }
+            
+            // Auto-start timer-based playback if no video player
+            if player == nil {
+                startSimulationPlayback()
+            }
+        }
+    }
+    
+    /// Start timer-based playback for simulation-only recordings
+    private func startSimulationPlayback() {
+        guard player == nil && !simulationFrames.isEmpty else { return }
+        
+        isPlaying = true
+        simulationStartTime = Date().addingTimeInterval(-currentTime)
+        
+        simulationTimer = Timer.scheduledTimer(withTimeInterval: 1.0/60.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.updateSimulationTime()
+            }
+        }
+    }
+    
+    /// Update time based on simulation timer
+    private func updateSimulationTime() {
+        // Don't update if paused
+        guard isPlaying, let startTime = simulationStartTime else { return }
+        
+        var elapsed = Date().timeIntervalSince(startTime) * Double(playbackSpeed)
+        
+        // Loop when reaching the end
+        if elapsed >= duration && duration > 0 {
+            elapsed = elapsed.truncatingRemainder(dividingBy: duration)
+            simulationStartTime = Date().addingTimeInterval(-elapsed / Double(playbackSpeed))
+        }
+        
+        updateCurrentTime(elapsed)
+    }
+    
+    /// Stop simulation timer
+    private func stopSimulationTimer() {
+        simulationTimer?.invalidate()
+        simulationTimer = nil
+    }
+    
     private func updateCurrentTime(_ time: Double) {
         currentTime = time
         
@@ -283,6 +358,11 @@ class PlaybackController: ObservableObject {
         if let index = frames.lastIndex(where: { $0.timestamp <= time }) {
             currentFrameIndex = index
             currentFrame = frames[index]
+        }
+        
+        // Find matching simulation frame
+        if let index = simulationFrames.lastIndex(where: { $0.timestamp <= time }) {
+            currentSimulationFrame = simulationFrames[index]
         }
     }
     
@@ -295,32 +375,58 @@ class PlaybackController: ObservableObject {
     }
     
     func play() {
-        player?.play()
-        player?.rate = playbackSpeed
+        if player != nil {
+            player?.play()
+            player?.rate = playbackSpeed
+        } else if !simulationFrames.isEmpty {
+            startSimulationPlayback()
+        }
     }
     
     func pause() {
         player?.pause()
+        stopSimulationTimer()
+        isPlaying = false
     }
     
     func seek(to time: Double) {
+        // Pause playback when seeking manually
+        let wasPlaying = isPlaying
+        if wasPlaying {
+            pause()
+        }
+        
         let cmTime = CMTime(seconds: time, preferredTimescale: 600)
         player?.seek(to: cmTime, toleranceBefore: .zero, toleranceAfter: .zero)
+        
+        // Update simulation start time for when we resume
+        simulationStartTime = Date().addingTimeInterval(-time / Double(playbackSpeed))
+        
         updateCurrentTime(time)
     }
     
     func stepForward() {
-        let newIndex = min(currentFrameIndex + 1, frames.count - 1)
-        if newIndex < frames.count {
-            seek(to: frames[newIndex].timestamp)
-        }
+        // Use simulation frames if available, otherwise tracking frames
+        let frameList: [(timestamp: Double, index: Int)] = 
+            simulationFrames.isEmpty 
+                ? frames.enumerated().map { ($0.element.timestamp, $0.offset) }
+                : simulationFrames.enumerated().map { ($0.element.timestamp, $0.offset) }
+        
+        guard !frameList.isEmpty else { return }
+        let newIndex = min(currentFrameIndex + 1, frameList.count - 1)
+        seek(to: frameList[newIndex].timestamp)
     }
     
     func stepBackward() {
+        // Use simulation frames if available, otherwise tracking frames
+        let frameList: [(timestamp: Double, index: Int)] = 
+            simulationFrames.isEmpty 
+                ? frames.enumerated().map { ($0.element.timestamp, $0.offset) }
+                : simulationFrames.enumerated().map { ($0.element.timestamp, $0.offset) }
+        
+        guard !frameList.isEmpty else { return }
         let newIndex = max(currentFrameIndex - 1, 0)
-        if newIndex >= 0 && !frames.isEmpty {
-            seek(to: frames[newIndex].timestamp)
-        }
+        seek(to: frameList[newIndex].timestamp)
     }
     
     func setSpeed(_ speed: Float) {
@@ -331,9 +437,14 @@ class PlaybackController: ObservableObject {
     }
     
     func cleanup() {
+        stopSimulationTimer()
         if let observer = timeObserver, let player = player {
             player.removeTimeObserver(observer)
             timeObserver = nil
+        }
+        if let loopObserver = loopObserver {
+            NotificationCenter.default.removeObserver(loopObserver)
+            self.loopObserver = nil
         }
         player?.pause()
         cancellables.removeAll()

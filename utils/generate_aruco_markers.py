@@ -413,5 +413,236 @@ def main():
     print("   3. Run extrinsic calibration in the app")
 
 
+def display_marker_fullscreen(
+    marker_id: int = 0,
+    marker_size_mm: float = 100.0,
+    border_width_mm: float = 10.0,
+    dictionary_name: str = "DICT_4X4_50",
+    screen_dpi: float = 96.0
+):
+    """
+    Display ArUco marker fullscreen at 2x iPhone size (100mm).
+    
+    This provides an alternative to displaying on iPhone screen.
+    Computer monitors typically have better visibility for camera detection
+    than phone screens (less glare, no PWM dimming).
+    
+    Args:
+        marker_id: Marker ID to display (0-49 for DICT_4X4_50)
+        marker_size_mm: Physical marker size in mm (default 100mm = 2x iPhone)
+        border_width_mm: White border around marker in mm
+        dictionary_name: ArUco dictionary (default DICT_4X4_50)
+        screen_dpi: Screen DPI (96 for standard, 110-120 for high-res, 220+ for Retina)
+    """
+    # Calculate pixel size based on screen DPI
+    # 1 inch = 25.4mm
+    marker_size_px = int((marker_size_mm / 25.4) * screen_dpi)
+    border_size_px = int((border_width_mm / 25.4) * screen_dpi)
+    total_size_px = marker_size_px + 2 * border_size_px
+    
+    # Generate marker at screen resolution
+    marker_img = generate_aruco_marker(
+        marker_id=marker_id,
+        dictionary_name=dictionary_name,
+        marker_size_pixels=marker_size_px
+    )
+    
+    # Add white border
+    marker_with_border = np.ones((total_size_px, total_size_px), dtype=np.uint8) * 255
+    marker_with_border[border_size_px:border_size_px + marker_size_px,
+                      border_size_px:border_size_px + marker_size_px] = marker_img
+    
+    # Get screen size
+    try:
+        import tkinter as tk
+        root = tk.Tk()
+        screen_width = root.winfo_screenwidth()
+        screen_height = root.winfo_screenheight()
+        root.destroy()
+    except:
+        screen_width = 1920
+        screen_height = 1080
+    
+    # Create white canvas
+    canvas = np.ones((screen_height, screen_width), dtype=np.uint8) * 255
+    
+    # Center marker on canvas
+    start_y = (screen_height - total_size_px) // 2
+    start_x = (screen_width - total_size_px) // 2
+    
+    if start_y >= 0 and start_x >= 0 and start_y + total_size_px <= screen_height and start_x + total_size_px <= screen_width:
+        canvas[start_y:start_y + total_size_px, start_x:start_x + total_size_px] = marker_with_border
+    else:
+        print(f"⚠️  Warning: Marker ({total_size_px}px) larger than screen ({screen_width}x{screen_height})")
+        # Scale down to fit
+        scale = min(screen_width / total_size_px, screen_height / total_size_px) * 0.9
+        new_size = int(total_size_px * scale)
+        marker_resized = cv2.resize(marker_with_border, (new_size, new_size))
+        start_y = (screen_height - new_size) // 2
+        start_x = (screen_width - new_size) // 2
+        canvas[start_y:start_y + new_size, start_x:start_x + new_size] = marker_resized
+        print(f"   Scaled marker to {new_size}px to fit screen")
+    
+    # Display fullscreen
+    window_name = f"ArUco Marker {marker_id} - {marker_size_mm}mm (2x iPhone size)"
+    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+    cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+    cv2.imshow(window_name, canvas)
+    
+    print(f"\n{'='*70}")
+    print(f"Displaying ArUco Marker {marker_id} at 2x iPhone Size")
+    print(f"{'='*70}")
+    print(f"Dictionary: {dictionary_name}")
+    print(f"Physical Size: {marker_size_mm}mm (with {border_width_mm}mm border)")
+    print(f"Screen DPI: {screen_dpi}")
+    print(f"Pixel Size: {total_size_px}px")
+    print(f"\n💡 DETECTION TIPS:")
+    print(f"   • Position monitor perpendicular to UVC camera")
+    print(f"   • Set monitor brightness to 100%")
+    print(f"   • Minimize room lighting to reduce glare")
+    print(f"   • If detection fails, try moving camera closer/farther")
+    print(f"   • Matte screen protector helps reduce reflections")
+    print(f"\n⌨️  CONTROLS:")
+    print(f"   SPACE / 'n' - Next marker (ID {marker_id + 1})")
+    print(f"   'p' - Previous marker (ID {marker_id - 1 if marker_id > 0 else marker_id})")
+    print(f"   'q' / ESC - Quit")
+    print(f"{'='*70}\n")
+    
+    return window_name, canvas
+
+
+def interactive_marker_display(
+    marker_ids: list = [0, 1, 2, 3],
+    marker_size_mm: float = 100.0,
+    border_width_mm: float = 10.0,
+    dictionary_name: str = "DICT_4X4_50",
+    screen_dpi: float = 96.0
+):
+    """
+    Interactive marker display - cycle through markers with keyboard.
+    
+    This mimics the iPhone CalibrationViews.swift functionality but on computer screen.
+    Useful for testing if 2x size improves detection.
+    
+    Args:
+        marker_ids: List of marker IDs to cycle through
+        marker_size_mm: Marker size in mm (default 100mm = 2x iPhone)
+        border_width_mm: Border width in mm
+        dictionary_name: ArUco dictionary
+        screen_dpi: Screen DPI
+    """
+    current_idx = 0
+    
+    print(f"\n🎯 Interactive ArUco Display - Sequential Workflow")
+    print(f"   Mimicking iPhone app at 2x size for better detection")
+    print(f"   Marker IDs: {marker_ids}")
+    print(f"   Size: {marker_size_mm}mm (2x iPhone display size)")
+    print(f"\n   This is equivalent to iPhone CalibrationViews.swift")
+    print(f"   but displayed on computer monitor at larger size.\n")
+    
+    while True:
+        marker_id = marker_ids[current_idx]
+        window_name, _ = display_marker_fullscreen(
+            marker_id=marker_id,
+            marker_size_mm=marker_size_mm,
+            border_width_mm=border_width_mm,
+            dictionary_name=dictionary_name,
+            screen_dpi=screen_dpi
+        )
+        
+        print(f"📍 Currently showing: Marker {marker_id} (Position {current_idx + 1}/{len(marker_ids)})")
+        
+        # Wait for key
+        key = cv2.waitKey(0) & 0xFF
+        
+        cv2.destroyWindow(window_name)
+        
+        if key == ord('q') or key == 27:  # q or ESC
+            print("\n✅ Exiting marker display")
+            break
+        elif key == ord('n') or key == 32:  # n or SPACE
+            current_idx = (current_idx + 1) % len(marker_ids)
+            print(f"\n➡️  Advancing to next marker...")
+        elif key == ord('p'):  # p
+            current_idx = (current_idx - 1) % len(marker_ids)
+            print(f"\n⬅️  Going back to previous marker...")
+    
+    cv2.destroyAllWindows()
+
+
 if __name__ == "__main__":
-    main()
+    # Check if --display or --interactive flag is present
+    import sys
+    
+    if "--display" in sys.argv or "--interactive" in sys.argv:
+        parser = argparse.ArgumentParser(
+            description="Display ArUco markers on screen (alternative to iPhone display)",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            epilog="""
+Examples:
+  # Interactive display (recommended) - cycle through all markers
+  python generate_aruco_markers.py --interactive
+  
+  # Display single marker
+  python generate_aruco_markers.py --display --marker-id 0
+  
+  # Custom size and DPI
+  python generate_aruco_markers.py --interactive --size 150 --screen-dpi 110
+  
+  # High-DPI display (Retina)
+  python generate_aruco_markers.py --interactive --screen-dpi 220
+  
+  # Generate printable PDFs (original functionality)
+  python generate_aruco_markers.py --num-markers 4 --marker-size 100
+            """
+        )
+        
+        subparsers = parser.add_subparsers(dest="mode")
+        
+        # Display mode arguments
+        display_parser = argparse.ArgumentParser(add_help=False)
+        display_parser.add_argument("--display", action="store_true",
+                                   help="Display single marker on screen")
+        display_parser.add_argument("--interactive", action="store_true",
+                                   help="Interactive display with keyboard navigation (recommended)")
+        display_parser.add_argument("--marker-id", type=int, default=0,
+                                   help="Marker ID to display (default: 0)")
+        display_parser.add_argument("--marker-ids", type=str, default="0,1,2,3",
+                                   help="Marker IDs for interactive mode (default: '0,1,2,3')")
+        display_parser.add_argument("--size", type=float, default=100.0,
+                                   help="Marker size in mm (default: 100mm = 2x iPhone)")
+        display_parser.add_argument("--border", type=float, default=10.0,
+                                   help="Border width in mm (default: 10mm)")
+        display_parser.add_argument("--dictionary", type=str, default="DICT_4X4_50",
+                                   choices=list(ARUCO_DICTIONARIES.keys()),
+                                   help="ArUco dictionary (default: DICT_4X4_50)")
+        display_parser.add_argument("--screen-dpi", type=float, default=96.0,
+                                   help="Screen DPI (96=standard, 110=high-res, 220=Retina)")
+        
+        # Parse args
+        args, remaining = display_parser.parse_known_args()
+        
+        if args.interactive:
+            marker_ids = [int(x.strip()) for x in args.marker_ids.split(",")]
+            interactive_marker_display(
+                marker_ids=marker_ids,
+                marker_size_mm=args.size,
+                border_width_mm=args.border,
+                dictionary_name=args.dictionary,
+                screen_dpi=args.screen_dpi
+            )
+        elif args.display:
+            display_marker_fullscreen(
+                marker_id=args.marker_id,
+                marker_size_mm=args.size,
+                border_width_mm=args.border,
+                dictionary_name=args.dictionary,
+                screen_dpi=args.screen_dpi
+            )
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+        else:
+            parser.print_help()
+    else:
+        # Original PDF generation functionality
+        main()

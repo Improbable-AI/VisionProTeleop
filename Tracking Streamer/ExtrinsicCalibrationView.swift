@@ -14,6 +14,8 @@ struct ExtrinsicCalibrationView: View {
     @State private var isCalibrating = false
     @State private var showingDeleteConfirmation = false
     @State private var calibrationToDelete: String? = nil
+    @State private var showingProceedDialog = false
+    @State private var isProcessing = false
     
     // Camera selection
     @State private var selectedDeviceId: String? = nil
@@ -370,57 +372,63 @@ struct ExtrinsicCalibrationView: View {
                 .background(Color.blue.opacity(0.05))
                 .cornerRadius(8)
                 
-                // Marker IDs info
-                HStack {
-                    Text("OpenCV Marker IDs")
-                    Spacer()
-                    Text(calibrationManager.markerIds.map { String($0) }.joined(separator: ", "))
-                        .foregroundColor(.secondary)
+                // Sequential marker workflow info
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Sequential Workflow")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    
+                    HStack {
+                        Text("Marker IDs")
+                        Spacer()
+                        Text(calibrationManager.markerIds.map { String($0) }.joined(separator: " → "))
+                            .foregroundColor(.purple)
+                    }
+                    
+                    HStack {
+                        Text("Samples per position")
+                        Spacer()
+                        Text("\(calibrationManager.samplesPerPosition)")
+                            .foregroundColor(.purple)
+                    }
+                    
+                    HStack {
+                        Text("Min positions needed")
+                        Spacer()
+                        Text("\(calibrationManager.minUniqueMarkers)")
+                            .foregroundColor(.orange)
+                    }
                 }
-                
-                // Marker IDs info
-                HStack {
-                    Text("Tracking Markers")
-                    Spacer()
-                    Text(calibrationManager.markerIds.map { String($0) }.joined(separator: ", "))
-                        .foregroundColor(.purple)
-                }
-                
-                // Min unique markers requirement
-                HStack {
-                    Text("Min Unique Markers")
-                    Spacer()
-                    Text("\(calibrationManager.minUniqueMarkers)")
-                        .foregroundColor(.orange)
-                }
-                
-                Text("⚠️ ARKit tracks ONE marker at a time. Place markers at different 3D locations and look at each one during calibration.")
-                    .font(.caption)
-                    .foregroundColor(.orange)
-                
-                // Min samples
-                HStack {
-                    Text("Min Samples")
-                    Spacer()
-                    Text("\(calibrationManager.minSamples)")
-                        .foregroundColor(.secondary)
-                }
+                .font(.caption)
+                .padding()
+                .background(Color.purple.opacity(0.05))
+                .cornerRadius(8)
             }
             .padding()
             .background(Color.secondary.opacity(0.1))
             .cornerRadius(12)
             
-            // Instructions
+            // Instructions - updated for sequential workflow
             VStack(alignment: .leading, spacing: 8) {
-                Text("Instructions")
+                Text("📱 Calibration Workflow")
                     .font(.subheadline)
                     .fontWeight(.medium)
                 
-                Text("1. Print ArUco markers: python utils/generate_aruco_markers.py")
-                Text("2. Place ≥\(calibrationManager.minUniqueMarkers) markers at DIFFERENT 3D locations (not on same plane)")
-                Text("3. Look at each marker while camera sees it")
-                Text("4. ARKit switches between markers as you look around")
-                Text("5. Collect samples from ALL markers for proper rotation")
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("1. Open iPhone Calibration tab → 'Display ArUco Marker'")
+                    Text("2. iPhone shows marker ID 0 (55mm)")
+                    Text("3. Look CLOSELY at marker until ARKit registers correct ID")
+                    Text("4. Once registered, move away and view from different angles")
+                    Text("5. After 20 samples → swipe iPhone to marker ID 2")
+                    Text("6. MOVE iPhone to different location, repeat steps 3-4")
+                    Text("7. Repeat for marker ID 3 at third location")
+                    Text("8. Tap 'Finish' when all 3 markers completed")
+                }
+                
+                Text("⚠️ Markers: 0, 2, 3 only (ID 1 removed)")
+                    .font(.caption2)
+                    .foregroundColor(.orange)
+                    .padding(.top, 4)
             }
             .font(.caption)
             .foregroundColor(.secondary)
@@ -437,16 +445,49 @@ struct ExtrinsicCalibrationView: View {
             // Status header
             VStack(spacing: 8) {
                 if calibrationManager.isCalibrating {
-                    ProgressView()
-                        .scaleEffect(1.5)
+                    // Current marker indicator - prominent display
+                    VStack(spacing: 12) {
+                        Text("📱 Display on iPhone:")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                        
+                        HStack(spacing: 20) {
+                            ForEach(calibrationManager.markerIds, id: \.self) { markerId in
+                                let isCurrent = markerId == calibrationManager.currentMarkerId
+                                let samplesForMarker = calibrationManager.samples.filter { $0.markerId == markerId }.count
+                                let isDone = samplesForMarker >= calibrationManager.samplesPerPosition
+                                
+                                VStack(spacing: 4) {
+                                    Text("ID \(markerId)")
+                                        .font(.system(size: isCurrent ? 24 : 16, weight: isCurrent ? .bold : .medium, design: .rounded))
+                                        .foregroundColor(isCurrent ? .purple : (isDone ? .green : .secondary))
+                                    
+                                    if isDone {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(.green)
+                                    } else if isCurrent {
+                                        Text("\(samplesForMarker)/\(calibrationManager.samplesPerPosition)")
+                                            .font(.caption2)
+                                            .foregroundColor(.purple)
+                                    }
+                                }
+                                .frame(width: 60)
+                                .padding(.vertical, 8)
+                                .background(isCurrent ? Color.purple.opacity(0.2) : Color.clear)
+                                .cornerRadius(8)
+                            }
+                        }
+                        
+                        Text(calibrationManager.statusMessage)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.top, 4)
+                    }
+                    .padding()
+                    .background(Color.secondary.opacity(0.1))
+                    .cornerRadius(16)
                     
-                    Text("Calibrating...")
-                        .font(.headline)
-                    
-                    Text(calibrationManager.statusMessage)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
                 } else if let error = calibrationManager.lastError {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.largeTitle)
@@ -463,83 +504,95 @@ struct ExtrinsicCalibrationView: View {
             }
             .padding()
             
-            // Progress
+            // Overall progress
             VStack(spacing: 8) {
                 ProgressView(value: calibrationManager.calibrationProgress)
                     .progressViewStyle(.linear)
                     .tint(.purple)
                 
+                let uniqueMarkers = Set(calibrationManager.samples.map { $0.markerId }).count
+                
                 if isStereoMode {
                     HStack {
-                        Text("Left: \(calibrationManager.leftSamplesCollected)/\(calibrationManager.minSamples)")
+                        Text("Left: \(calibrationManager.leftSamplesCollected)")
                         Spacer()
-                        Text("Right: \(calibrationManager.rightSamplesCollected)/\(calibrationManager.minSamples)")
+                        Text("Right: \(calibrationManager.rightSamplesCollected)")
+                        Spacer()
+                        Text("Markers: \(uniqueMarkers)/\(calibrationManager.minUniqueMarkers)")
                     }
                     .font(.caption)
                     .foregroundColor(.secondary)
                 } else {
-                    Text("\(calibrationManager.samplesCollected) / \(calibrationManager.minSamples) samples")
+                    Text("\(calibrationManager.samplesCollected) samples • \(uniqueMarkers) markers")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
             }
             .padding(.horizontal)
             
-            // Marker detection status
+            // Detection status
             VStack(alignment: .leading, spacing: 8) {
-                // Remembered markers (persistent)
+                // Target marker
                 HStack {
-                    Text("Registered Markers")
+                    Text("Target Marker")
                         .font(.caption)
                         .foregroundColor(.secondary)
                     Spacer()
-                    Text("\(calibrationManager.rememberedMarkerPositions.count)/\(calibrationManager.minUniqueMarkers) needed")
+                    Text("ID \(calibrationManager.currentMarkerId)")
                         .font(.caption)
-                        .foregroundColor(calibrationManager.rememberedMarkerPositions.count >= calibrationManager.minUniqueMarkers ? .green : .orange)
+                        .fontWeight(.bold)
+                        .foregroundColor(.purple)
                 }
                 
-                if calibrationManager.rememberedMarkerPositions.isEmpty {
-                    Text("None yet - look at ArUco markers to register")
-                        .font(.caption)
-                        .foregroundColor(.orange)
-                } else {
-                    Text("IDs: \(calibrationManager.rememberedMarkerPositions.keys.sorted().map { String($0) }.joined(separator: ", "))")
-                        .font(.caption)
-                        .foregroundColor(.green)
-                }
-                
-                // Active ARKit tracking
+                // ARKit tracking status
                 HStack {
-                    Text("ARKit Active")
+                    Text("ARKit Sees")
                         .font(.caption)
                         .foregroundColor(.secondary)
                     Spacer()
-                    if calibrationManager.arkitTrackedMarkers.isEmpty {
-                        Text("—")
+                    if calibrationManager.arkitTrackedMarkers.isEmpty && calibrationManager.rememberedMarkerPositions.isEmpty {
+                        Text("No markers detected")
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.orange)
                     } else {
-                        Text("\(calibrationManager.arkitTrackedMarkers.keys.sorted().map { String($0) }.joined(separator: ", "))")
-                            .font(.caption)
-                            .foregroundColor(.blue)
+                        let active = calibrationManager.arkitTrackedMarkers.keys.sorted()
+                        let hasTarget = calibrationManager.rememberedMarkerPositions[calibrationManager.currentMarkerId] != nil || calibrationManager.arkitTrackedMarkers[calibrationManager.currentMarkerId] != nil
+                        HStack(spacing: 4) {
+                            if hasTarget {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                                    .font(.caption)
+                            }
+                            Text(active.isEmpty ? "remembered" : active.map { String($0) }.joined(separator: ", "))
+                                .font(.caption)
+                                .foregroundColor(hasTarget ? .green : .blue)
+                        }
                     }
                 }
-                .padding(.top, 4)
                 
-                // Camera detection
+                // Camera detection status
                 HStack {
                     Text("Camera Sees")
                         .font(.caption)
                         .foregroundColor(.secondary)
                     Spacer()
                     if calibrationManager.cameraDetectedMarkers.isEmpty {
-                        Text("—")
+                        Text("No markers detected")
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.orange)
                     } else {
-                        Text("\(calibrationManager.cameraDetectedMarkers.keys.sorted().map { String($0) }.joined(separator: ", "))")
-                            .font(.caption)
-                            .foregroundColor(.purple)
+                        let detected = calibrationManager.cameraDetectedMarkers.keys.sorted()
+                        let hasTarget = calibrationManager.cameraDetectedMarkers[calibrationManager.currentMarkerId] != nil
+                        HStack(spacing: 4) {
+                            if hasTarget {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                                    .font(.caption)
+                            }
+                            Text(detected.map { String($0) }.joined(separator: ", "))
+                                .font(.caption)
+                                .foregroundColor(hasTarget ? .green : .purple)
+                        }
                     }
                 }
             }
@@ -549,46 +602,181 @@ struct ExtrinsicCalibrationView: View {
             .cornerRadius(12)
             .padding(.horizontal)
             
+            // Dynamic user guidance
+            VStack(spacing: 8) {
+                let arkitHasTarget = calibrationManager.rememberedMarkerPositions[calibrationManager.currentMarkerId] != nil || calibrationManager.arkitTrackedMarkers[calibrationManager.currentMarkerId] != nil
+                let cameraHasTarget = calibrationManager.cameraDetectedMarkers[calibrationManager.currentMarkerId] != nil
+                let samplesForCurrent = calibrationManager.samplesForCurrentMarker
+                
+                if !arkitHasTarget {
+                    // Step 1: ARKit needs to register the marker
+                    HStack(spacing: 8) {
+                        Image(systemName: "eye.fill")
+                            .font(.title3)
+                            .foregroundColor(.orange)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("👀 Look closely at marker ID \(calibrationManager.currentMarkerId)")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                            Text("Move closer until ARKit registers the marker")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+                    .background(Color.orange.opacity(0.15))
+                    .cornerRadius(10)
+                } else if samplesForCurrent < calibrationManager.samplesPerPosition {
+                    // Step 2: Collecting samples
+                    HStack(spacing: 8) {
+                        Image(systemName: "move.3d")
+                            .font(.title3)
+                            .foregroundColor(.blue)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("📐 Move away & view from different angles")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                            Text("Collecting: \(samplesForCurrent)/\(calibrationManager.samplesPerPosition) samples")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+                    .background(Color.blue.opacity(0.15))
+                    .cornerRadius(10)
+                } else if calibrationManager.canAdvanceToNextMarker {
+                    // Step 3: Ready to advance
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.right.circle.fill")
+                            .font(.title3)
+                            .foregroundColor(.green)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("✅ Position complete!")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                            Text("Swipe iPhone to next marker & move to new location")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+                    .background(Color.green.opacity(0.15))
+                    .cornerRadius(10)
+                } else {
+                    // Final step: Ready to finish
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.title3)
+                            .foregroundColor(.green)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("🎉 All markers complete!")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                            Text("Tap 'Finish Calibration' below")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+                    .background(Color.green.opacity(0.15))
+                    .cornerRadius(10)
+                }
+            }
+            .padding(.horizontal)
+            
             Spacer()
             
             // Action buttons
-            HStack(spacing: 16) {
-                Button(action: {
-                    calibrationManager.cancelCalibration()
-                    isCalibrating = false
-                }) {
-                    Text("Cancel")
-                        .font(.headline)
-                        .foregroundColor(.red)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.red.opacity(0.1))
-                        .cornerRadius(12)
+            VStack(spacing: 12) {
+                // Proceed button (when current position is done, waiting for user to advance)
+                if calibrationManager.hasEnoughSamplesForCurrentMarker && !showingProceedDialog {
+                    if calibrationManager.canAdvanceToNextMarker {
+                        Button(action: {
+                            showingProceedDialog = true
+                        }) {
+                            HStack {
+                                Image(systemName: "arrow.right.circle.fill")
+                                Text("Proceed to Next Marker")
+                            }
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.green)
+                            .cornerRadius(12)
+                        }
+                    } else {
+                        // All markers done - automatically finish
+                        Button(action: {
+                            Task {
+                                await autoFinishCalibration()
+                            }
+                        }) {
+                            HStack {
+                                if isProcessing {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                } else {
+                                    Image(systemName: "checkmark.circle.fill")
+                                }
+                                Text(isProcessing ? "Optimizing..." : "Complete!")
+                            }
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.green)
+                            .cornerRadius(12)
+                        }
+                        .disabled(isProcessing)
+                    }
                 }
                 
-                Button(action: {
-                    finishCalibration()
-                }) {
-                    Text("Finish")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(canFinish ? Color.purple : Color.gray)
-                        .cornerRadius(12)
+                if !isProcessing {
+                    Button(action: {
+                        calibrationManager.cancelCalibration()
+                        isCalibrating = false
+                    }) {
+                        Text("Cancel")
+                            .font(.headline)
+                            .foregroundColor(.red)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.red.opacity(0.1))
+                            .cornerRadius(12)
+                    }
                 }
-                .disabled(!canFinish)
             }
             .padding()
+            .alert("Move to Next Position", isPresented: $showingProceedDialog) {
+                Button("Cancel", role: .cancel) {}
+                Button("Ready - Proceed") {
+                    // Advance to next marker and reset ARKit tracking
+                    calibrationManager.advanceToNextMarker()
+                    // Clear remembered positions to force re-registration
+                    calibrationManager.rememberedMarkerPositions.removeAll()
+                }
+            } message: {
+                Text("Swipe iPhone to show marker ID \(calibrationManager.markerIds[calibrationManager.currentMarkerIndex + 1])\n\nMove iPhone to a DIFFERENT location\n\nThen press 'Ready' to start collecting 20 more samples")
+            }
         }
     }
     
     private var canFinish: Bool {
+        // Need minimum unique markers and total samples
+        let uniqueMarkers = Set(calibrationManager.samples.map { $0.markerId }).count
+        
         if isStereoMode {
-            return calibrationManager.leftSamplesCollected >= calibrationManager.minSamples &&
+            return uniqueMarkers >= calibrationManager.minUniqueMarkers &&
+                   calibrationManager.leftSamplesCollected >= calibrationManager.minSamples &&
                    calibrationManager.rightSamplesCollected >= calibrationManager.minSamples
         } else {
-            return calibrationManager.samplesCollected >= calibrationManager.minSamples
+            return uniqueMarkers >= calibrationManager.minUniqueMarkers &&
+                   calibrationManager.samplesCollected >= calibrationManager.minSamples
         }
     }
     
@@ -665,6 +853,34 @@ struct ExtrinsicCalibrationView: View {
         
         if result != nil {
             print("✅ [ExtrinsicCalibrationView] Calibration complete, dismissing...")
+            onDismiss?()
+        }
+    }
+    
+    private func autoFinishCalibration() async {
+        guard let deviceId = selectedDeviceId,
+              let device = uvcCameraManager.availableDevices.first(where: { $0.id == deviceId }) else {
+            return
+        }
+        
+        isProcessing = true
+        
+        // Small delay to show processing state
+        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        
+        let result = calibrationManager.finishCalibration(
+            deviceId: deviceId,
+            deviceName: device.name,
+            isStereo: isStereoMode
+        )
+        
+        isProcessing = false
+        isCalibrating = false
+        
+        if result != nil {
+            print("✅ [ExtrinsicCalibrationView] Auto-finish complete, dismissing...")
+            // Dismiss after showing success briefly
+            try? await Task.sleep(nanoseconds: 500_000_000)
             onDismiss?()
         }
     }

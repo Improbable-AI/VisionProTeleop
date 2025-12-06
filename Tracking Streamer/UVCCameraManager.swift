@@ -21,11 +21,37 @@ class UVCCameraManager: NSObject, ObservableObject {
     @Published var availableDevices: [UVCDevice] = []
     @Published var selectedDevice: UVCDevice? = nil
     @Published var isCapturing: Bool = false
-    @Published var authorizationStatus: AVAuthorizationStatus = .notDetermined
+    @Published var authorizationStatus: AVAuthorizationStatus = .authorized
     @Published var currentFrame: UIImage? = nil
     @Published var frameWidth: Int = 0
     @Published var frameHeight: Int = 0
     @Published var fps: Int = 0
+    @Published var stereoEnabled: Bool = false  // Whether current camera feed should be treated as stereo
+    
+    // MARK: - Stereo Preference Persistence
+    
+    /// UserDefaults key prefix for per-camera stereo preference
+    private static let stereoPreferenceKeyPrefix = "uvcStereo_"
+    
+    /// Set stereo mode for current camera with persistence
+    func setStereoMode(_ isStereo: Bool) {
+        stereoEnabled = isStereo
+        
+        // Persist for this specific camera
+        if let deviceID = selectedDevice?.id {
+            let key = Self.stereoPreferenceKeyPrefix + deviceID
+            UserDefaults.standard.set(isStereo, forKey: key)
+            print("📷 [UVCCameraManager] Saved stereo preference for camera \(selectedDevice?.name ?? "unknown"): \(isStereo)")
+        }
+    }
+    
+    /// Load stereo preference for a specific camera
+    private func loadStereoPreference(for device: UVCDevice) {
+        let key = Self.stereoPreferenceKeyPrefix + device.id
+        let savedValue = UserDefaults.standard.object(forKey: key) as? Bool ?? false
+        stereoEnabled = savedValue
+        print("📷 [UVCCameraManager] Loaded stereo preference for \(device.name): \(savedValue)")
+    }
     
     // MARK: - Private Properties
     private let captureSession = AVCaptureSession()
@@ -239,6 +265,7 @@ class UVCCameraManager: NSObject, ObservableObject {
                     
                     Task { @MainActor in
                         self.selectedDevice = device
+                        self.loadStereoPreference(for: device)
                     }
                 } else {
                     print("❌ [UVCCameraManager] Unable to add input for \(device.name)")

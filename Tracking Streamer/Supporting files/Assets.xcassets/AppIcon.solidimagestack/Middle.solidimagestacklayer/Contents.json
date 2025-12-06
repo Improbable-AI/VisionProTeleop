@@ -4,9 +4,13 @@
     "version" : 1
   },
   "properties" : {
+    "frame-center" : {
+      "x" : 260,
+      "y" : 240
+    },
     "frame-size" : {
-      "height" : 516,
-      "width" : 516
+      "height" : 310,
+      "width" : 320
     }
   }
 }

@@ -17,8 +17,12 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
     var onFrameReceived: ((CVPixelBuffer) -> Void)?
     
     /// Callback for receiving simulation pose updates via WebRTC data channel
-    /// Format: JSON dictionary {"t": timestamp, "p": {"body_name": [x,y,z,qx,qy,qz,qw], ...}}
-    var onSimPosesReceived: (([String: [Float]]) -> Void)?
+    /// Format: JSON dictionary {"t": timestamp, "p": {"body_name": [x,y,z,qx,qy,qz,qw], ...}, "q": [...], "c": [...]}
+    /// Returns: (timestamp, poses, qpos, ctrl)
+    var onSimPosesReceived: ((Double, [String: [Float]], [Float]?, [Float]?) -> Void)?
+    
+    /// Callback for connection state changes (isConnected)
+    var onConnectionStateChanged: ((Bool) -> Void)?
     
     private let stunServer = "stun:stun.l.google.com:19302"
     
@@ -293,15 +297,26 @@ extension WebRTCClient {
         print("DEBUG: Should negotiate")
     }
     
+    
     func peerConnection(_ peerConnection: LKRTCPeerConnection, didChange newState: LKRTCIceConnectionState) {
         print("DEBUG: ICE connection state changed to: \(newState.rawValue) (\(iceStateString(newState)))")
         Task { @MainActor in
             if newState == .connected {
                 print("DEBUG: *** ICE CONNECTION SUCCESSFUL ***")
                 DataManager.shared.connectionStatus = "ICE connected successfully!"
+                self.onConnectionStateChanged?(true)
             } else if newState == .failed {
                 print("ERROR: ICE connection failed")
                 DataManager.shared.connectionStatus = "ICE connection failed"
+                self.onConnectionStateChanged?(false)
+            } else if newState == .disconnected {
+                print("DEBUG: ICE disconnected")
+                DataManager.shared.connectionStatus = "ICE disconnected"
+                self.onConnectionStateChanged?(false)
+            } else if newState == .closed {
+                print("DEBUG: ICE closed")
+                DataManager.shared.connectionStatus = "ICE closed"
+                self.onConnectionStateChanged?(false)
             } else if newState == .checking {
                 DataManager.shared.connectionStatus = "Checking ICE connection..."
             }
@@ -420,6 +435,11 @@ extension WebRTCClient: LKRTCDataChannelDelegate {
                 }
             }
             
+            // Extract additional data
+            let timestamp = parsed["t"] as? Double ?? Date().timeIntervalSince1970
+            let qpos = (parsed["q"] as? [NSNumber])?.map { $0.floatValue }
+            let ctrl = (parsed["c"] as? [NSNumber])?.map { $0.floatValue }
+            
             // Convert to [String: [Float]]
             var floatPoses: [String: [Float]] = [:]
             for (bodyName, values) in poses {
@@ -429,7 +449,7 @@ extension WebRTCClient: LKRTCDataChannelDelegate {
             // Call callback on main thread
             if let callback = onSimPosesReceived {
                 DispatchQueue.main.async {
-                    callback(floatPoses)
+                    callback(timestamp, floatPoses, qpos, ctrl)
                 }
             }
         } else {

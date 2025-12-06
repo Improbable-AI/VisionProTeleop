@@ -28,8 +28,17 @@ def rotate_head(R, degrees=-90):
 
 def get_pinch_distance(finger_messages): 
     fingers = process_matrices(finger_messages)
-    thumb = fingers[4, :3, 3]
-    index = fingers[9, :3, 3]
+    # Handle both 25-joint (old) and 27-joint (new) skeleton formats
+    # 27-joint order: [0] forearmArm, [1] forearmWrist, [2] wrist, [3-6] thumb, [7-11] index, ...
+    # 25-joint order: [0] wrist, [1-4] thumb, [5-9] index, ...
+    if fingers.shape[0] >= 27:
+        # New 27-joint format: thumbTip is at index 6, indexFingerTip is at index 11
+        thumb = fingers[6, :3, 3]
+        index = fingers[11, :3, 3]
+    else:
+        # Old 25-joint format: thumbTip is at index 4, indexFingerTip is at index 9
+        thumb = fingers[4, :3, 3]
+        index = fingers[9, :3, 3]
 
     return np.linalg.norm(thumb - index)
 

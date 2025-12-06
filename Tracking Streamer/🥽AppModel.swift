@@ -10,8 +10,8 @@ struct Skeleton {
     var joints: [simd_float4x4]
 
     init() {
-        // Initialize the joints array with 24 identity matrices
-        self.joints = Array(repeating: simd_float4x4(1), count: 25)
+        // Initialize the joints array with 27 matrices (forearmArm, forearmWrist, wrist + 24 finger joints)
+        self.joints = Array(repeating: simd_float4x4(1), count: 27)
     }
 }
 
@@ -142,6 +142,7 @@ class DataManager: ObservableObject {
     @Published var videoPlaneZDistance: Float {
         didSet {
             UserDefaults.standard.set(videoPlaneZDistance, forKey: "videoPlaneZDistance")
+            syncSettingToiCloud("visionos.videoPlaneZDistance", value: Double(videoPlaneZDistance))
         }
     }
     
@@ -149,6 +150,7 @@ class DataManager: ObservableObject {
     @Published var videoPlaneYPosition: Float {
         didSet {
             UserDefaults.standard.set(videoPlaneYPosition, forKey: "videoPlaneYPosition")
+            syncSettingToiCloud("visionos.videoPlaneYPosition", value: Double(videoPlaneYPosition))
         }
     }
     
@@ -166,12 +168,14 @@ class DataManager: ObservableObject {
     @Published var statusMinimizedXPosition: Float {
         didSet {
             UserDefaults.standard.set(statusMinimizedXPosition, forKey: "statusMinimizedXPosition")
+            syncSettingToiCloud("visionos.statusMinimizedXPosition", value: Double(statusMinimizedXPosition))
         }
     }
     
     @Published var statusMinimizedYPosition: Float {
         didSet {
             UserDefaults.standard.set(statusMinimizedYPosition, forKey: "statusMinimizedYPosition")
+            syncSettingToiCloud("visionos.statusMinimizedYPosition", value: Double(statusMinimizedYPosition))
         }
     }
     
@@ -179,10 +183,44 @@ class DataManager: ObservableObject {
     @Published var upperLimbVisible: Bool {
         didSet {
             UserDefaults.standard.set(upperLimbVisible, forKey: "upperLimbVisible")
+            syncSettingToiCloud("visionos.upperLimbVisible", value: upperLimbVisible)
+        }
+    }
+    
+    // Head beam (ray cast) visibility setting (persistent via UserDefaults)
+    @Published var showHeadBeam: Bool {
+        didSet {
+            UserDefaults.standard.set(showHeadBeam, forKey: "showHeadBeam")
+            syncSettingToiCloud("visionos.showHeadBeam", value: showHeadBeam)
+        }
+    }
+    
+    // Hand joint spheres visibility setting (persistent via UserDefaults)
+    @Published var showHandJoints: Bool {
+        didSet {
+            UserDefaults.standard.set(showHandJoints, forKey: "showHandJoints")
+            syncSettingToiCloud("visionos.showHandJoints", value: showHandJoints)
+        }
+    }
+    
+    // Hand joints opacity setting (persistent via UserDefaults)
+    @Published var handJointsOpacity: Float {
+        didSet {
+            UserDefaults.standard.set(handJointsOpacity, forKey: "handJointsOpacity")
+            syncSettingToiCloud("visionos.handJointsOpacity", value: Double(handJointsOpacity))
         }
     }
     
     @Published var showExitConfirmation: Bool = false
+    
+    // MARK: - iCloud Sync Helper
+    
+    private func syncSettingToiCloud<T>(_ key: String, value: T) {
+        let store = NSUbiquitousKeyValueStore.default
+        store.set(value, forKey: key)
+        store.set(Date().timeIntervalSince1970, forKey: "visionos.lastSyncTime")
+        store.synchronize()
+    }
     
     private init() {
         // Load saved video source or default to network
@@ -205,6 +243,12 @@ class DataManager: ObservableObject {
         self.statusMinimizedYPosition = UserDefaults.standard.object(forKey: "statusMinimizedYPosition") as? Float ?? -0.3
         // Load saved upper limb visibility or default to true (visible)
         self.upperLimbVisible = UserDefaults.standard.object(forKey: "upperLimbVisible") as? Bool ?? true
+        // Load saved head beam visibility or default to false (hidden)
+        self.showHeadBeam = UserDefaults.standard.object(forKey: "showHeadBeam") as? Bool ?? false
+        // Load saved hand joints visibility or default to false (hidden)
+        self.showHandJoints = UserDefaults.standard.object(forKey: "showHandJoints") as? Bool ?? false
+        // Load saved hand joints opacity or default to 0.9 (90%)
+        self.handJointsOpacity = UserDefaults.standard.object(forKey: "handJointsOpacity") as? Float ?? 0.9
     }
 }
 
@@ -310,7 +354,7 @@ extension 🥽AppModel {
                 
 
                 let jointTypes: [HandSkeleton.JointName] = [
-                    .wrist,
+                    .forearmArm, .forearmWrist, .wrist,
                     .thumbKnuckle, .thumbIntermediateBase, .thumbIntermediateTip, .thumbTip,
                     .indexFingerMetacarpal, .indexFingerKnuckle, .indexFingerIntermediateBase, .indexFingerIntermediateTip, .indexFingerTip,
                     .middleFingerMetacarpal, .middleFingerKnuckle, .middleFingerIntermediateBase, .middleFingerIntermediateTip, .middleFingerTip,
@@ -336,7 +380,7 @@ extension 🥽AppModel {
                 // print(handAnchor.originFromAnchorTransform)
                 
                 let jointTypes: [HandSkeleton.JointName] = [
-                    .wrist,
+                    .forearmArm, .forearmWrist, .wrist,
                     .thumbKnuckle, .thumbIntermediateBase, .thumbIntermediateTip, .thumbTip,
                     .indexFingerMetacarpal, .indexFingerKnuckle, .indexFingerIntermediateBase, .indexFingerIntermediateTip, .indexFingerTip,
                     .middleFingerMetacarpal, .middleFingerKnuckle, .middleFingerIntermediateBase, .middleFingerIntermediateTip, .middleFingerTip,

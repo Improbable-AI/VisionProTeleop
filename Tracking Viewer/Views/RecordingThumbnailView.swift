@@ -11,9 +11,29 @@ import SwiftUI
 struct RecordingThumbnailView: View {
     let recording: Recording
     let isSelected: Bool
+    var isSelectionMode: Bool = false
+    var showAnnotations: Bool = true
     
+    @StateObject private var annotationsManager = AnnotationsManager.shared
     @State private var thumbnail: UIImage?
     @State private var isLoadingThumbnail: Bool = true
+    
+    private var isFavorite: Bool {
+        annotationsManager.isFavorite(recording.id)
+    }
+    
+    private var recordingTags: [Tag] {
+        annotationsManager.tags(for: recording.id)
+    }
+    
+    private var hasNotes: Bool {
+        let notes = annotationsManager.notes(for: recording.id)
+        return notes != nil && !notes!.isEmpty
+    }
+    
+    private var customName: String? {
+        annotationsManager.annotation(for: recording.id)?.customName
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -57,19 +77,49 @@ struct RecordingThumbnailView: View {
                         }
                     }
                     
-                    // Selection indicator
-                    if isSelected {
-                        VStack {
-                            HStack {
+                    // Top row: Selection indicator + Favorite + Notes
+                    VStack {
+                        HStack {
+                            if isSelected {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.title2)
                                     .foregroundColor(.blue)
                                     .background(Color.white.clipShape(Circle()))
                                     .padding(6)
-                                Spacer()
                             }
+                            
                             Spacer()
+                            
+                            if showAnnotations {
+                                HStack(spacing: 4) {
+                                    if hasNotes {
+                                        Image(systemName: "note.text")
+                                            .font(.caption)
+                                            .foregroundColor(.white)
+                                            .padding(4)
+                                            .background(Color.black.opacity(0.6))
+                                            .clipShape(Circle())
+                                    }
+                                    
+                                    if isFavorite {
+                                        Image(systemName: "star.fill")
+                                            .font(.caption)
+                                            .foregroundColor(.yellow)
+                                            .padding(4)
+                                            .background(Color.black.opacity(0.6))
+                                            .clipShape(Circle())
+                                    }
+                                }
+                                .padding(6)
+                            }
                         }
+                        Spacer()
+                    }
+                    
+                    // Selection Mode Overlay
+                    if isSelectionMode && !isSelected {
+                        Rectangle()
+                            .fill(Color.black.opacity(0.4))
                     }
                 }
             }
@@ -81,12 +131,37 @@ struct RecordingThumbnailView: View {
             )
             
             // Info
-            VStack(alignment: .leading, spacing: 2) {
-                Text(recording.displayName)
+            VStack(alignment: .leading, spacing: 4) {
+                // Name (custom or default)
+                Text(customName ?? recording.displayName)
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .lineLimit(1)
                 
+                // Tags (if any)
+                if showAnnotations && !recordingTags.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 4) {
+                            ForEach(recordingTags.prefix(3)) { tag in
+                                Text(tag.name)
+                                    .font(.system(size: 9))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(tag.color.color)
+                                    .cornerRadius(4)
+                            }
+                            if recordingTags.count > 3 {
+                                Text("+\(recordingTags.count - 3)")
+                                    .font(.system(size: 9))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                    .frame(height: 16)
+                }
+                
+                // Stats
                 HStack(spacing: 8) {
                     Label(recording.frameCountString, systemImage: "photo.on.rectangle")
                     Label(recording.fileSizeString, systemImage: "doc")
@@ -117,7 +192,8 @@ struct RecordingThumbnailView: View {
             videoURL: nil,
             trackingURL: nil
         ),
-        isSelected: false
+        isSelected: false,
+        isSelectionMode: false
     )
     .frame(width: 180)
     .padding()

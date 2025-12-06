@@ -45,6 +45,17 @@ struct VisionProTeleopApp: App {
             print("🔧 [DEBUG] Calling startServer() from app init...")
             startServer()
         }
+        
+        // Configure settings sync from iOS
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            Task { @MainActor in
+                VisionOSSettingsSync.shared.configure(
+                    dataManager: DataManager.shared,
+                    recordingManager: RecordingManager.shared
+                )
+                print("☁️ [DEBUG] VisionOS settings sync configured")
+            }
+        }
     }
 }
 

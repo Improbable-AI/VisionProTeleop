@@ -2,3 +2,4 @@
 /dist 
 *.pyc
 build/
+*.mp4

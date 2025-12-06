@@ -58,68 +58,97 @@ struct CombinedStreamingView: View {
     @State private var mujocoPoseUpdateTrigger: UUID = UUID()
     @State private var mujocoUsdzURL: String? = nil
     
+    // Hand joint visualization state
+    @State private var handJointUpdateTrigger: UUID = UUID()
+    
     private let applyInWorldSpace: Bool = true
     
     var body: some View {
+        realityViewContent
+    }
+    
+    // MARK: - View Components
+    
+    @ViewBuilder
+    private var realityViewContent: some View {
+        baseRealityView
+            .modifier(VideoSourceModifiers(
+                dataManager: dataManager,
+                uvcCameraManager: uvcCameraManager,
+                imageData: imageData,
+                uvcFrame: $uvcFrame,
+                updateTrigger: $updateTrigger,
+                hasFrames: $hasFrames,
+                currentAspectRatio: $currentAspectRatio
+            ))
+            .modifier(LifecycleModifiers(
+                dataManager: dataManager,
+                appModel: appModel,
+                videoStreamManager: videoStreamManager,
+                uvcCameraManager: uvcCameraManager,
+                mujocoManager: mujocoManager,
+                recordingManager: recordingManager,
+                imageData: imageData,
+                hasAutoMinimized: $hasAutoMinimized,
+                userInteracted: $userInteracted,
+                hasFrames: $hasFrames,
+                hasAudio: $hasAudio,
+                hasSimPoses: $hasSimPoses,
+                stereoMaterialEntity: $stereoMaterialEntity,
+                attachToPosition: $attachToPosition,
+                attachToRotation: $attachToRotation,
+                mujocoUsdzURL: $mujocoUsdzURL,
+                mujocoFinalTransforms: $mujocoFinalTransforms,
+                mujocoPoseUpdateTrigger: $mujocoPoseUpdateTrigger,
+                computeMuJoCoFinalTransformsFromWebRTC: computeMuJoCoFinalTransformsFromWebRTC,
+                computeMuJoCoFinalTransforms: computeMuJoCoFinalTransforms,
+                tryAutoMinimize: tryAutoMinimize
+            ))
+            .modifier(StateChangeModifiers(
+                dataManager: dataManager,
+                videoStreamManager: videoStreamManager,
+                uvcCameraManager: uvcCameraManager,
+                mujocoManager: mujocoManager,
+                recordingManager: recordingManager,
+                imageData: imageData,
+                hasFrames: $hasFrames,
+                hasAudio: $hasAudio,
+                hasSimPoses: $hasSimPoses,
+                videoMinimized: $videoMinimized,
+                hasAutoMinimized: $hasAutoMinimized,
+                fixedWorldTransform: $fixedWorldTransform,
+                userInteracted: $userInteracted,
+                mujocoUsdzURL: $mujocoUsdzURL,
+                mujocoEntity: $mujocoEntity,
+                mujocoBodyEntities: $mujocoBodyEntities,
+                initialLocalTransforms: $initialLocalTransforms,
+                pythonToSwiftNameMap: $pythonToSwiftNameMap,
+                pythonToSwiftTargets: $pythonToSwiftTargets,
+                entityPathByObjectID: $entityPathByObjectID,
+                nameMappingInitialized: $nameMappingInitialized,
+                mujocoFinalTransforms: $mujocoFinalTransforms,
+                attachToPosition: $attachToPosition,
+                attachToRotation: $attachToRotation,
+                mujocoPoseUpdateTrigger: $mujocoPoseUpdateTrigger,
+                loadMuJoCoModel: loadMuJoCoModel,
+                tryAutoMinimize: tryAutoMinimize
+            ))
+            .task {
+                // Hand joint visualization update loop (~60Hz when enabled)
+                while !Task.isCancelled {
+                    if dataManager.showHandJoints {
+                        handJointUpdateTrigger = UUID()
+                    }
+                    try? await Task.sleep(nanoseconds: 16_666_666) // ~60Hz
+                }
+            }
+            .upperLimbVisibility(dataManager.upperLimbVisible ? .visible : .hidden)
+    }
+    
+    @ViewBuilder
+    private var baseRealityView: some View {
         RealityView { content, attachments in
-            print("🟢 [CombinedStreamingView] RealityView content block called")
-            
-            // === VIDEO SETUP (from ImmersiveView) ===
-            let videoAnchor = AnchorEntity(.head)
-            videoAnchor.name = "videoAnchor"
-            content.add(videoAnchor)
-            
-            let worldAnchor = AnchorEntity(world: .zero)
-            worldAnchor.name = "videoWorldAnchor"
-            content.add(worldAnchor)
-            
-            let videoRoot = Entity()
-            videoRoot.name = "videoRoot"
-            videoRoot.setParent(worldAnchor)
-            
-            let skyBox = createSkyBox()
-            skyBox.isEnabled = false
-            skyBox.name = "videoPlane"
-            skyBox.setParent(videoRoot)
-            
-            let previewPlane = createPreviewPlane()
-            previewPlane.name = "previewPlane"
-            previewPlane.isEnabled = false
-            previewPlane.setParent(videoRoot)
-            
-            // === MUJOCO SETUP ===
-            let mujocoRoot = Entity()
-            mujocoRoot.name = "mujocoRoot"
-            content.add(mujocoRoot)
-            
-            // === STATUS DISPLAY ===
-            let statusAnchor = AnchorEntity(.head)
-            statusAnchor.name = "statusHeadAnchor"
-            content.add(statusAnchor)
-            
-            let statusContainer = Entity()
-            statusContainer.name = "statusContainer"
-            statusContainer.setParent(statusAnchor)
-            statusContainer.transform.translation = SIMD3<Float>(0.0, 0.0, -1.0)
-            
-            if let statusAttachment = attachments.entity(for: "status") {
-                print("🟢 [CombinedStreamingView] Status attachment found and attached")
-                statusAttachment.setParent(statusContainer)
-            }
-            
-            let statusPreviewContainer = Entity()
-            statusPreviewContainer.name = "statusPreviewContainer"
-            statusPreviewContainer.setParent(statusAnchor)
-            statusPreviewContainer.transform.translation = SIMD3<Float>(
-                dataManager.statusMinimizedXPosition,
-                dataManager.statusMinimizedYPosition,
-                -1.0
-            )
-            
-            if let statusPreviewAttachment = attachments.entity(for: "statusPreview") {
-                statusPreviewAttachment.setParent(statusPreviewContainer)
-                statusPreviewContainer.isEnabled = false
-            }
+            setupRealityViewContent(content: content, attachments: attachments)
         } update: { updateContent, attachments in
             let _ = updateTrigger
             let _ = dataManager.videoPlaneZDistance
@@ -135,6 +164,10 @@ struct CombinedStreamingView: View {
             let _ = isMinimized
             let _ = mujocoPoseUpdateTrigger
             let _ = mujocoEntity  // Trigger update when model is loaded
+            let _ = dataManager.showHeadBeam  // Trigger update when head beam visibility changes
+            let _ = dataManager.showHandJoints  // Trigger update when hand joints visibility changes
+            let _ = dataManager.handJointsOpacity  // Trigger update when hand joints opacity changes
+            let _ = handJointUpdateTrigger  // Trigger update when hand tracking data changes
             
             func findEntity(named name: String, in collection: RealityViewEntityCollection) -> Entity? {
                 for entity in collection {
@@ -227,7 +260,10 @@ struct CombinedStreamingView: View {
                         recordingManager.recordVideoFrame(displayImage)
                     }
                     
-                    let aspectRatio = Float(imageWidth / imageHeight)
+                    // Calculate aspect ratio - for stereo UVC, the displayed image is half width (side-by-side split)
+                    let isUVCStereo = isUVCMode && UVCCameraManager.shared.stereoEnabled
+                    let effectiveWidth = isUVCStereo ? imageWidth / 2 : imageWidth
+                    let aspectRatio = Float(effectiveWidth / imageHeight)
                     
                     if currentAspectRatio == nil || abs(currentAspectRatio! - aspectRatio) > 0.01 {
                         currentAspectRatio = aspectRatio
@@ -259,31 +295,69 @@ struct CombinedStreamingView: View {
                         }
                     }
                     
-                    // UVC camera is always mono, network can be stereo
-                    let isStereo = !isUVCMode && DataManager.shared.stereoEnabled
+                    // Check stereo mode: UVC uses UVCCameraManager.stereoEnabled, network uses DataManager.stereoEnabled
+                    let isStereo = isUVCMode ? UVCCameraManager.shared.stereoEnabled : DataManager.shared.stereoEnabled
                     
-                    if isStereo, let imageLeft = imageData.left, let imageRight = imageData.right {
-                        do {
-                            guard let sphereEntity = stereoMaterialEntity,
-                                  var stereoMaterial = sphereEntity.components[ModelComponent.self]?.materials.first as? ShaderGraphMaterial else {
-                                var skyBoxMaterial = UnlitMaterial()
+                    if isStereo {
+                        // Stereo mode: need left and right images
+                        let leftImage: CGImage?
+                        let rightImage: CGImage?
+                        
+                        if isUVCMode, let uvc = uvcFrame, let cgImage = uvc.cgImage {
+                            // Split UVC side-by-side frame into left and right halves
+                            let width = cgImage.width
+                            let height = cgImage.height
+                            let halfWidth = width / 2
+                            
+                            let leftRect = CGRect(x: 0, y: 0, width: halfWidth, height: height)
+                            let rightRect = CGRect(x: halfWidth, y: 0, width: halfWidth, height: height)
+                            
+                            leftImage = cgImage.cropping(to: leftRect)
+                            rightImage = cgImage.cropping(to: rightRect)
+                        } else if let imgLeft = imageData.left, let imgRight = imageData.right {
+                            // Network stream already has separate left/right
+                            leftImage = imgLeft.cgImage
+                            rightImage = imgRight.cgImage
+                        } else {
+                            leftImage = nil
+                            rightImage = nil
+                        }
+                        
+                        if let leftCG = leftImage, let rightCG = rightImage {
+                            do {
+                                guard let sphereEntity = stereoMaterialEntity,
+                                      var stereoMaterial = sphereEntity.components[ModelComponent.self]?.materials.first as? ShaderGraphMaterial else {
+                                    var skyBoxMaterial = UnlitMaterial()
+                                    var textureOptions = TextureResource.CreateOptions(semantic: .hdrColor)
+                                    textureOptions.mipmapsMode = .none
+                                    let texture = try TextureResource.generate(from: rightCG, options: textureOptions)
+                                    skyBoxMaterial.color = .init(texture: .init(texture))
+                                    skyBox.components[ModelComponent.self]?.materials = [skyBoxMaterial]
+                                    return
+                                }
+                                
                                 var textureOptions = TextureResource.CreateOptions(semantic: .hdrColor)
                                 textureOptions.mipmapsMode = .none
-                                let texture = try TextureResource.generate(from: imageRight.cgImage!, options: textureOptions)
+                                let leftTexture = try TextureResource.generate(from: leftCG, options: textureOptions)
+                                let rightTexture = try TextureResource.generate(from: rightCG, options: textureOptions)
+                                try stereoMaterial.setParameter(name: "left", value: .textureResource(leftTexture))
+                                try stereoMaterial.setParameter(name: "right", value: .textureResource(rightTexture))
+                                skyBox.components[ModelComponent.self]?.materials = [stereoMaterial]
+                            } catch {
+                                print("❌ ERROR: Failed to load stereo textures: \(error)")
+                            }
+                        } else {
+                            // Fallback to mono if stereo split fails
+                            var skyBoxMaterial = UnlitMaterial()
+                            do {
+                                var textureOptions = TextureResource.CreateOptions(semantic: .hdrColor)
+                                textureOptions.mipmapsMode = .none
+                                let texture = try TextureResource.generate(from: displayImage.cgImage!, options: textureOptions)
                                 skyBoxMaterial.color = .init(texture: .init(texture))
                                 skyBox.components[ModelComponent.self]?.materials = [skyBoxMaterial]
-                                return
+                            } catch {
+                                print("❌ ERROR: Failed to load fallback mono texture: \(error)")
                             }
-                            
-                            var textureOptions = TextureResource.CreateOptions(semantic: .hdrColor)
-                            textureOptions.mipmapsMode = .none
-                            let leftTexture = try TextureResource.generate(from: imageLeft.cgImage!, options: textureOptions)
-                            let rightTexture = try TextureResource.generate(from: imageRight.cgImage!, options: textureOptions)
-                            try stereoMaterial.setParameter(name: "left", value: .textureResource(leftTexture))
-                            try stereoMaterial.setParameter(name: "right", value: .textureResource(rightTexture))
-                            skyBox.components[ModelComponent.self]?.materials = [stereoMaterial]
-                        } catch {
-                            print("❌ ERROR: Failed to load stereo textures: \(error)")
                         }
                     } else {
                         // Mono mode (either UVC or network mono)
@@ -318,7 +392,7 @@ struct CombinedStreamingView: View {
                             -1.0
                         )
                     } else {
-                        targetTranslation = SIMD3<Float>(0.0, 0.0, -1.0)
+                        targetTranslation = SIMD3<Float>(0.0, -0.1, -1.0)
                     }
                     var transform = statusContainer.transform
                     transform.translation = targetTranslation
@@ -350,369 +424,364 @@ struct CombinedStreamingView: View {
                 }
             }
             
+            // === HEAD BEAM UPDATE ===
+            if let headBeamAnchor = findEntity(named: "headBeamAnchor", in: updateContent.entities),
+               let headBeam = headBeamAnchor.findEntity(named: "headBeam") {
+                headBeam.isEnabled = dataManager.showHeadBeam
+            }
+            
+            // === HAND JOINTS UPDATE ===
+            if let handJointsRoot = findEntity(named: "handJointsRoot", in: updateContent.entities) {
+                handJointsRoot.isEnabled = dataManager.showHandJoints
+                
+                if dataManager.showHandJoints {
+                    let trackingData = DataManager.shared.latestHandTrackingData
+                    let leftWrist = trackingData.leftWrist
+                    let rightWrist = trackingData.rightWrist
+                    let opacity = CGFloat(dataManager.handJointsOpacity)
+                    
+                    // Update materials with current opacity
+                    // Use UnlitMaterial when fully opaque (brighter), SimpleMaterial when transparent (supports alpha blending)
+                    let leftJointMaterial: RealityKit.Material
+                    let rightJointMaterial: RealityKit.Material
+                    let leftBoneMaterial: RealityKit.Material
+                    let rightBoneMaterial: RealityKit.Material
+                    
+                    if opacity >= 0.99 {
+                        // Fully opaque - use UnlitMaterial for brighter, unlit appearance
+                        var leftJoint = UnlitMaterial()
+                        leftJoint.color = .init(tint: UIColor(red: 0.2, green: 0.8, blue: 1.0, alpha: 1.0))
+                        leftJointMaterial = leftJoint
+                        
+                        var rightJoint = UnlitMaterial()
+                        rightJoint.color = .init(tint: UIColor(red: 1.0, green: 0.6, blue: 0.2, alpha: 1.0))
+                        rightJointMaterial = rightJoint
+                        
+                        var leftBone = UnlitMaterial()
+                        leftBone.color = .init(tint: UIColor(red: 0.1, green: 0.6, blue: 0.8, alpha: 1.0))
+                        leftBoneMaterial = leftBone
+                        
+                        var rightBone = UnlitMaterial()
+                        rightBone.color = .init(tint: UIColor(red: 0.9, green: 0.5, blue: 0.1, alpha: 1.0))
+                        rightBoneMaterial = rightBone
+                    } else {
+                        // Transparent - use SimpleMaterial for proper alpha blending
+                        var leftJoint = SimpleMaterial()
+                        leftJoint.color = .init(tint: UIColor(red: 0.2, green: 0.8, blue: 1.0, alpha: opacity))
+                        leftJoint.metallic = 0.0
+                        leftJoint.roughness = 1.0
+                        leftJointMaterial = leftJoint
+                        
+                        var rightJoint = SimpleMaterial()
+                        rightJoint.color = .init(tint: UIColor(red: 1.0, green: 0.6, blue: 0.2, alpha: opacity))
+                        rightJoint.metallic = 0.0
+                        rightJoint.roughness = 1.0
+                        rightJointMaterial = rightJoint
+                        
+                        var leftBone = SimpleMaterial()
+                        leftBone.color = .init(tint: UIColor(red: 0.1, green: 0.6, blue: 0.8, alpha: opacity * 0.9))
+                        leftBone.metallic = 0.0
+                        leftBone.roughness = 1.0
+                        leftBoneMaterial = leftBone
+                        
+                        var rightBone = SimpleMaterial()
+                        rightBone.color = .init(tint: UIColor(red: 0.9, green: 0.5, blue: 0.1, alpha: opacity * 0.9))
+                        rightBone.metallic = 0.0
+                        rightBone.roughness = 1.0
+                        rightBoneMaterial = rightBone
+                    }
+                    
+                    // Skeleton bone connections (27 joints: 0=forearmArm, 1=forearmWrist, 2=wrist, 3-6=thumb, 7-11=index, 12-16=middle, 17-21=ring, 22-26=little)
+                    let fingerConnections: [(Int, Int)] = [
+                        (0, 1), (1, 2),  // forearm
+                        (2, 3), (3, 4), (4, 5), (5, 6),  // thumb
+                        (2, 7), (7, 8), (8, 9), (9, 10), (10, 11),  // index
+                        (2, 12), (12, 13), (13, 14), (14, 15), (15, 16),  // middle
+                        (2, 17), (17, 18), (18, 19), (19, 20), (20, 21),  // ring
+                        (2, 22), (22, 23), (23, 24), (24, 25), (25, 26)  // little
+                    ]
+                    let palmConnections: [(Int, Int)] = [(8, 13), (13, 18), (18, 23)]
+                    let allConnections = fingerConnections + palmConnections
+                    
+                    // Calculate all joint world positions for left hand
+                    var leftJointPositions: [SIMD3<Float>] = []
+                    let leftWristPos = SIMD3<Float>(leftWrist.columns.3.x, leftWrist.columns.3.y, leftWrist.columns.3.z)
+                    let leftHandValid = simd_length(leftWristPos) > 0.01
+                    
+                    for i in 0..<27 {
+                        let jointLocal = trackingData.leftSkeleton.joints[i]
+                        let jointWorld = simd_mul(leftWrist, jointLocal)
+                        let position = SIMD3<Float>(jointWorld.columns.3.x, jointWorld.columns.3.y, jointWorld.columns.3.z)
+                        leftJointPositions.append(position)
+                        
+                        // Update joint sphere
+                        if let jointEntity = handJointsRoot.findEntity(named: "leftJoint_\(i)") as? ModelEntity {
+                            if leftHandValid {
+                                jointEntity.position = position
+                                jointEntity.model?.materials = [leftJointMaterial]
+                                jointEntity.isEnabled = true
+                            } else {
+                                jointEntity.isEnabled = false
+                            }
+                        }
+                    }
+                    
+                    // Update left hand bones
+                    for (idx, connection) in allConnections.enumerated() {
+                        if let boneEntity = handJointsRoot.findEntity(named: "leftBone_\(idx)_\(connection.0)_\(connection.1)") as? ModelEntity {
+                            // Skip forearm bones if forearmArm (joint 0) is at origin (not tracked)
+                            let skipForearm = (connection.0 == 0 || connection.1 == 0) && simd_length(leftJointPositions[0]) < 0.01
+                            if leftHandValid && !skipForearm {
+                                let startPos = leftJointPositions[connection.0]
+                                let endPos = leftJointPositions[connection.1]
+                                updateBoneEntity(boneEntity, from: startPos, to: endPos)
+                                boneEntity.model?.materials = [leftBoneMaterial]
+                                boneEntity.isEnabled = true
+                            } else {
+                                boneEntity.isEnabled = false
+                            }
+                        }
+                    }
+                    
+                    // Calculate all joint world positions for right hand
+                    var rightJointPositions: [SIMD3<Float>] = []
+                    let rightWristPos = SIMD3<Float>(rightWrist.columns.3.x, rightWrist.columns.3.y, rightWrist.columns.3.z)
+                    let rightHandValid = simd_length(rightWristPos) > 0.01
+                    
+                    for i in 0..<27 {
+                        let jointLocal = trackingData.rightSkeleton.joints[i]
+                        let jointWorld = simd_mul(rightWrist, jointLocal)
+                        let position = SIMD3<Float>(jointWorld.columns.3.x, jointWorld.columns.3.y, jointWorld.columns.3.z)
+                        rightJointPositions.append(position)
+                        
+                        // Update joint sphere
+                        if let jointEntity = handJointsRoot.findEntity(named: "rightJoint_\(i)") as? ModelEntity {
+                            if rightHandValid {
+                                jointEntity.position = position
+                                jointEntity.model?.materials = [rightJointMaterial]
+                                jointEntity.isEnabled = true
+                            } else {
+                                jointEntity.isEnabled = false
+                            }
+                        }
+                    }
+                    
+                    // Update right hand bones
+                    for (idx, connection) in allConnections.enumerated() {
+                        if let boneEntity = handJointsRoot.findEntity(named: "rightBone_\(idx)_\(connection.0)_\(connection.1)") as? ModelEntity {
+                            // Skip forearm bones if forearmArm (joint 0) is at origin (not tracked)
+                            let skipForearm = (connection.0 == 0 || connection.1 == 0) && simd_length(rightJointPositions[0]) < 0.01
+                            if rightHandValid && !skipForearm {
+                                let startPos = rightJointPositions[connection.0]
+                                let endPos = rightJointPositions[connection.1]
+                                updateBoneEntity(boneEntity, from: startPos, to: endPos)
+                                boneEntity.model?.materials = [rightBoneMaterial]
+                                boneEntity.isEnabled = true
+                            } else {
+                                boneEntity.isEnabled = false
+                            }
+                        }
+                    }
+                }
+            }
+            
             // === MUJOCO POSE UPDATE ===
             if !mujocoFinalTransforms.isEmpty {
                 applyMuJoCoTransforms(mujocoFinalTransforms)
             }
             
         } attachments: {
-            Attachment(id: "status") {
-                StatusOverlay(
-                    hasFrames: $hasFrames,
-                    showVideoStatus: true,
-                    isMinimized: $isMinimized,
-                    showViewControls: $showViewControls,
-                    previewZDistance: $previewZDistance,
-                    previewActive: $previewActive,
-                    userInteracted: $userInteracted,
-                    videoMinimized: $videoMinimized,
-                    videoFixed: Binding(
-                        get: { dataManager.videoPlaneFixedToWorld },
-                        set: { newValue in dataManager.videoPlaneFixedToWorld = newValue }
-                    ),
-                    previewStatusPosition: $previewStatusPosition,
-                    previewStatusActive: $previewStatusActive,
-                    mujocoManager: mujocoManager
-                )
-            }
-            
-            Attachment(id: "statusPreview") {
-                StatusPreviewView(
-                    showVideoStatus: true,
-                    videoFixed: dataManager.videoPlaneFixedToWorld
-                )
-            }
+            statusAttachments
         }
-        .onReceive(imageData.$left) { _ in
-            // Only trigger update for network source
-            if dataManager.videoSource == .network {
-                updateTrigger.toggle()
-            }
+    }
+    
+    // MARK: - Attachments
+    
+    @AttachmentContentBuilder
+    private var statusAttachments: some AttachmentContent {
+        Attachment(id: "status") {
+            StatusOverlay(
+                hasFrames: $hasFrames,
+                showVideoStatus: true,
+                isMinimized: $isMinimized,
+                showViewControls: $showViewControls,
+                previewZDistance: $previewZDistance,
+                previewActive: $previewActive,
+                userInteracted: $userInteracted,
+                videoMinimized: $videoMinimized,
+                videoFixed: Binding(
+                    get: { dataManager.videoPlaneFixedToWorld },
+                    set: { newValue in dataManager.videoPlaneFixedToWorld = newValue }
+                ),
+                previewStatusPosition: $previewStatusPosition,
+                previewStatusActive: $previewStatusActive,
+                mujocoManager: mujocoManager
+            )
         }
-        .onReceive(uvcCameraManager.$currentFrame) { frame in
-            // Update UVC frame and trigger view update
-            if dataManager.videoSource == .uvcCamera {
-                uvcFrame = frame
-                updateTrigger.toggle()
-            }
+        
+        Attachment(id: "statusPreview") {
+            StatusPreviewView(
+                showVideoStatus: true,
+                videoFixed: dataManager.videoPlaneFixedToWorld
+            )
         }
-        .onChange(of: dataManager.videoSource) { oldValue, newValue in
-            print("📹 [CombinedStreamingView] Video source changed from \(oldValue.rawValue) to \(newValue.rawValue)")
-            
-            // Reset frame state when switching sources
-            hasFrames = false
-            currentAspectRatio = nil
-            
-            if newValue == .uvcCamera {
-                // Start UVC capture if a device is selected
-                if uvcCameraManager.selectedDevice != nil {
-                    print("📹 [CombinedStreamingView] Starting UVC capture with selected device: \(uvcCameraManager.selectedDevice?.name ?? "unknown")")
-                    uvcCameraManager.startCapture()
-                } else if let firstDevice = uvcCameraManager.availableDevices.first {
-                    print("📹 [CombinedStreamingView] Selecting first available device: \(firstDevice.name)")
-                    uvcCameraManager.selectDevice(firstDevice)
-                    // Wait a moment for device to be configured, then start capture
-                    Task {
-                        try? await Task.sleep(nanoseconds: 200_000_000) // 200ms
-                        await MainActor.run {
-                            uvcCameraManager.startCapture()
-                        }
-                    }
-                } else {
-                    print("📹 [CombinedStreamingView] No UVC devices available")
-                }
-            } else {
-                // Stop UVC capture when switching to network
-                uvcCameraManager.stopCapture()
-                uvcFrame = nil
-            }
-            
-            updateTrigger.toggle()
+    }
+    
+    // MARK: - RealityView Setup
+    
+    private func setupRealityViewContent(content: RealityViewContent, attachments: RealityViewAttachments) {
+        print("🟢 [CombinedStreamingView] RealityView content block called")
+        
+        // === VIDEO SETUP (from ImmersiveView) ===
+        let videoAnchor = AnchorEntity(.head)
+        videoAnchor.name = "videoAnchor"
+        content.add(videoAnchor)
+        
+        let worldAnchor = AnchorEntity(world: .zero)
+        worldAnchor.name = "videoWorldAnchor"
+        content.add(worldAnchor)
+        
+        let videoRoot = Entity()
+        videoRoot.name = "videoRoot"
+        videoRoot.setParent(worldAnchor)
+        
+        let skyBox = createSkyBox()
+        skyBox.isEnabled = false
+        skyBox.name = "videoPlane"
+        skyBox.setParent(videoRoot)
+        
+        let previewPlane = createPreviewPlane()
+        previewPlane.name = "previewPlane"
+        previewPlane.isEnabled = false
+        previewPlane.setParent(videoRoot)
+        
+        // === MUJOCO SETUP ===
+        let mujocoRoot = Entity()
+        mujocoRoot.name = "mujocoRoot"
+        content.add(mujocoRoot)
+        
+        // === HEAD BEAM SETUP ===
+        let headBeamAnchor = AnchorEntity(.head)
+        headBeamAnchor.name = "headBeamAnchor"
+        content.add(headBeamAnchor)
+        
+        let headBeamEntity = createHeadBeam()
+        headBeamEntity.name = "headBeam"
+        headBeamEntity.isEnabled = dataManager.showHeadBeam
+        headBeamEntity.setParent(headBeamAnchor)
+        
+        // === HAND JOINTS SETUP ===
+        let handJointsRoot = Entity()
+        handJointsRoot.name = "handJointsRoot"
+        handJointsRoot.isEnabled = dataManager.showHandJoints
+        content.add(handJointsRoot)
+        
+        // Create 54 spheres for hand joint visualization (27 per hand)
+        // Joint indices: 0=forearmArm, 1=forearmWrist, 2=wrist, 3-6=thumb, 7-11=index, 12-16=middle, 17-21=ring, 22-26=little
+        let jointRadius: Float = 0.008  // 8mm radius spheres
+        let jointMesh = MeshResource.generateSphere(radius: jointRadius)
+        
+        // Left hand joints (cyan/blue color)
+        var leftHandMaterial = UnlitMaterial()
+        leftHandMaterial.color = .init(tint: UIColor(red: 0.2, green: 0.8, blue: 1.0, alpha: 0.9))
+        
+        for i in 0..<27 {
+            let jointEntity = ModelEntity(mesh: jointMesh, materials: [leftHandMaterial])
+            jointEntity.name = "leftJoint_\(i)"
+            jointEntity.isEnabled = false
+            handJointsRoot.addChild(jointEntity)
         }
-        // Auto-start UVC capture when a device becomes available while in UVC mode
-        .onChange(of: uvcCameraManager.availableDevices) { oldDevices, newDevices in
-            if dataManager.videoSource == .uvcCamera && !newDevices.isEmpty && oldDevices.isEmpty {
-                print("📹 [CombinedStreamingView] UVC device connected while in UVC mode, auto-starting capture")
-                if let firstDevice = newDevices.first {
-                    uvcCameraManager.selectDevice(firstDevice)
-                    Task {
-                        try? await Task.sleep(nanoseconds: 200_000_000) // 200ms
-                        await MainActor.run {
-                            uvcCameraManager.startCapture()
-                        }
-                    }
-                }
-            }
+        
+        // Right hand joints (orange color)
+        var rightHandMaterial = UnlitMaterial()
+        rightHandMaterial.color = .init(tint: UIColor(red: 1.0, green: 0.6, blue: 0.2, alpha: 0.9))
+        
+        for i in 0..<27 {
+            let jointEntity = ModelEntity(mesh: jointMesh, materials: [rightHandMaterial])
+            jointEntity.name = "rightJoint_\(i)"
+            jointEntity.isEnabled = false
+            handJointsRoot.addChild(jointEntity)
         }
-        // Auto-start capture when device selection changes
-        .onChange(of: uvcCameraManager.selectedDevice) { oldDevice, newDevice in
-            if dataManager.videoSource == .uvcCamera && newDevice != nil && !uvcCameraManager.isCapturing {
-                print("📹 [CombinedStreamingView] UVC device selected, starting capture")
-                Task {
-                    try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
-                    await MainActor.run {
-                        uvcCameraManager.startCapture()
-                    }
-                }
-            }
+        
+        // Skeleton bone connections (forearm + finger + palm connections)
+        // New joint indices: 0=forearmArm, 1=forearmWrist, 2=wrist, 3-6=thumb, 7-11=index, 12-16=middle, 17-21=ring, 22-26=little
+        let fingerConnections: [(Int, Int)] = [
+            // Forearm: forearmArm(0) -> forearmWrist(1) -> wrist(2)
+            (0, 1), (1, 2),
+            // Thumb: wrist(2) -> knuckle(3) -> intermediateBase(4) -> intermediateTip(5) -> tip(6)
+            (2, 3), (3, 4), (4, 5), (5, 6),
+            // Index: wrist(2) -> metacarpal(7) -> knuckle(8) -> intermediateBase(9) -> intermediateTip(10) -> tip(11)
+            (2, 7), (7, 8), (8, 9), (9, 10), (10, 11),
+            // Middle: wrist(2) -> metacarpal(12) -> knuckle(13) -> intermediateBase(14) -> intermediateTip(15) -> tip(16)
+            (2, 12), (12, 13), (13, 14), (14, 15), (15, 16),
+            // Ring: wrist(2) -> metacarpal(17) -> knuckle(18) -> intermediateBase(19) -> intermediateTip(20) -> tip(21)
+            (2, 17), (17, 18), (18, 19), (19, 20), (20, 21),
+            // Little: wrist(2) -> metacarpal(22) -> knuckle(23) -> intermediateBase(24) -> intermediateTip(25) -> tip(26)
+            (2, 22), (22, 23), (23, 24), (24, 25), (25, 26)
+        ]
+        
+        let palmConnections: [(Int, Int)] = [
+            (8, 13),   // indexKnuckle -> middleKnuckle
+            (13, 18),  // middleKnuckle -> ringKnuckle
+            (18, 23)   // ringKnuckle -> littleKnuckle
+        ]
+        
+        let allConnections = fingerConnections + palmConnections
+        
+        // Create a unit cylinder mesh (height=1) to be scaled per bone
+        let boneRadius: Float = 0.003  // 3mm radius
+        let unitBoneMesh = MeshResource.generateCylinder(height: 1.0, radius: boneRadius)
+        
+        // Create bone entities for left hand
+        var leftBoneMaterial = UnlitMaterial()
+        leftBoneMaterial.color = .init(tint: UIColor(red: 0.1, green: 0.6, blue: 0.8, alpha: 0.8))
+        
+        for (idx, connection) in allConnections.enumerated() {
+            let boneEntity = ModelEntity(mesh: unitBoneMesh, materials: [leftBoneMaterial])
+            boneEntity.name = "leftBone_\(idx)_\(connection.0)_\(connection.1)"
+            boneEntity.isEnabled = false
+            handJointsRoot.addChild(boneEntity)
         }
-        .task { appModel.run() }
-        .task { await appModel.processDeviceAnchorUpdates() }
-        .task(priority: .low) { await appModel.processReconstructionUpdates() }
-        .onAppear {
-            print("🚀 [CombinedStreamingView] View appeared, starting services")
-            
-            // Reset auto-minimize state on view appear (fresh start)
-            hasAutoMinimized = false
-            userInteracted = false
-            hasFrames = false
-            hasAudio = false
-            hasSimPoses = false
-            print("🔄 [CombinedStreamingView] Reset auto-minimize state: hasAutoMinimized=\(hasAutoMinimized), userInteracted=\(userInteracted)")
-            
-            // Setup WebRTC sim-poses callback BEFORE starting video stream
-            videoStreamManager.onSimPosesReceived = { [self] poses in
-                // Convert WebRTC JSON format [x,y,z,qx,qy,qz,qw] to MuJoCo poses
-                Task { @MainActor in
-                    let transforms = self.computeMuJoCoFinalTransformsFromWebRTC(poses)
-                    self.mujocoFinalTransforms = transforms
-                    self.mujocoPoseUpdateTrigger = UUID()
+        
+        // Create bone entities for right hand
+        var rightBoneMaterial = UnlitMaterial()
+        rightBoneMaterial.color = .init(tint: UIColor(red: 0.9, green: 0.5, blue: 0.1, alpha: 0.8))
+        
+        for (idx, connection) in allConnections.enumerated() {
+            let boneEntity = ModelEntity(mesh: unitBoneMesh, materials: [rightBoneMaterial])
+            boneEntity.name = "rightBone_\(idx)_\(connection.0)_\(connection.1)"
+            boneEntity.isEnabled = false
+            handJointsRoot.addChild(boneEntity)
+        }
                     
-                    // Update stats
-                    mujocoManager.recordPoseUpdate(bodyCount: poses.count)
-                    
-                    // Update status if we're receiving poses via WebRTC
-                    if !mujocoManager.poseStreamingViaWebRTC {
-                        mujocoManager.poseStreamingViaWebRTC = true
-                        mujocoManager.simEnabled = true  // Mark simulation as enabled
-                        mujocoManager.updateConnectionStatus("Streaming via WebRTC")
-                    }
-                    
-                    // Track sim poses for auto-minimize
-                    if !hasSimPoses {
-                        hasSimPoses = true
-                        tryAutoMinimize()
-                    }
-                }
-            }
-            
-            videoStreamManager.start(imageData: imageData)
-            
-            // Auto-start MuJoCo gRPC server for USDZ transfer
-            Task {
-                await mujocoManager.startServer()
-            }
-            
-            // Initialize UVC camera if it's the selected source
-            if dataManager.videoSource == .uvcCamera {
-                print("📹 [CombinedStreamingView] UVC mode active on appear, initializing camera")
-                Task {
-                    let granted = await uvcCameraManager.requestCameraAccess()
-                    if granted {
-                        await MainActor.run {
-                            if uvcCameraManager.selectedDevice != nil {
-                                print("📹 [CombinedStreamingView] Starting capture with existing device")
-                                uvcCameraManager.startCapture()
-                            } else if let firstDevice = uvcCameraManager.availableDevices.first {
-                                print("📹 [CombinedStreamingView] Selecting and starting first device: \(firstDevice.name)")
-                                uvcCameraManager.selectDevice(firstDevice)
-                            }
-                        }
-                        // Wait for device setup then start capture
-                        try? await Task.sleep(nanoseconds: 300_000_000) // 300ms
-                        await MainActor.run {
-                            if !uvcCameraManager.isCapturing && uvcCameraManager.selectedDevice != nil {
-                                uvcCameraManager.startCapture()
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // Load stereo material
-            Task {
-                if let scene = try? await Entity(named: "Immersive", in: realityKitContentBundle) {
-                    if let sphereEntity = scene.findEntity(named: "Sphere") {
-                        sphereEntity.isEnabled = false
-                        await MainActor.run {
-                            self.stereoMaterialEntity = sphereEntity
-                        }
-                        print("✅ [CombinedStreamingView] Loaded stereo material")
-                    }
-                }
-            }
-            
-            // Setup MuJoCo callbacks (for gRPC USDZ transfer, backup poses)
-            mujocoManager.onUsdzReceived = { url, position, rotation in
-                Task { @MainActor in
-                    self.attachToPosition = position
-                    self.attachToRotation = rotation
-                    self.mujocoUsdzURL = url
-                    mujocoManager.simEnabled = true  // Mark simulation as enabled when USDZ is received
-                }
-            }
-            
-            mujocoManager.onPosesReceived = { poses in
-                // Only use gRPC poses if WebRTC is not streaming
-                if !mujocoManager.poseStreamingViaWebRTC {
-                    Task { @MainActor in
-                        let transforms = self.computeMuJoCoFinalTransforms(poses)
-                        self.mujocoFinalTransforms = transforms
-                        self.mujocoPoseUpdateTrigger = UUID()
-                    }
-                }
-            }
+        // === STATUS DISPLAY ===
+        let statusAnchor = AnchorEntity(.head)
+        statusAnchor.name = "statusHeadAnchor"
+        content.add(statusAnchor)
+        
+        let statusContainer = Entity()
+        statusContainer.name = "statusContainer"
+        statusContainer.setParent(statusAnchor)
+        statusContainer.transform.translation = SIMD3<Float>(0.0, 0.0, -1.0)
+        
+        if let statusAttachment = attachments.entity(for: "status") {
+            print("🟢 [CombinedStreamingView] Status attachment found and attached")
+            statusAttachment.setParent(statusContainer)
         }
-        .onChange(of: mujocoUsdzURL) { _, newValue in
-            if let urlStr = newValue, let url = URL(string: urlStr) {
-                Task {
-                    await loadMuJoCoModel(from: url)
-                }
-            }
+        
+        let statusPreviewContainer = Entity()
+        statusPreviewContainer.name = "statusPreviewContainer"
+        statusPreviewContainer.setParent(statusAnchor)
+        statusPreviewContainer.transform.translation = SIMD3<Float>(
+            dataManager.statusMinimizedXPosition,
+            dataManager.statusMinimizedYPosition,
+            -1.0
+        )
+        
+        if let statusPreviewAttachment = attachments.entity(for: "statusPreview") {
+            statusPreviewAttachment.setParent(statusPreviewContainer)
+            statusPreviewContainer.isEnabled = false
         }
-        .onChange(of: mujocoPoseUpdateTrigger) { _, _ in
-            Task {
-                try? await Task.sleep(nanoseconds: 1_000_000)
-                mujocoFinalTransforms = [:]
-            }
-        }
-        .onChange(of: dataManager.pythonClientIP) { oldValue, newValue in
-            if newValue == nil {
-                print("🔌 [CombinedStreamingView] Python client disconnected")
-                
-                // Stop auto-recording when Python client disconnects
-                recordingManager.onVideoSourceDisconnected(reason: "Python client disconnected")
-                
-                imageData.left = nil
-                imageData.right = nil
-                hasFrames = false
-                hasAudio = false
-                hasSimPoses = false
-                videoMinimized = false
-                hasAutoMinimized = false
-                fixedWorldTransform = nil
-                mujocoManager.poseStreamingViaWebRTC = false
-                mujocoManager.simEnabled = false
-                videoStreamManager.stop()
-                
-                // Remove MuJoCo assets
-                mujocoEntity?.removeFromParent()
-                mujocoEntity = nil
-                mujocoBodyEntities.removeAll()
-                initialLocalTransforms.removeAll()
-                pythonToSwiftNameMap.removeAll()
-                pythonToSwiftTargets.removeAll()
-                entityPathByObjectID.removeAll()
-                nameMappingInitialized = false
-                mujocoFinalTransforms.removeAll()
-                mujocoUsdzURL = nil
-                attachToPosition = nil
-                attachToRotation = nil
-            }
-        }
-        .onChange(of: dataManager.webrtcGeneration) { oldValue, newValue in
-            if newValue < 0 {
-                // Stop auto-recording when WebRTC disconnects
-                recordingManager.onVideoSourceDisconnected(reason: "WebRTC disconnected")
-                
-                imageData.left = nil
-                imageData.right = nil
-                hasFrames = false
-                hasAudio = false
-                hasSimPoses = false
-                videoMinimized = false
-                fixedWorldTransform = nil
-                mujocoManager.poseStreamingViaWebRTC = false
-                mujocoManager.simEnabled = false
-                videoStreamManager.stop()
-                
-                // Remove MuJoCo assets on WebRTC disconnect
-                mujocoEntity?.removeFromParent()
-                mujocoEntity = nil
-                mujocoBodyEntities.removeAll()
-                initialLocalTransforms.removeAll()
-                pythonToSwiftNameMap.removeAll()
-                pythonToSwiftTargets.removeAll()
-                entityPathByObjectID.removeAll()
-                nameMappingInitialized = false
-                mujocoFinalTransforms.removeAll()
-                mujocoUsdzURL = nil
-                attachToPosition = nil
-                attachToRotation = nil
-            } else if newValue > 0 && oldValue != newValue {
-                mujocoManager.poseStreamingViaWebRTC = false
-                hasSimPoses = false  // Reset sim poses on new connection
-                videoStreamManager.stop()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    videoStreamManager.start(imageData: imageData)
-                }
-            }
-        }
-        .onChange(of: hasFrames) { oldValue, newValue in
-            if newValue && !oldValue {
-                print("🎬 [CombinedStreamingView] Video frames arrived, attempting auto-minimize")
-                tryAutoMinimize()
-            }
-        }
-        .onChange(of: dataManager.videoEnabled) { _, newValue in
-            print("🔧 [CombinedStreamingView] videoEnabled changed to \(newValue)")
-            // Re-check auto-minimize in case frames arrived before config
-            if newValue {
-                tryAutoMinimize()
-            }
-        }
-        .onChange(of: dataManager.audioEnabled) { _, newValue in
-            print("🔧 [CombinedStreamingView] audioEnabled changed to \(newValue)")
-            // If we have video frames and audio is now enabled, mark audio as ready
-            if newValue && hasFrames {
-                hasAudio = true
-                tryAutoMinimize()
-            }
-        }
-        .onChange(of: dataManager.simEnabled) { _, newValue in
-            print("🔧 [CombinedStreamingView] simEnabled changed to \(newValue)")
-            // Re-check auto-minimize in case sim poses arrived before config
-            if newValue {
-                tryAutoMinimize()
-            }
-        }
-        .onChange(of: dataManager.videoPlaneFixedToWorld) { oldValue, isFixed in
-            if isFixed {
-                let headWorldMatrix = DataManager.shared.latestHandTrackingData.Head
-                let targetY = dataManager.videoPlaneYPosition
-                let targetZ = dataManager.videoPlaneZDistance
-                
-                var offsetTransform = Transform()
-                offsetTransform.translation = SIMD3<Float>(0.0, targetY, targetZ)
-                if dataManager.videoPlaneAutoPerpendicular {
-                    let distance = abs(targetZ)
-                    let angle = atan2(targetY, distance)
-                    offsetTransform.rotation = simd_quatf(angle: -angle, axis: SIMD3<Float>(1, 0, 0))
-                }
-                
-                let worldMatrix = simd_mul(headWorldMatrix, offsetTransform.matrix)
-                fixedWorldTransform = Transform(matrix: worldMatrix)
-            } else {
-                fixedWorldTransform = nil
-            }
-        }
-        .onChange(of: userInteracted) { oldValue, newValue in
-            print("⚠️ [CombinedStreamingView] userInteracted changed from \(oldValue) to \(newValue)")
-            // Print stack trace to see who changed it
-            if newValue {
-                Thread.callStackSymbols.prefix(10).forEach { print("  \($0)") }
-            }
-        }
-        .onDisappear {
-            print("🛑 [CombinedStreamingView] View disappeared, stopping services")
-            videoStreamManager.stop()
-            uvcCameraManager.stopCapture()
-            fixedWorldTransform = nil
-            Task {
-                await mujocoManager.stopServer()
-            }
-        }
-        .upperLimbVisibility(dataManager.upperLimbVisible ? .visible : .hidden)
     }
     
     // MARK: - Auto-Minimize Logic
@@ -1125,6 +1194,46 @@ struct CombinedStreamingView: View {
         }
         return best?.swiftOriginal
     }
+    
+    /// Updates a bone entity (cylinder) to connect two joint positions
+    /// Uses scale on Y-axis to adjust length (mesh is created with height=1)
+    private func updateBoneEntity(_ entity: ModelEntity, from start: SIMD3<Float>, to end: SIMD3<Float>) {
+        let direction = end - start
+        let length = simd_length(direction)
+        
+        // Skip if joints are too close or invalid
+        guard length > 0.001 else {
+            entity.isEnabled = false
+            return
+        }
+        
+        // Position at midpoint
+        let midpoint = (start + end) / 2.0
+        entity.position = midpoint
+        
+        // Scale Y to match bone length (mesh has height=1)
+        entity.scale = SIMD3<Float>(1.0, length, 1.0)
+        
+        // Rotate to align with direction
+        // Cylinder is created along Y-axis, so we need to rotate it to align with the bone direction
+        let normalizedDirection = simd_normalize(direction)
+        let yAxis = SIMD3<Float>(0, 1, 0)
+        
+        // Calculate rotation from Y-axis to the bone direction
+        let dot = simd_dot(yAxis, normalizedDirection)
+        if dot > 0.9999 {
+            // Already aligned
+            entity.orientation = simd_quatf(ix: 0, iy: 0, iz: 0, r: 1)
+        } else if dot < -0.9999 {
+            // Opposite direction, rotate 180° around X or Z
+            entity.orientation = simd_quatf(angle: .pi, axis: SIMD3<Float>(1, 0, 0))
+        } else {
+            // General case: rotate around the cross product axis
+            let axis = simd_normalize(simd_cross(yAxis, normalizedDirection))
+            let angle = acos(dot)
+            entity.orientation = simd_quatf(angle: angle, axis: axis)
+        }
+    }
 }
 
 // MARK: - Helper Functions
@@ -1149,6 +1258,37 @@ private func createPreviewPlane() -> Entity {
     previewMaterial.color = .init(tint: .init(white: 0.5, alpha: 0.6))
     previewEntity.components.set(ModelComponent(mesh: largePlane, materials: [previewMaterial]))
     return previewEntity
+}
+
+/// Creates a "light beam" ray that extends from the head anchor towards -Z axis
+private func createHeadBeam() -> Entity {
+    let beamEntity = Entity()
+    
+    // Create a very long, thin cylinder to represent the beam
+    // The cylinder is oriented along Y-axis by default, so we'll rotate it to point along -Z
+    let beamLength: Float = 100.0  // 100 meters long (effectively infinite)
+    let beamRadius: Float = 0.002  // 2mm radius for a thin laser-like appearance
+    
+    let cylinderMesh = MeshResource.generateCylinder(height: beamLength, radius: beamRadius)
+    
+    // Create a glowing yellow/orange material for the beam
+    var beamMaterial = UnlitMaterial()
+    beamMaterial.color = .init(tint: UIColor(red: 1.0, green: 0.8, blue: 0.2, alpha: 0.8))  // Golden yellow
+    
+    let beamModelEntity = ModelEntity(mesh: cylinderMesh, materials: [beamMaterial])
+    
+    // Rotate the cylinder 90 degrees around X-axis so it points along -Z instead of Y
+    beamModelEntity.transform.rotation = simd_quatf(angle: .pi / 2, axis: SIMD3<Float>(1, 0, 0))
+    
+    // Offset the beam so it starts 0.3m (30cm) away from head and extends towards -Z
+    // Also offset by -0.1m on both X and Y axes
+    // Since the cylinder is centered, we offset by half its length plus the start distance
+    let startOffset: Float = 0.3  // 30cm away from head anchor
+    beamModelEntity.transform.translation = SIMD3<Float>(-0.0, -0.05, -(beamLength / 2 + startOffset))
+    
+    beamEntity.addChild(beamModelEntity)
+    
+    return beamEntity
 }
 
 // MARK: - Combined MuJoCo Manager
@@ -1512,5 +1652,417 @@ struct CombinedMuJoCoARServiceImpl: MujocoAr_MuJoCoARService.SimpleServiceProtoc
         matrix.m32 = m.columns.2.w
         matrix.m33 = m.columns.3.w
         return matrix
+    }
+}
+
+// MARK: - View Modifiers for CombinedStreamingView
+
+/// Video source related modifiers
+private struct VideoSourceModifiers: ViewModifier {
+    @ObservedObject var dataManager: DataManager
+    @ObservedObject var uvcCameraManager: UVCCameraManager
+    @ObservedObject var imageData: ImageData
+    @Binding var uvcFrame: UIImage?
+    @Binding var updateTrigger: Bool
+    @Binding var hasFrames: Bool
+    @Binding var currentAspectRatio: Float?
+    
+    func body(content: Content) -> some View {
+        content
+            .onReceive(imageData.$left) { _ in
+                if dataManager.videoSource == .network {
+                    updateTrigger.toggle()
+                }
+            }
+            .onReceive(uvcCameraManager.$currentFrame) { frame in
+                if dataManager.videoSource == .uvcCamera {
+                    uvcFrame = frame
+                    updateTrigger.toggle()
+                }
+            }
+            .onChange(of: dataManager.videoSource) { oldValue, newValue in
+                handleVideoSourceChange(oldValue: oldValue, newValue: newValue)
+            }
+            .onChange(of: uvcCameraManager.availableDevices) { oldDevices, newDevices in
+                handleDevicesChange(oldDevices: oldDevices, newDevices: newDevices)
+            }
+            .onChange(of: uvcCameraManager.selectedDevice) { oldDevice, newDevice in
+                handleDeviceSelection(oldDevice: oldDevice, newDevice: newDevice)
+            }
+    }
+    
+    private func handleVideoSourceChange(oldValue: VideoSource, newValue: VideoSource) {
+        print("📹 [CombinedStreamingView] Video source changed from \(oldValue.rawValue) to \(newValue.rawValue)")
+        hasFrames = false
+        currentAspectRatio = nil
+        
+        if newValue == .uvcCamera {
+            if uvcCameraManager.selectedDevice != nil {
+                print("📹 [CombinedStreamingView] Starting UVC capture with selected device: \(uvcCameraManager.selectedDevice?.name ?? "unknown")")
+                uvcCameraManager.startCapture()
+            } else if let firstDevice = uvcCameraManager.availableDevices.first {
+                print("📹 [CombinedStreamingView] Selecting first available device: \(firstDevice.name)")
+                uvcCameraManager.selectDevice(firstDevice)
+                Task {
+                    try? await Task.sleep(nanoseconds: 200_000_000)
+                    await MainActor.run { uvcCameraManager.startCapture() }
+                }
+            } else {
+                print("📹 [CombinedStreamingView] No UVC devices available")
+            }
+        } else {
+            uvcCameraManager.stopCapture()
+            uvcFrame = nil
+        }
+        updateTrigger.toggle()
+    }
+    
+    private func handleDevicesChange(oldDevices: [UVCDevice], newDevices: [UVCDevice]) {
+        if dataManager.videoSource == .uvcCamera && !newDevices.isEmpty && oldDevices.isEmpty {
+            print("📹 [CombinedStreamingView] UVC device connected while in UVC mode, auto-starting capture")
+            if let firstDevice = newDevices.first {
+                uvcCameraManager.selectDevice(firstDevice)
+                Task {
+                    try? await Task.sleep(nanoseconds: 200_000_000)
+                    await MainActor.run { uvcCameraManager.startCapture() }
+                }
+            }
+        }
+    }
+    
+    private func handleDeviceSelection(oldDevice: UVCDevice?, newDevice: UVCDevice?) {
+        if dataManager.videoSource == .uvcCamera && newDevice != nil && !uvcCameraManager.isCapturing {
+            print("📹 [CombinedStreamingView] UVC device selected, starting capture")
+            Task {
+                try? await Task.sleep(nanoseconds: 100_000_000)
+                await MainActor.run { uvcCameraManager.startCapture() }
+            }
+        }
+    }
+}
+
+/// Lifecycle modifiers (task, onAppear)
+private struct LifecycleModifiers: ViewModifier {
+    @ObservedObject var dataManager: DataManager
+    @ObservedObject var appModel: 🥽AppModel
+    @ObservedObject var videoStreamManager: VideoStreamManager
+    @ObservedObject var uvcCameraManager: UVCCameraManager
+    @ObservedObject var mujocoManager: CombinedMuJoCoManager
+    @ObservedObject var recordingManager: RecordingManager
+    @ObservedObject var imageData: ImageData
+    @Binding var hasAutoMinimized: Bool
+    @Binding var userInteracted: Bool
+    @Binding var hasFrames: Bool
+    @Binding var hasAudio: Bool
+    @Binding var hasSimPoses: Bool
+    @Binding var stereoMaterialEntity: Entity?
+    @Binding var attachToPosition: SIMD3<Float>?
+    @Binding var attachToRotation: simd_quatf?
+    @Binding var mujocoUsdzURL: String?
+    @Binding var mujocoFinalTransforms: [String: simd_float4x4]
+    @Binding var mujocoPoseUpdateTrigger: UUID
+    
+    var computeMuJoCoFinalTransformsFromWebRTC: ([String: [Float]]) -> [String: simd_float4x4]
+    var computeMuJoCoFinalTransforms: ([String: MujocoAr_BodyPose]) -> [String: simd_float4x4]
+    var tryAutoMinimize: () -> Void
+    
+    func body(content: Content) -> some View {
+        content
+            .task { appModel.run() }
+            .task { await appModel.processDeviceAnchorUpdates() }
+            .task(priority: .low) { await appModel.processReconstructionUpdates() }
+            .onAppear { handleOnAppear() }
+    }
+    
+    private func handleOnAppear() {
+        print("🚀 [CombinedStreamingView] View appeared, starting services")
+        
+        hasAutoMinimized = false
+        userInteracted = false
+        hasFrames = false
+        hasAudio = false
+        hasSimPoses = false
+        print("🔄 [CombinedStreamingView] Reset auto-minimize state: hasAutoMinimized=\(hasAutoMinimized), userInteracted=\(userInteracted)")
+        
+        setupTeleoperationMode()
+        
+        loadStereoMaterial()
+        setupMuJoCoCallbacks()
+    }
+    
+    private func setupTeleoperationMode() {
+        print("🤖 [CombinedStreamingView] Teleoperation Mode - Full WebRTC support")
+        
+        videoStreamManager.onSimPosesReceived = { timestamp, poses, qpos, ctrl in
+            // Record simulation data along with current hand tracking data
+            RecordingManager.shared.recordSimulationData(
+                timestamp: timestamp, 
+                poses: poses, 
+                qpos: qpos, 
+                ctrl: ctrl, 
+                trackingData: DataManager.shared.latestHandTrackingData
+            )
+            
+            Task { @MainActor in
+                let transforms = computeMuJoCoFinalTransformsFromWebRTC(poses)
+                mujocoFinalTransforms = transforms
+                mujocoPoseUpdateTrigger = UUID()
+                
+                mujocoManager.recordPoseUpdate(bodyCount: poses.count)
+                
+                if !mujocoManager.poseStreamingViaWebRTC {
+                    mujocoManager.poseStreamingViaWebRTC = true
+                    mujocoManager.simEnabled = true
+                    mujocoManager.updateConnectionStatus("Streaming via WebRTC")
+                }
+                
+                if !hasSimPoses {
+                    hasSimPoses = true
+                    tryAutoMinimize()
+                }
+            }
+        }
+        
+        videoStreamManager.start(imageData: imageData)
+        
+        Task { await mujocoManager.startServer() }
+        
+        if dataManager.videoSource == .uvcCamera {
+            print("📹 [CombinedStreamingView] UVC mode active on appear, initializing camera")
+            startUVCCapture()
+        }
+    }
+    
+    private func startUVCCapture() {
+        Task {
+            let granted = await uvcCameraManager.requestCameraAccess()
+            if granted {
+                await MainActor.run {
+                    if uvcCameraManager.selectedDevice != nil {
+                        print("📹 [CombinedStreamingView] Starting capture with existing device")
+                        uvcCameraManager.startCapture()
+                    } else if let firstDevice = uvcCameraManager.availableDevices.first {
+                        print("📹 [CombinedStreamingView] Selecting and starting first device: \(firstDevice.name)")
+                        uvcCameraManager.selectDevice(firstDevice)
+                    }
+                }
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                await MainActor.run {
+                    if !uvcCameraManager.isCapturing && uvcCameraManager.selectedDevice != nil {
+                        uvcCameraManager.startCapture()
+                    }
+                }
+            }
+        }
+    }
+    
+    private func loadStereoMaterial() {
+        Task {
+            if let scene = try? await Entity(named: "Immersive", in: realityKitContentBundle) {
+                if let sphereEntity = scene.findEntity(named: "Sphere") {
+                    sphereEntity.isEnabled = false
+                    await MainActor.run {
+                        stereoMaterialEntity = sphereEntity
+                    }
+                    print("✅ [CombinedStreamingView] Loaded stereo material")
+                }
+            }
+        }
+    }
+    
+    private func setupMuJoCoCallbacks() {
+        mujocoManager.onUsdzReceived = { url, position, rotation in
+            Task { @MainActor in
+                attachToPosition = position
+                attachToRotation = rotation
+                mujocoUsdzURL = url
+                mujocoManager.simEnabled = true
+                
+                // Register USDZ for recording
+                if !url.isEmpty {
+                    let fileURL: URL?
+                    if url.hasPrefix("file://") {
+                        // Already a file URL string, parse it directly
+                        fileURL = URL(string: url)
+                    } else {
+                        // Plain file path, convert to file URL
+                        fileURL = URL(fileURLWithPath: url)
+                    }
+                    if let validURL = fileURL {
+                        RecordingManager.shared.setUsdzUrl(validURL)
+                    }
+                }
+            }
+        }
+        
+        mujocoManager.onPosesReceived = { poses in
+            if !mujocoManager.poseStreamingViaWebRTC {
+                Task { @MainActor in
+                    let transforms = computeMuJoCoFinalTransforms(poses)
+                    mujocoFinalTransforms = transforms
+                    mujocoPoseUpdateTrigger = UUID()
+                }
+            }
+        }
+    }
+}
+
+/// State change modifiers (onChange, onDisappear)
+private struct StateChangeModifiers: ViewModifier {
+    @ObservedObject var dataManager: DataManager
+    @ObservedObject var videoStreamManager: VideoStreamManager
+    @ObservedObject var uvcCameraManager: UVCCameraManager
+    @ObservedObject var mujocoManager: CombinedMuJoCoManager
+    @ObservedObject var recordingManager: RecordingManager
+    @ObservedObject var imageData: ImageData
+    @Binding var hasFrames: Bool
+    @Binding var hasAudio: Bool
+    @Binding var hasSimPoses: Bool
+    @Binding var videoMinimized: Bool
+    @Binding var hasAutoMinimized: Bool
+    @Binding var fixedWorldTransform: Transform?
+    @Binding var userInteracted: Bool
+    @Binding var mujocoUsdzURL: String?
+    @Binding var mujocoEntity: Entity?
+    @Binding var mujocoBodyEntities: [String: ModelEntity]
+    @Binding var initialLocalTransforms: [String: Transform]
+    @Binding var pythonToSwiftNameMap: [String: String]
+    @Binding var pythonToSwiftTargets: [String: [String]]
+    @Binding var entityPathByObjectID: [ObjectIdentifier: String]
+    @Binding var nameMappingInitialized: Bool
+    @Binding var mujocoFinalTransforms: [String: simd_float4x4]
+    @Binding var attachToPosition: SIMD3<Float>?
+    @Binding var attachToRotation: simd_quatf?
+    @Binding var mujocoPoseUpdateTrigger: UUID
+    
+    var loadMuJoCoModel: (URL) async -> Void
+    var tryAutoMinimize: () -> Void
+    
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: mujocoUsdzURL) { _, newValue in
+                if let urlStr = newValue, let url = URL(string: urlStr) {
+                    Task { await loadMuJoCoModel(url) }
+                }
+            }
+            .onChange(of: mujocoPoseUpdateTrigger) { _, _ in
+                Task {
+                    try? await Task.sleep(nanoseconds: 1_000_000)
+                    mujocoFinalTransforms = [:]
+                }
+            }
+            .onChange(of: dataManager.pythonClientIP) { _, newValue in
+                if newValue == nil { handlePythonClientDisconnected() }
+            }
+            .onChange(of: dataManager.webrtcGeneration) { oldValue, newValue in
+                handleWebRTCGenerationChange(oldValue: oldValue, newValue: newValue)
+            }
+            .onChange(of: hasFrames) { oldValue, newValue in
+                if newValue && !oldValue {
+                    print("🎬 [CombinedStreamingView] Video frames arrived, attempting auto-minimize")
+                    tryAutoMinimize()
+                }
+            }
+            .onChange(of: dataManager.videoEnabled) { _, newValue in
+                print("🔧 [CombinedStreamingView] videoEnabled changed to \(newValue)")
+                if newValue { tryAutoMinimize() }
+            }
+            .onChange(of: dataManager.audioEnabled) { _, newValue in
+                print("🔧 [CombinedStreamingView] audioEnabled changed to \(newValue)")
+                if newValue && hasFrames {
+                    hasAudio = true
+                    tryAutoMinimize()
+                }
+            }
+            .onChange(of: dataManager.simEnabled) { _, newValue in
+                print("🔧 [CombinedStreamingView] simEnabled changed to \(newValue)")
+                if newValue { tryAutoMinimize() }
+            }
+            .onChange(of: dataManager.videoPlaneFixedToWorld) { _, isFixed in
+                handleVideoPlaneFixedChange(isFixed: isFixed)
+            }
+            .onChange(of: userInteracted) { oldValue, newValue in
+                print("⚠️ [CombinedStreamingView] userInteracted changed from \(oldValue) to \(newValue)")
+                if newValue {
+                    Thread.callStackSymbols.prefix(10).forEach { print("  \($0)") }
+                }
+            }
+            .onDisappear { handleOnDisappear() }
+    }
+    
+    private func handlePythonClientDisconnected() {
+        print("🔌 [CombinedStreamingView] Python client disconnected")
+        recordingManager.onVideoSourceDisconnected(reason: "Python client disconnected")
+        resetStreamingState()
+    }
+    
+    private func handleWebRTCGenerationChange(oldValue: Int, newValue: Int) {
+        if newValue < 0 {
+            recordingManager.onVideoSourceDisconnected(reason: "WebRTC disconnected")
+            resetStreamingState()
+        } else if newValue > 0 && oldValue != newValue {
+            mujocoManager.poseStreamingViaWebRTC = false
+            hasSimPoses = false
+            videoStreamManager.stop()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                videoStreamManager.start(imageData: imageData)
+            }
+        }
+    }
+    
+    private func resetStreamingState() {
+        imageData.left = nil
+        imageData.right = nil
+        hasFrames = false
+        hasAudio = false
+        hasSimPoses = false
+        videoMinimized = false
+        hasAutoMinimized = false
+        fixedWorldTransform = nil
+        mujocoManager.poseStreamingViaWebRTC = false
+        mujocoManager.simEnabled = false
+        videoStreamManager.stop()
+        
+        mujocoEntity?.removeFromParent()
+        mujocoEntity = nil
+        mujocoBodyEntities.removeAll()
+        initialLocalTransforms.removeAll()
+        pythonToSwiftNameMap.removeAll()
+        pythonToSwiftTargets.removeAll()
+        entityPathByObjectID.removeAll()
+        nameMappingInitialized = false
+        mujocoFinalTransforms.removeAll()
+        mujocoUsdzURL = nil
+        attachToPosition = nil
+        attachToRotation = nil
+    }
+    
+    private func handleVideoPlaneFixedChange(isFixed: Bool) {
+        if isFixed {
+            let headWorldMatrix = DataManager.shared.latestHandTrackingData.Head
+            let targetY = dataManager.videoPlaneYPosition
+            let targetZ = dataManager.videoPlaneZDistance
+            
+            var offsetTransform = Transform()
+            offsetTransform.translation = SIMD3<Float>(0.0, targetY, targetZ)
+            if dataManager.videoPlaneAutoPerpendicular {
+                let distance = abs(targetZ)
+                let angle = atan2(targetY, distance)
+                offsetTransform.rotation = simd_quatf(angle: -angle, axis: SIMD3<Float>(1, 0, 0))
+            }
+            
+            let worldMatrix = simd_mul(headWorldMatrix, offsetTransform.matrix)
+            fixedWorldTransform = Transform(matrix: worldMatrix)
+        } else {
+            fixedWorldTransform = nil
+        }
+    }
+    
+    private func handleOnDisappear() {
+        print("🛑 [CombinedStreamingView] View disappeared, stopping services")
+        videoStreamManager.stop()
+        uvcCameraManager.stopCapture()
+        fixedWorldTransform = nil
+        Task { await mujocoManager.stopServer() }
     }
 }

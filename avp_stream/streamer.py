@@ -509,6 +509,8 @@ class VisionProStreamer:
         self._webrtc_hand_ready = False
         self._webrtc_sim_channel = None  # WebRTC data channel for sim pose streaming
         self._webrtc_sim_ready = False
+        self._webrtc_connected = False  # WebRTC ICE connection established
+        self._webrtc_connection_condition = Condition()  # For blocking wait
         self._webrtc_loop = None  # Event loop for WebRTC thread
         self._benchmark_epoch = time.perf_counter()
         self._benchmark_condition = Condition()
@@ -573,11 +575,30 @@ class VisionProStreamer:
                 right_wrist = inv_attach @ right_wrist
                 head = inv_attach @ head
             
+            # Process skeleton joints (27 joints if new app, 25 if old app)
+            left_fingers_full = process_matrices(hand_update.left_hand.skeleton.jointMatrices)
+            right_fingers_full = process_matrices(hand_update.right_hand.skeleton.jointMatrices)
+            
+            # Check if we have the new 27-joint format or old 25-joint format
+            has_forearm = left_fingers_full.shape[0] >= 27
+            
+            if has_forearm:
+                # New 27-joint format: [forearmArm, forearmWrist, wrist, ...]
+                # For backward compatibility, slice to 25 joints (skip first 2)
+                left_fingers_compat = left_fingers_full[2:]
+                right_fingers_compat = right_fingers_full[2:]
+            else:
+                # Old 25-joint format: no forearm joints, use as-is
+                left_fingers_compat = left_fingers_full
+                right_fingers_compat = right_fingers_full
+            
             transformations = {
                 "left_wrist": left_wrist,
                 "right_wrist": right_wrist,
-                "left_fingers": process_matrices(hand_update.left_hand.skeleton.jointMatrices),
-                "right_fingers": process_matrices(hand_update.right_hand.skeleton.jointMatrices),
+                "left_fingers": left_fingers_compat,  # (25, 4, 4) always for backward compat
+                "right_fingers": right_fingers_compat,  # (25, 4, 4) always for backward compat
+                "left_arm": left_fingers_full,  # (27, 4, 4) if new app, (25, 4, 4) if old app
+                "right_arm": right_fingers_full,  # (27, 4, 4) if new app, (25, 4, 4) if old app
                 "head": head,
                 "left_pinch_distance": get_pinch_distance(hand_update.left_hand.skeleton.jointMatrices),
                 "right_pinch_distance": get_pinch_distance(hand_update.right_hand.skeleton.jointMatrices),
@@ -839,9 +860,22 @@ class VisionProStreamer:
         Keys in the returned dict:
           - head (1,4,4 ndarray): Head pose (Z-up)
           - left_wrist / right_wrist (1,4,4 ndarray): Wrist poses
-          - left_fingers / right_fingers (25,4,4 ndarray): Finger joints in wrist frame
+          - left_fingers / right_fingers (25,4,4 ndarray): Finger joints in wrist frame (always 25)
+          - left_arm / right_arm (N,4,4 ndarray): Full skeleton (27 joints if new app, 25 if old app)
           - left_pinch_distance / right_pinch_distance (float): Thumb–index pinch distance (m)
           - left_wrist_roll / right_wrist_roll (float): Axial wrist rotation (rad)
+
+        The 27-joint skeleton order (new VisionOS app with forearm tracking):
+          [0] forearmArm, [1] forearmWrist, [2] wrist,
+          [3-6] thumb (knuckle, intermediateBase, intermediateTip, tip),
+          [7-11] index (metacarpal, knuckle, intermediateBase, intermediateTip, tip),
+          [12-16] middle, [17-21] ring, [22-26] little
+
+        The 25-joint skeleton order (old VisionOS app without forearm):
+          [0] wrist, [1-4] thumb, [5-9] index, [10-14] middle, [15-19] ring, [20-24] little
+
+        For backward compatibility, left_fingers/right_fingers always return 25 joints
+        (skipping forearm joints if present). Use left_arm/right_arm for full skeleton.
 
         :param use_cache: If True, return cached data if recent enough (reduces lock contention)
         :param cache_ms: Cache validity in milliseconds (default: 10ms)
@@ -853,6 +887,10 @@ class VisionProStreamer:
             sample = streamer.get_latest()
             if sample:
                 left_pos = sample["left_wrist"][0, :3, 3]
+                # Full skeleton (27 joints if available):
+                if sample["left_arm"].shape[0] == 27:
+                    forearm_arm = sample["left_arm"][0]  # forearmArm joint
+                    forearm_wrist = sample["left_arm"][1]  # forearmWrist joint
         """
         if use_cache:
             current_time = time.perf_counter()
@@ -1252,9 +1290,19 @@ class VisionProStreamer:
         # Get current poses
         poses = self._get_mujoco_poses()
         
+        # Get qpos and ctrl
+        qpos = self._mujoco_data.qpos.tolist()
+        ctrl = self._mujoco_data.ctrl.tolist()
+        timestamp = time.time()
+        
         # Update the current poses that the streaming thread will send
         with self._pose_stream_lock:
-            self._current_poses = poses
+            self._current_poses = {
+                "poses": poses,
+                "qpos": qpos,
+                "ctrl": ctrl,
+                "timestamp": timestamp,
+            }
     
     def _get_mujoco_poses(self) -> Dict[str, Dict[str, Any]]:
         """Get current MuJoCo body poses as a dictionary."""
@@ -1327,14 +1375,27 @@ class VisionProStreamer:
                     continue
                 
                 with self._pose_stream_lock:
-                    current_poses = self._current_poses.copy()
+                    current_data = self._current_poses.copy()
                 
-                if current_poses:
+                if current_data:
+                    # Extract data components
+                    # Handle backward compatibility or initialization state
+                    if "poses" in current_data and isinstance(current_data["poses"], dict):
+                        poses = current_data["poses"]
+                        qpos = current_data.get("qpos", [])
+                        ctrl = current_data.get("ctrl", [])
+                        timestamp = current_data.get("timestamp", time.time())
+                    else:
+                        # Fallback if _current_poses is just the poses dict (old format)
+                        poses = current_data
+                        qpos = []
+                        ctrl = []
+                        timestamp = time.time()
+
                     # Build compact JSON message for poses
-                    # Format: {"t": timestamp, "p": {"body_name": [x,y,z,qx,qy,qz,qw], ...}}
-                    # With benchmark: {"t": ..., "p": {...}, "b": {"s": seq, "t": sent_ms}}
+                    # Format: {"t": timestamp, "p": {"body_name": [x,y,z,qx,qy,qz,qw], ...}, "q": [...], "c": [...]}
                     pose_dict = {}
-                    for body_name, pose_data in current_poses.items():
+                    for body_name, pose_data in poses.items():
                         if not body_name:
                             continue
                         # Pack position and quaternion into a list
@@ -1347,7 +1408,12 @@ class VisionProStreamer:
                         ]
                     
                     if pose_dict:
-                        msg_data = {"t": time.time(), "p": pose_dict}
+                        msg_data = {
+                            "t": timestamp, 
+                            "p": pose_dict,
+                            "q": [round(x, 5) for x in qpos],
+                            "c": [round(x, 5) for x in ctrl]
+                        }
                         
                         # Add benchmark data if enabled
                         if self._sim_benchmark_enabled:
@@ -1686,10 +1752,16 @@ class VisionProStreamer:
                     streamer_instance._log(f"[WEBRTC] ICE state ({client_addr}): {pc.iceConnectionState}", force=True)
                     if pc.iceConnectionState == "connected":
                         streamer_instance._log(f"[WEBRTC] Connection established ({client_addr}) - video should flow now", force=True)
-                    if pc.iceConnectionState in ("failed", "closed"):
-                        await pc.close()
-                        writer.close()
-                        await writer.wait_closed()
+                        with streamer_instance._webrtc_connection_condition:
+                            streamer_instance._webrtc_connected = True
+                            streamer_instance._webrtc_connection_condition.notify_all()
+                    if pc.iceConnectionState in ("failed", "closed", "disconnected"):
+                        with streamer_instance._webrtc_connection_condition:
+                            streamer_instance._webrtc_connected = False
+                        if pc.iceConnectionState in ("failed", "closed"):
+                            await pc.close()
+                            writer.close()
+                            await writer.wait_closed()
                 
                 @pc.on("track")
                 def on_track(track):
@@ -1880,7 +1952,7 @@ class VisionProStreamer:
             return
         self._log("[WEBRTC] Sim-poses channel ready!", force=True)
 
-    def start_webrtc(self, port: int = 9999):
+    def start_webrtc(self, port: int = 9999, blocking: bool = False, timeout: float = 30.0) -> bool:
         """
         Start WebRTC streaming to Vision Pro.
         
@@ -1892,15 +1964,32 @@ class VisionProStreamer:
         
         Args:
             port: WebRTC server port (default: 9999)
+            blocking: If True, block until VisionOS connects and starts receiving frames (default: False)
+            timeout: Maximum time to wait for connection when blocking=True (default: 30.0 seconds)
+        
+        Returns:
+            bool: True if connection was established (always True if blocking=False), 
+                  False if timeout occurred while waiting for connection.
         
         Example::
         
             streamer = VisionProStreamer(ip=avp_ip)  # Hand tracking starts automatically
             
             streamer.configure_video(device=None, size="1280x720")
-            streamer.start_webrtc()  # Start video streaming to Vision Pro
+            streamer.start_webrtc()  # Start video streaming to Vision Pro (non-blocking)
+            
+            # Or wait for VisionOS to connect:
+            streamer.configure_video(device=None, size="1280x720")
+            if streamer.start_webrtc(blocking=True, timeout=60.0):
+                print("VisionOS connected and receiving frames!")
+            else:
+                print("Timeout waiting for VisionOS connection")
         """
         self.serve(port=port)
+        
+        if blocking:
+            return self.wait_for_connection(timeout=timeout)
+        return True
 
     def wait_for_sim_channel(self, timeout: float = 30.0) -> bool:
         """
@@ -1934,6 +2023,60 @@ class VisionProStreamer:
             time.sleep(0.1)
         
         return True
+
+    def wait_for_connection(self, timeout: float = 30.0) -> bool:
+        """
+        Wait for the WebRTC connection to be established with VisionOS.
+        
+        This method blocks until VisionOS connects and the ICE connection state
+        becomes "connected", meaning video/audio frames are flowing.
+        
+        Args:
+            timeout: Maximum time to wait in seconds (default: 30)
+        
+        Returns:
+            True if connection established successfully, False on timeout
+        
+        Example::
+        
+            streamer.configure_video(device=None, size="1280x720")
+            streamer.start_webrtc()  # Non-blocking
+            
+            # Later, wait for connection
+            if streamer.wait_for_connection(timeout=60):
+                print("VisionOS is now receiving frames!")
+            else:
+                print("Connection timed out")
+        """
+        self._log(f"[WEBRTC] Waiting for VisionOS to connect (timeout={timeout}s)...", force=True)
+        
+        deadline = time.time() + timeout
+        with self._webrtc_connection_condition:
+            while not self._webrtc_connected:
+                remaining = deadline - time.time()
+                if remaining <= 0:
+                    self._log(f"[WEBRTC] Timeout waiting for connection (waited {timeout}s)", force=True)
+                    return False
+                self._webrtc_connection_condition.wait(timeout=remaining)
+        
+        self._log("[WEBRTC] VisionOS connected - frames are flowing!", force=True)
+        return True
+
+    def is_connected(self) -> bool:
+        """
+        Check if WebRTC connection to VisionOS is currently active.
+        
+        Returns:
+            True if connected and streaming, False otherwise
+        
+        Example::
+        
+            if streamer.is_connected():
+                print("Streaming to VisionOS")
+            else:
+                print("Not connected")
+        """
+        return self._webrtc_connected
 
     def reset_benchmark_epoch(self, epoch=None):
         if epoch is None:

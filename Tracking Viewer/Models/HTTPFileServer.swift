@@ -126,6 +126,12 @@ class HTTPFileServer: ObservableObject {
         return "\(base)/download-selected?ids=\(ids)"
     }
     
+    /// Generate a URL for downloading a playlist as a zip
+    func getPlaylistDownloadURL(for playlist: Playlist) -> String? {
+        guard isRunning, let base = serverURL else { return nil }
+        return "\(base)/playlist/\(playlist.id.uuidString)"
+    }
+    
     // MARK: - Connection Handling
     
     nonisolated private func handleConnection(_ connection: NWConnection) {
@@ -204,6 +210,11 @@ class HTTPFileServer: ObservableObject {
             Task {
                 await self.handleDownloadSelected(recordingIDs: ids, on: connection)
             }
+        } else if path.hasPrefix("/playlist/") {
+            let playlistIDString = String(path.dropFirst("/playlist/".count))
+            Task {
+                await self.handleDownloadPlaylist(id: playlistIDString, on: connection)
+            }
         } else if path.hasPrefix("/download/") {
             let recordingID = String(path.dropFirst("/download/".count))
             Task {
@@ -231,6 +242,7 @@ class HTTPFileServer: ObservableObject {
     private func sendIndexPage(on connection: NWConnection) {
         Task { @MainActor in
             let recordings = RecordingsManager.shared.recordings
+            let playlists = PlaylistManager.shared.playlists
             
             var html = """
             <!DOCTYPE html>
@@ -240,21 +252,60 @@ class HTTPFileServer: ObservableObject {
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <style>
                     body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 20px; background: #1a1a1a; color: #fff; }
-                    h1 { color: #0a84ff; }
-                    .recording { background: #2a2a2a; padding: 15px; margin: 10px 0; border-radius: 8px; }
-                    .recording h3 { margin: 0 0 10px 0; }
-                    .recording .meta { color: #888; font-size: 14px; }
+                    h1, h2 { color: #0a84ff; }
+                    .recording, .playlist { background: #2a2a2a; padding: 15px; margin: 10px 0; border-radius: 8px; }
+                    .recording h3, .playlist h3 { margin: 0 0 10px 0; }
+                    .recording .meta, .playlist .meta { color: #888; font-size: 14px; }
                     a { color: #0a84ff; text-decoration: none; }
                     a:hover { text-decoration: underline; }
                     .btn { display: inline-block; padding: 10px 20px; background: #0a84ff; color: white; border-radius: 6px; margin: 5px 5px 5px 0; }
                     .btn-all { background: #30d158; }
+                    .btn-playlist { background: #bf5af2; }
                     code { background: #333; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
                     .curl { background: #333; padding: 10px; border-radius: 6px; margin: 10px 0; overflow-x: auto; }
+                    .section { margin: 30px 0; }
+                    .playlist-icon { font-size: 24px; margin-right: 10px; }
                 </style>
             </head>
             <body>
-                <h1>📹 Tracking Viewer Recordings</h1>
-                <p>Found <strong>\(recordings.count)</strong> recordings</p>
+                <h1>📹 Tracking Viewer</h1>
+            """
+            
+            // Playlists section
+            if !playlists.isEmpty {
+                html += """
+                <div class="section">
+                    <h2>📁 Playlists (\(playlists.count))</h2>
+                """
+                
+                for playlist in playlists {
+                    let playlistURL = self.getPlaylistDownloadURL(for: playlist) ?? ""
+                    let recordingCount = playlist.recordingIDs.count
+                    
+                    html += """
+                    <div class="playlist">
+                        <h3>\(playlist.name)</h3>
+                        <p class="meta">
+                            \(recordingCount) recording\(recordingCount == 1 ? "" : "s")
+                            \(!playlist.description.isEmpty ? " · \(playlist.description)" : "")
+                        </p>
+                        \(recordingCount > 0 ? """
+                        <a href="/playlist/\(playlist.id.uuidString)" class="btn btn-playlist">⬇️ Download Playlist</a>
+                        <div class="curl">
+                            <code>curl -o "\(playlist.name.replacingOccurrences(of: " ", with: "_")).zip" "\(playlistURL)"</code>
+                        </div>
+                        """ : "<p style=\"color: #666;\">Empty playlist</p>")
+                    </div>
+                    """
+                }
+                
+                html += "</div><hr style=\"border-color: #333; margin: 20px 0;\">"
+            }
+            
+            // Recordings section
+            html += """
+            <div class="section">
+                <h2>🎬 All Recordings (\(recordings.count))</h2>
             """
             
             if !recordings.isEmpty {
@@ -266,7 +317,6 @@ class HTTPFileServer: ObservableObject {
                 <div class="curl">
                     <code>curl -o recordings.zip "\(allURL)"</code>
                 </div>
-                <hr style="border-color: #333; margin: 20px 0;">
                 """
             }
             
@@ -295,6 +345,7 @@ class HTTPFileServer: ObservableObject {
             }
             
             html += """
+            </div>
             </body>
             </html>
             """
@@ -403,6 +454,59 @@ class HTTPFileServer: ObservableObject {
         
         let timestamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
         sendFile(data: zipData, filename: "selected_recordings_\(timestamp).zip", mimeType: "application/zip", on: connection)
+    }
+    
+    private func handleDownloadPlaylist(id: String, on connection: NWConnection) async {
+        await MainActor.run {
+            isCreatingZip = true
+            exportProgress = 0
+        }
+        
+        defer {
+            Task { @MainActor in
+                isCreatingZip = false
+                exportProgress = 0
+                statusMessage = ""
+            }
+        }
+        
+        // Find the playlist
+        guard let playlistUUID = UUID(uuidString: id) else {
+            sendError(400, message: "Invalid playlist ID", on: connection)
+            return
+        }
+        
+        let playlist = await MainActor.run {
+            PlaylistManager.shared.playlists.first { $0.id == playlistUUID }
+        }
+        
+        guard let playlist = playlist else {
+            sendError(404, message: "Playlist not found", on: connection)
+            return
+        }
+        
+        // Get recordings for this playlist
+        let recordings = await MainActor.run {
+            PlaylistManager.shared.recordings(for: playlist)
+        }
+        
+        guard !recordings.isEmpty else {
+            sendError(404, message: "Playlist is empty", on: connection)
+            return
+        }
+        
+        guard let zipData = await createZip(for: recordings) else {
+            sendError(500, message: "Failed to create ZIP", on: connection)
+            return
+        }
+        
+        // Use playlist name for filename (sanitized)
+        let sanitizedName = playlist.name
+            .replacingOccurrences(of: " ", with: "_")
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: "\\", with: "-")
+        
+        sendFile(data: zipData, filename: "\(sanitizedName).zip", mimeType: "application/zip", on: connection)
     }
     
     private func handleFileRequest(recordingID: String, filename: String, on connection: NWConnection) async {

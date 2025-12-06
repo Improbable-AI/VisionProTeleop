@@ -538,9 +538,17 @@ struct MuJoCoStreamingView: View {
             } else {
                 finalURLString += "?t=\(timestamp)"
             }
+            
+            // If it's a file URL, pass it to RecordingManager (stripping query params)
+            if let urlObj = URL(string: url), urlObj.isFileURL {
+                RecordingManager.shared.setUsdzUrl(urlObj)
+            }
         } else {
             let fileURL = URL(fileURLWithPath: url)
             finalURLString = "\(fileURL.absoluteString)?t=\(timestamp)"
+            
+            // Pass clean file URL to RecordingManager
+            RecordingManager.shared.setUsdzUrl(fileURL)
         }
         
         self.usdzURL = finalURLString

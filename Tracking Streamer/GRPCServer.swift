@@ -103,8 +103,9 @@ struct HandTrackingServiceImpl: Handtracking_HandTrackingService.SimpleServicePr
             let audioEnabled = request.head.m20 > 0.5
             let videoEnabled = request.head.m21 > 0.5
             let simEnabled = request.head.m22 > 0.5
+            let meshEnabled = request.head.m23 > 0.5
             let host = "\(ip1).\(ip2).\(ip3).\(ip4)"
-            print("🎞️ WebRTC server available at: \(host):\(port) (video=\(videoEnabled), audio=\(audioEnabled), sim=\(simEnabled))")
+            print("🎞️ WebRTC server available at: \(host):\(port) (video=\(videoEnabled), audio=\(audioEnabled), sim=\(simEnabled), mesh=\(meshEnabled))")
             print("💾 [DEBUG] Storing WebRTC info in DataManager...")
             
             await MainActor.run {
@@ -119,7 +120,7 @@ struct HandTrackingServiceImpl: Handtracking_HandTrackingService.SimpleServicePr
                     DataManager.shared.webrtcGeneration = 1
                 } else {
                     DataManager.shared.webrtcGeneration += 1
-                }
+                }  
                 print("🔄 [DEBUG] Set WebRTC generation to \(DataManager.shared.webrtcGeneration)")
             }
             

@@ -127,9 +127,9 @@ class CameraCalibrationManager: ObservableObject {
     
     /// Current checkerboard configuration
     @Published var checkerboardConfig = CheckerboardConfig(
-        innerCornersX: 9,
-        innerCornersY: 6,
-        squareSize: 0.024  // 24mm
+        innerCornersX: 5,
+        innerCornersY: 4,
+        squareSize: 0.010  // 10mm squares to fit on iPhone screen
     )
     
     /// Minimum time between auto-captures (seconds)
@@ -177,8 +177,48 @@ class CameraCalibrationManager: ObservableObject {
             let data = try encoder.encode(allCalibrations)
             UserDefaults.standard.set(data, forKey: storageKey)
             print("📷 [CameraCalibrationManager] Saved \(allCalibrations.count) calibration(s)")
+            
+            // Also sync to iCloud for iPhone app
+            syncToiCloud()
         } catch {
             print("❌ [CameraCalibrationManager] Failed to save calibrations: \(error)")
+        }
+    }
+    
+    // MARK: - iCloud Sync for iPhone App
+    
+    /// iCloud KVS key for intrinsic calibration results
+    private static let iCloudIntrinsicResultsKey = "intrinsicCalibrationResults"
+    
+    /// Sync all intrinsic calibrations to iCloud KVS for the iPhone app to display
+    private func syncToiCloud() {
+        var results: [[String: Any]] = []
+        
+        for calibration in allCalibrations.values {
+            let result: [String: Any] = [
+                "cameraDeviceId": calibration.deviceId,
+                "cameraDeviceName": calibration.deviceName,
+                "isStereo": calibration.isStereo,
+                "fx": calibration.leftIntrinsics.fx,
+                "fy": calibration.leftIntrinsics.fy,
+                "cx": calibration.leftIntrinsics.cx,
+                "cy": calibration.leftIntrinsics.cy,
+                "distortionCoeffs": calibration.leftIntrinsics.distortionCoeffs,
+                "reprojectionError": calibration.leftIntrinsics.reprojectionError,
+                "imageWidth": calibration.leftIntrinsics.imageWidth,
+                "imageHeight": calibration.leftIntrinsics.imageHeight,
+                "calibrationDate": calibration.calibrationDate.timeIntervalSince1970
+            ]
+            results.append(result)
+        }
+        
+        do {
+            let jsonData = try JSONSerialization.data(withJSONObject: results, options: [])
+            NSUbiquitousKeyValueStore.default.set(jsonData, forKey: Self.iCloudIntrinsicResultsKey)
+            NSUbiquitousKeyValueStore.default.synchronize()
+            print("☁️ [CameraCalibrationManager] Synced \(results.count) calibration(s) to iCloud")
+        } catch {
+            print("❌ [CameraCalibrationManager] Failed to sync to iCloud: \(error)")
         }
     }
     
@@ -370,7 +410,104 @@ class CameraCalibrationManager: ObservableObject {
         return detection
     }
     
-    /// Finishes calibration and computes the intrinsics
+    /// Finishes calibration and computes the intrinsics (async version - runs heavy computation on background thread)
+    /// - Parameters:
+    ///   - deviceId: Unique identifier for the camera
+    ///   - deviceName: Human-readable name for the camera
+    ///   - isStereo: Whether this is a stereo camera
+    /// - Returns: The computed calibration data, or nil on failure
+    func finishCalibrationAsync(deviceId: String, deviceName: String, isStereo: Bool) async -> CameraCalibrationData? {
+        guard let calibrator = calibrator else {
+            lastError = "No calibrator available"
+            isCalibrating = false
+            return nil
+        }
+        
+        statusMessage = "Computing calibration..."
+        
+        // Capture minSamples before entering detached task
+        let minSamplesCount = Int32(minSamples)
+        
+        // Run heavy OpenCV computation on background thread
+        let result: StereoCalibrationResult? = await Task.detached(priority: .userInitiated) {
+            if isStereo {
+                return calibrator.performStereoCalibration(minSamples: minSamplesCount)
+            } else {
+                return calibrator.performMonoCalibration(minSamples: minSamplesCount)
+            }
+        }.value
+        
+        guard let calibResult = result, calibResult.success else {
+            lastError = result?.errorMessage ?? "Calibration failed"
+            statusMessage = "Calibration failed"
+            isCalibrating = false
+            return nil
+        }
+        
+        // Build calibration data
+        let leftIntrinsics = CameraIntrinsics(
+            from: calibResult.leftIntrinsicMatrix.map { $0.doubleValue },
+            distortion: calibResult.leftDistortionCoeffs.map { $0.doubleValue },
+            reprojError: calibResult.leftReprojectionError,
+            width: Int(calibResult.imageWidth),
+            height: Int(calibResult.imageHeight)
+        )
+        
+        var rightIntrinsics: CameraIntrinsics? = nil
+        var stereoExtrinsics: StereoExtrinsics? = nil
+        
+        if isStereo {
+            rightIntrinsics = CameraIntrinsics(
+                from: calibResult.rightIntrinsicMatrix.map { $0.doubleValue },
+                distortion: calibResult.rightDistortionCoeffs.map { $0.doubleValue },
+                reprojError: calibResult.rightReprojectionError,
+                width: Int(calibResult.imageWidth),
+                height: Int(calibResult.imageHeight)
+            )
+            
+            stereoExtrinsics = StereoExtrinsics(
+                rotationMatrix: calibResult.rotationMatrix.map { $0.doubleValue },
+                translationVector: calibResult.translationVector.map { $0.doubleValue },
+                stereoReprojectionError: calibResult.stereoReprojectionError
+            )
+        }
+        
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        
+        let calibrationData = CameraCalibrationData(
+            deviceId: deviceId,
+            deviceName: deviceName,
+            isStereo: isStereo,
+            leftIntrinsics: leftIntrinsics,
+            rightIntrinsics: rightIntrinsics,
+            stereoExtrinsics: stereoExtrinsics,
+            checkerboardConfig: checkerboardConfig,
+            calibrationDate: Date(),
+            sampleCount: samplesCollected,
+            appVersion: appVersion
+        )
+        
+        // Save calibration
+        allCalibrations[deviceId] = calibrationData
+        currentCalibration = calibrationData
+        saveAllCalibrations()
+        
+        statusMessage = "Calibration complete!"
+        isCalibrating = false
+        
+        print("✅ [CameraCalibrationManager] Calibration saved for: \(deviceName)")
+        print("   Left reproj error: \(leftIntrinsics.reprojectionError)")
+        if let right = rightIntrinsics {
+            print("   Right reproj error: \(right.reprojectionError)")
+        }
+        if let stereo = stereoExtrinsics {
+            print("   Stereo reproj error: \(stereo.stereoReprojectionError)")
+        }
+        
+        return calibrationData
+    }
+    
+    /// Finishes calibration and computes the intrinsics (synchronous version - may block UI)
     /// - Parameters:
     ///   - deviceId: Unique identifier for the camera
     ///   - deviceName: Human-readable name for the camera

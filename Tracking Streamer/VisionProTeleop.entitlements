@@ -9,12 +9,19 @@
 	<key>com.apple.developer.icloud-services</key>
 	<array>
 		<string>CloudDocuments</string>
+		<string>CloudKit</string>
 	</array>
+	<key>com.apple.developer.ubiquity-kvstore-identifier</key>
+	<string>$(TeamIdentifierPrefix)com.younghyopark.VisionProTeleop</string>
 	<key>com.apple.developer.networking.networkextension</key>
 	<array/>
 	<key>com.apple.developer.ubiquity-container-identifiers</key>
 	<array>
 		<string>iCloud.com.younghyopark.VisionProTeleop</string>
+	</array>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>ATTMC2WVK2.com.younghyopark.VisionProTeleop.shared</string>
 	</array>
 </dict>
 </plist>

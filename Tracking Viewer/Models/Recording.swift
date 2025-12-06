@@ -17,6 +17,16 @@ struct Recording: Identifiable, Hashable {
     let videoURL: URL?
     let trackingURL: URL?
     
+    var simulationDataURL: URL? {
+        guard metadata?.hasSimulationData == true else { return nil }
+        return folderURL.appendingPathComponent("mjdata.jsonl")
+    }
+    
+    var usdzURL: URL? {
+        guard metadata?.hasUSDZ == true else { return nil }
+        return folderURL.appendingPathComponent("scene.usdz")
+    }
+    
     var displayName: String {
         // Extract date from folder name (e.g., "recording_20251129_143000")
         let name = folderURL.lastPathComponent
@@ -95,13 +105,15 @@ struct RecordingMetadata: Codable {
     let hasLeftHand: Bool
     let hasRightHand: Bool
     let hasHead: Bool
+    let hasSimulationData: Bool
+    let hasUSDZ: Bool
     let videoSource: String
     let averageFPS: Double
     let deviceInfo: DeviceInfo?
     
     enum CodingKeys: String, CodingKey {
         case version, createdAt, duration, frameCount, hasVideo
-        case hasLeftHand, hasRightHand, hasHead, videoSource, averageFPS, deviceInfo
+        case hasLeftHand, hasRightHand, hasHead, hasSimulationData, hasUSDZ, videoSource, averageFPS, deviceInfo
     }
     
     init(from decoder: Decoder) throws {
@@ -114,6 +126,8 @@ struct RecordingMetadata: Codable {
         hasLeftHand = try container.decode(Bool.self, forKey: .hasLeftHand)
         hasRightHand = try container.decode(Bool.self, forKey: .hasRightHand)
         hasHead = try container.decode(Bool.self, forKey: .hasHead)
+        hasSimulationData = try container.decodeIfPresent(Bool.self, forKey: .hasSimulationData) ?? false
+        hasUSDZ = try container.decodeIfPresent(Bool.self, forKey: .hasUSDZ) ?? false
         videoSource = try container.decode(String.self, forKey: .videoSource)
         averageFPS = try container.decode(Double.self, forKey: .averageFPS)
         deviceInfo = try container.decodeIfPresent(DeviceInfo.self, forKey: .deviceInfo)

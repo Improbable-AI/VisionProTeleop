@@ -32,8 +32,6 @@ async def test_video_device(device, format="avfoundation", size="1280x720", fps=
     Returns:
         bool: True if device opens successfully, False otherwise
     """
-    if options is None:
-        options = {}
     
     print(f"\n{'='*60}")
     print(f"Testing: {device}")

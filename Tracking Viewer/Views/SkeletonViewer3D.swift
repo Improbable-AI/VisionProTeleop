@@ -24,12 +24,14 @@ struct SkeletonViewer3D: UIViewRepresentable {
         
         // Setup camera
         let cameraNode = SCNNode()
+        cameraNode.name = "mainCamera"
         cameraNode.camera = SCNCamera()
         cameraNode.position = SCNVector3(0, 1.5, 2.0)
         cameraNode.look(at: SCNVector3(0, 1.0, 0))
         cameraNode.camera?.zNear = 0.01
         cameraNode.camera?.zFar = 100
         sceneView.scene?.rootNode.addChildNode(cameraNode)
+        sceneView.pointOfView = cameraNode  // Explicitly set as point of view
         context.coordinator.cameraNode = cameraNode
         
         // Add ambient light
@@ -68,41 +70,54 @@ struct SkeletonViewer3D: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: SCNView, context: Context) {
+        // Safety check - ensure coordinator nodes exist
+        guard let leftHandNode = context.coordinator.leftHandNode,
+              let rightHandNode = context.coordinator.rightHandNode,
+              let headNode = context.coordinator.headNode else {
+            print("⚠️ [SkeletonViewer3D] Coordinator nodes not initialized")
+            return
+        }
+        
         // Update left hand
         if let leftHand = leftHand {
             updateHandSkeleton(
-                node: context.coordinator.leftHandNode!,
+                node: leftHandNode,
                 hand: leftHand,
-                color: UIColor.systemBlue
+                color: UIColor(red: 0.4, green: 0.6, blue: 1.0, alpha: 1.0)  // Blue like Python LEFT_HAND_COLOR
             )
         } else {
-            context.coordinator.leftHandNode?.childNodes.forEach { $0.removeFromParentNode() }
+            leftHandNode.childNodes.forEach { $0.removeFromParentNode() }
         }
         
         // Update right hand
         if let rightHand = rightHand {
             updateHandSkeleton(
-                node: context.coordinator.rightHandNode!,
+                node: rightHandNode,
                 hand: rightHand,
-                color: UIColor.systemGreen
+                color: UIColor(red: 1.0, green: 0.5, blue: 0.4, alpha: 1.0)  // Red/Orange like Python
             )
         } else {
-            context.coordinator.rightHandNode?.childNodes.forEach { $0.removeFromParentNode() }
+            rightHandNode.childNodes.forEach { $0.removeFromParentNode() }
         }
         
         // Update head and camera
         if let headMatrix = headMatrix {
             updateHead(
-                node: context.coordinator.headNode!,
+                node: headNode,
                 matrix: headMatrix
             )
             
             // Follow head with camera
-            if followHead, let cameraNode = context.coordinator.cameraNode {
+            if followHead, let cameraNode = context.coordinator.cameraNode, let sceneView = context.coordinator.sceneView {
+                // Reset point of view to our camera node when following is enabled
+                // This ensures we regain control after user interaction
+                if sceneView.pointOfView != cameraNode {
+                    sceneView.pointOfView = cameraNode
+                }
                 updateCameraToFollowHead(cameraNode: cameraNode, headMatrix: headMatrix)
             }
         } else {
-            context.coordinator.headNode?.childNodes.forEach { $0.removeFromParentNode() }
+            headNode.childNodes.forEach { $0.removeFromParentNode() }
         }
     }
     
@@ -227,50 +242,281 @@ struct SkeletonViewer3D: UIViewRepresentable {
     private func updateCameraToFollowHead(cameraNode: SCNNode, headMatrix: [Float]) {
         guard headMatrix.count >= 16 else { return }
         
-        // Extract head position from matrix
-        let headX = headMatrix[12]
-        let headY = headMatrix[13]
-        let headZ = headMatrix[14]
+        // Extract head position from matrix (column-major: translation at indices 12, 13, 14)
+        let headPos = SIMD3<Float>(headMatrix[12], headMatrix[13], headMatrix[14])
         
-        // Position camera behind and above the head
-        let cameraOffset = SCNVector3(0, 0.3, 0.8) // Behind and above
+        // Extract rotation matrix columns (column-major order)
+        // Column 0 (X-axis): indices 0, 1, 2 - points right
+        // Column 1 (Y-axis): indices 4, 5, 6 - points up
+        // Column 2 (Z-axis): indices 8, 9, 10 - points backward (in ARKit, -Z is forward)
+        let headXAxis = SIMD3<Float>(headMatrix[0], headMatrix[1], headMatrix[2])
+        let headYAxis = SIMD3<Float>(headMatrix[4], headMatrix[5], headMatrix[6])
+        let headZAxis = SIMD3<Float>(headMatrix[8], headMatrix[9], headMatrix[10])
         
-        // Smoothly interpolate camera position
-        let targetPosition = SCNVector3(
-            headX + cameraOffset.x,
-            headY + cameraOffset.y,
-            headZ + cameraOffset.z
-        )
+        // Camera position: behind and slightly above the head
+        // In ARKit, -Z is forward, so +Z is backward (behind the head)
+        let followDistance: Float = 0.6
+        let heightOffset: Float = 0.2
+        
+        // Position camera behind head (along head's +Z) and above (along head's +Y)
+        let cameraPos = headPos + headZAxis * followDistance + headYAxis * heightOffset
+        
+        // The camera should look at a point slightly in front of the head
+        // This is along the head's -Z direction
+        let lookAtPos = headPos - headZAxis * 0.3
+        
+        // Calculate camera orientation to match head's horizontal orientation
+        // We want the camera's "up" to align with the head's Y axis
+        let cameraUp = headYAxis
         
         // Smooth camera movement
         SCNTransaction.begin()
-        SCNTransaction.animationDuration = 0.1
-        cameraNode.position = targetPosition
-        cameraNode.look(at: SCNVector3(headX, headY, headZ))
+        SCNTransaction.animationDuration = 0.15
+        
+        cameraNode.position = SCNVector3(cameraPos.x, cameraPos.y, cameraPos.z)
+        
+        // Use look(at:up:localFront:) for proper orientation matching
+        cameraNode.look(at: SCNVector3(lookAtPos.x, lookAtPos.y, lookAtPos.z),
+                        up: SCNVector3(cameraUp.x, cameraUp.y, cameraUp.z),
+                        localFront: SCNVector3(0, 0, -1))
+        
         SCNTransaction.commit()
     }
     
     // MARK: - Hand Skeleton
     
+    /// Fingertip indices for highlighting (ARKit 27-joint structure)
+    /// thumbTip=6, indexTip=11, middleTip=16, ringTip=21, littleTip=26
+    private static let fingertipIndices27: Set<Int> = [6, 11, 16, 21, 26]
+    
+    /// Fingertip indices for legacy 25-joint structure
+    /// thumbTip=4, indexTip=9, middleTip=14, ringTip=19, littleTip=24
+    private static let fingertipIndices25: Set<Int> = [4, 9, 14, 19, 24]
+    
+    /// Thumb tip and index tip indices for pinch detection (27-joint)
+    private static let thumbTipIdx27 = 6
+    private static let indexTipIdx27 = 11
+    
+    /// Thumb tip and index tip indices for legacy pinch detection (25-joint)
+    private static let thumbTipIdx25 = 4
+    private static let indexTipIdx25 = 9
+    
+    /// Forearm joint indices
+    private static let forearmArmIdx = 0
+    private static let forearmWristIdx = 1
+    private static let wristIdx27 = 2
+    
+    /// Base joint size (matches Python joint_size default of 0.015)
+    private static let baseJointSize: CGFloat = 0.015
+    
+    /// Pinch color for highlighting (matches Python PINCH_COLOR)
+    private static let pinchColor = UIColor(red: 0.2, green: 1.0, blue: 0.2, alpha: 1.0)  // Bright green
+    
+    /// Forearm color (slightly darker than hand color)
+    private static let forearmColor = UIColor(red: 0.5, green: 0.5, blue: 0.6, alpha: 1.0)  // Gray-blue
+    
     private func updateHandSkeleton(node: SCNNode, hand: HandJointData, color: UIColor) {
         // Clear existing children
         node.childNodes.forEach { $0.removeFromParentNode() }
         
-        // Get world-space positions (wrist @ finger_joint for each joint)
-        let positions = hand.worldJointPositions
-        guard positions.count >= 21 else { return }
+        // Check if this recording has forearm data
+        let hasForearmData = hand.hasForearmData
         
-        // Draw joints as spheres
-        for (index, position) in positions.prefix(21).enumerated() {
-            let sphere = SCNSphere(radius: 0.005)
-            sphere.firstMaterial?.diffuse.contents = index == 0 ? UIColor.white : color
+        if hasForearmData {
+            // Use 27-joint format with forearm
+            updateHandSkeleton27(node: node, hand: hand, color: color)
+        } else {
+            // Use legacy 25-joint format (backward compatibility)
+            updateHandSkeleton25(node: node, hand: hand, color: color)
+        }
+    }
+    
+    /// Update hand skeleton with 27-joint format (includes forearm)
+    private func updateHandSkeleton27(node: SCNNode, hand: HandJointData, color: UIColor) {
+        // Get world-space positions (27 joints)
+        let positions = hand.worldJointPositions
+        
+        // Count valid positions (non-nil)
+        var validPositions = 0
+        for pos in positions {
+            if let p = pos, !p.x.isNaN && !p.y.isNaN && !p.z.isNaN &&
+               !p.x.isInfinite && !p.y.isInfinite && !p.z.isInfinite {
+                if p.x != 0 || p.y != 0 || p.z != 0 {
+                    validPositions += 1
+                }
+            }
+        }
+        
+        if validPositions < 25 {
+            print("⚠️ [SkeletonViewer3D] Only \(validPositions)/27 positions are valid")
+            return
+        }
+        
+        guard positions.count >= 27 else {
+            print("⚠️ [SkeletonViewer3D] Not enough positions: \(positions.count) < 27")
+            return
+        }
+        
+        // Compute pinch distance for highlighting
+        var isPinching = false
+        if let thumbTip = positions[Self.thumbTipIdx27], let indexTip = positions[Self.indexTipIdx27] {
+            let pinchDist = simd_distance(thumbTip, indexTip)
+            isPinching = pinchDist < 0.02
+        }
+        
+        // Draw joints as spheres (all 27 joints)
+        for (index, positionOpt) in positions.enumerated() {
+            guard let position = positionOpt else { continue }  // Skip nil forearm joints
+            
+            let isFingertip = Self.fingertipIndices27.contains(index)
+            let isForearm = (index == Self.forearmArmIdx || index == Self.forearmWristIdx)
+            let isWrist = (index == Self.wristIdx27)
+            
+            // Fingertips are larger (1.3x), forearm joints slightly larger too
+            let jointSize: CGFloat
+            if isFingertip {
+                jointSize = Self.baseJointSize * 1.3
+            } else if isForearm {
+                jointSize = Self.baseJointSize * 1.2
+            } else {
+                jointSize = Self.baseJointSize
+            }
+            
+            let sphere = SCNSphere(radius: jointSize)
+            
+            // Color: wrist=white, forearm=gray, fingertips during pinch=green, others=hand color
+            let jointColor: UIColor
+            if isWrist {
+                jointColor = UIColor.white
+            } else if isForearm {
+                jointColor = Self.forearmColor
+            } else if isPinching && (index == Self.thumbTipIdx27 || index == Self.indexTipIdx27) {
+                jointColor = Self.pinchColor
+            } else {
+                jointColor = color
+            }
+            
+            sphere.firstMaterial?.diffuse.contents = jointColor
             let jointNode = SCNNode(geometry: sphere)
             jointNode.position = SCNVector3(position.x, position.y, position.z)
             node.addChildNode(jointNode)
         }
         
-        // Draw bones
+        // Draw forearm bones (if available)
+        for (startIdx, endIdx) in HandSkeleton.forearmConnections {
+            guard startIdx < positions.count, endIdx < positions.count,
+                  let start = positions[startIdx], let end = positions[endIdx] else { continue }
+            
+            let boneNode = createBone(from: start, to: end, color: Self.forearmColor)
+            node.addChildNode(boneNode)
+        }
+        
+        // Draw finger bones (27-joint connections)
         for (startIdx, endIdx) in HandSkeleton.fingerConnections {
+            guard startIdx < positions.count, endIdx < positions.count,
+                  let start = positions[startIdx], let end = positions[endIdx] else { continue }
+            
+            let boneNode = createBone(from: start, to: end, color: color)
+            node.addChildNode(boneNode)
+        }
+        
+        // Draw palm connections (27-joint)
+        for (startIdx, endIdx) in HandSkeleton.palmConnections {
+            guard startIdx < positions.count, endIdx < positions.count,
+                  let start = positions[startIdx], let end = positions[endIdx] else { continue }
+            
+            let boneNode = createBone(from: start, to: end, color: color)
+            node.addChildNode(boneNode)
+        }
+    }
+    
+    /// Update hand skeleton with legacy 25-joint format (no forearm)
+    private func updateHandSkeleton25(node: SCNNode, hand: HandJointData, color: UIColor) {
+        // Validate hand data first
+        let jointArrays = hand.allJointMatricesRelativeLegacy
+        var validJointCount = 0
+        for arr in jointArrays {
+            if arr.count >= 16 {
+                validJointCount += 1
+            }
+        }
+        
+        if validJointCount < 25 {
+            print("⚠️ [SkeletonViewer3D] Hand data has only \(validJointCount)/25 valid joint matrices")
+        }
+        
+        // Get world-space positions (25 joints, legacy format)
+        let positions = hand.worldJointPositionsLegacy
+        
+        // Debug: Check if positions seem valid
+        var validPositions = 0
+        var hasNonZeroPosition = false
+        for pos in positions {
+            if pos.x != 0 || pos.y != 0 || pos.z != 0 {
+                hasNonZeroPosition = true
+            }
+            if !pos.x.isNaN && !pos.y.isNaN && !pos.z.isNaN &&
+               !pos.x.isInfinite && !pos.y.isInfinite && !pos.z.isInfinite {
+                validPositions += 1
+            }
+        }
+        
+        if !hasNonZeroPosition {
+            print("⚠️ [SkeletonViewer3D] All joint positions are at origin - check wrist matrix")
+            return
+        }
+        
+        if validPositions < 25 {
+            print("⚠️ [SkeletonViewer3D] Only \(validPositions)/25 positions are valid (non-NaN/Inf)")
+        }
+        
+        guard positions.count >= 25 else {
+            print("⚠️ [SkeletonViewer3D] Not enough positions: \(positions.count) < 25")
+            return
+        }
+        
+        // Compute pinch distance for highlighting
+        var isPinching = false
+        if Self.thumbTipIdx25 < positions.count && Self.indexTipIdx25 < positions.count {
+            let pinchDist = simd_distance(positions[Self.thumbTipIdx25], positions[Self.indexTipIdx25])
+            isPinching = pinchDist < 0.02
+        }
+        
+        // Draw joints as spheres (all 25 joints)
+        for (index, position) in positions.enumerated() {
+            let isFingertip = Self.fingertipIndices25.contains(index)
+            
+            let jointSize = isFingertip ? Self.baseJointSize * 1.3 : Self.baseJointSize
+            let sphere = SCNSphere(radius: jointSize)
+            
+            let jointColor: UIColor
+            if index == 0 {
+                jointColor = UIColor.white
+            } else if isPinching && (index == Self.thumbTipIdx25 || index == Self.indexTipIdx25) {
+                jointColor = Self.pinchColor
+            } else {
+                jointColor = color
+            }
+            
+            sphere.firstMaterial?.diffuse.contents = jointColor
+            let jointNode = SCNNode(geometry: sphere)
+            jointNode.position = SCNVector3(position.x, position.y, position.z)
+            node.addChildNode(jointNode)
+        }
+        
+        // Draw bones (legacy 25-joint connections)
+        for (startIdx, endIdx) in HandSkeleton.fingerConnectionsLegacy {
+            guard startIdx < positions.count, endIdx < positions.count else { continue }
+            
+            let start = positions[startIdx]
+            let end = positions[endIdx]
+            
+            let boneNode = createBone(from: start, to: end, color: color)
+            node.addChildNode(boneNode)
+        }
+        
+        // Draw palm connections (legacy 25-joint)
+        for (startIdx, endIdx) in HandSkeleton.palmConnectionsLegacy {
             guard startIdx < positions.count, endIdx < positions.count else { continue }
             
             let start = positions[startIdx]
@@ -314,11 +560,12 @@ struct SkeletonViewer3D: UIViewRepresentable {
         
         guard matrix.count >= 16 else { return }
         
-        // Create head representation (simple box/pyramid)
-        let headGeometry = SCNBox(width: 0.15, height: 0.2, length: 0.15, chamferRadius: 0.02)
-        headGeometry.firstMaterial?.diffuse.contents = UIColor.systemOrange.withAlphaComponent(0.7)
+        // Create coordinate frame like Python's add_frame
+        // Axes length and radius match Python (0.1, 0.003)
+        let axisLength: Float = 0.1
+        let axisRadius: CGFloat = 0.003
         
-        let headNode = SCNNode(geometry: headGeometry)
+        let headFrameNode = SCNNode()
         
         // Apply transform from matrix (column-major)
         let transform = SCNMatrix4(
@@ -327,17 +574,38 @@ struct SkeletonViewer3D: UIViewRepresentable {
             m31: matrix[8], m32: matrix[9], m33: matrix[10], m34: matrix[11],
             m41: matrix[12], m42: matrix[13], m43: matrix[14], m44: matrix[15]
         )
-        headNode.transform = transform
+        headFrameNode.transform = transform
         
-        // Add nose indicator for direction
-        let nose = SCNCone(topRadius: 0, bottomRadius: 0.02, height: 0.05)
-        nose.firstMaterial?.diffuse.contents = UIColor.systemYellow
-        let noseNode = SCNNode(geometry: nose)
-        noseNode.position = SCNVector3(0, 0, 0.1)
-        noseNode.eulerAngles = SCNVector3(Float.pi/2, 0, 0)
-        headNode.addChildNode(noseNode)
+        // X axis (red) - points right
+        let xAxis = SCNCylinder(radius: axisRadius, height: CGFloat(axisLength))
+        xAxis.firstMaterial?.diffuse.contents = UIColor.red
+        let xNode = SCNNode(geometry: xAxis)
+        xNode.position = SCNVector3(axisLength/2, 0, 0)
+        xNode.eulerAngles = SCNVector3(0, 0, Float.pi/2)
+        headFrameNode.addChildNode(xNode)
         
-        node.addChildNode(headNode)
+        // Y axis (green) - points up
+        let yAxis = SCNCylinder(radius: axisRadius, height: CGFloat(axisLength))
+        yAxis.firstMaterial?.diffuse.contents = UIColor.green
+        let yNode = SCNNode(geometry: yAxis)
+        yNode.position = SCNVector3(0, axisLength/2, 0)
+        headFrameNode.addChildNode(yNode)
+        
+        // Z axis (blue) - points backward (in ARKit, -Z is forward)
+        let zAxis = SCNCylinder(radius: axisRadius, height: CGFloat(axisLength))
+        zAxis.firstMaterial?.diffuse.contents = UIColor.blue
+        let zNode = SCNNode(geometry: zAxis)
+        zNode.position = SCNVector3(0, 0, axisLength/2)
+        zNode.eulerAngles = SCNVector3(Float.pi/2, 0, 0)
+        headFrameNode.addChildNode(zNode)
+        
+        // Add small sphere at origin for visibility
+        let originSphere = SCNSphere(radius: 0.008)
+        originSphere.firstMaterial?.diffuse.contents = UIColor.white
+        let originNode = SCNNode(geometry: originSphere)
+        headFrameNode.addChildNode(originNode)
+        
+        node.addChildNode(headFrameNode)
     }
 }
 
