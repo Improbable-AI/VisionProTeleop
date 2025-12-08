@@ -113,6 +113,36 @@ enum VideoSource: String, CaseIterable {
 class DataManager: ObservableObject {
     static let shared = DataManager()
     
+    // MARK: - Python Library Version Compatibility
+    // Minimum required Python library version (encoded as major*10000 + minor*100 + patch)
+    // Update this when breaking changes are made that require users to upgrade
+    static let minimumPythonVersionCode: Int = 20500  // Minimum: 2.50.0
+    static let minimumPythonVersionString: String = "2.50.0"
+    
+    /// Connected Python library version code (0 if unknown/old library)
+    @Published var pythonLibraryVersionCode: Int = 0
+    
+    /// Human-readable version string of connected Python library
+    var pythonLibraryVersionString: String {
+        guard pythonLibraryVersionCode > 0 else { return "Unknown (< 2.50.0)" }
+        let major = pythonLibraryVersionCode / 10000
+        let minor = (pythonLibraryVersionCode % 10000) / 100
+        let patch = pythonLibraryVersionCode % 100
+        return "\(major).\(minor).\(patch)"
+    }
+    
+    /// Whether the connected Python library is compatible with this visionOS app
+    var isPythonVersionCompatible: Bool {
+        // Version code 0 means old library that doesn't send version - treat as incompatible
+        guard pythonLibraryVersionCode > 0 else { return false }
+        return pythonLibraryVersionCode >= DataManager.minimumPythonVersionCode
+    }
+    
+    /// Whether we should show a version warning (only when connected but incompatible)
+    var shouldShowVersionWarning: Bool {
+        return pythonClientIP != nil && !isPythonVersionCompatible
+    }
+    
     var latestHandTrackingData: HandTrackingData = HandTrackingData()
     @Published var pythonClientIP: String? = nil  // Store Python client's IP when it connects via gRPC
     @Published var grpcServerReady: Bool = false  // Indicates if gRPC server is ready to accept connections

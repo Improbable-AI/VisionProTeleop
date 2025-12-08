@@ -33,6 +33,7 @@
 		C1B6714D2EE220EF00574B6F /* GoogleDriveAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1B6714C2EE220EF00574B6F /* GoogleDriveAuthManager.swift */; };
 		C1B6714F2EE24C4300574B6F /* DropboxAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1B6714E2EE24C4300574B6F /* DropboxAuthManager.swift */; };
 		C1B671552EE3383A00574B6F /* VisionOSSettingsSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1B671542EE3383A00574B6F /* VisionOSSettingsSync.swift */; };
+		C1B6715F2EE68D4000574B6F /* PersonaCaptureController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1B6715E2EE68D4000574B6F /* PersonaCaptureController.swift */; };
 		C1DA80C42ECE377600B55CC2 /* StatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1DA80C32ECE377600B55CC2 /* StatusView.swift */; };
 		C1DA80C72ECE8C6F00B55CC2 /* ViewControlSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1DA80C62ECE8C6F00B55CC2 /* ViewControlSettings.swift */; };
 		C1DA80DC2ED0F61D00B55CC2 /* RealityKitContent in Frameworks */ = {isa = PBXBuildFile; productRef = C1DA80DB2ED0F61D00B55CC2 /* RealityKitContent */; };
@@ -110,6 +111,7 @@
 		C1B6714C2EE220EF00574B6F /* GoogleDriveAuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleDriveAuthManager.swift; sourceTree = "<group>"; };
 		C1B6714E2EE24C4300574B6F /* DropboxAuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DropboxAuthManager.swift; sourceTree = "<group>"; };
 		C1B671542EE3383A00574B6F /* VisionOSSettingsSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisionOSSettingsSync.swift; sourceTree = "<group>"; };
+		C1B6715E2EE68D4000574B6F /* PersonaCaptureController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonaCaptureController.swift; sourceTree = "<group>"; };
 		C1DA80C32ECE377600B55CC2 /* StatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusView.swift; sourceTree = "<group>"; };
 		C1DA80C52ECE821800B55CC2 /* VisionProTeleop.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VisionProTeleop.entitlements; sourceTree = "<group>"; };
 		C1DA80C62ECE8C6F00B55CC2 /* ViewControlSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewControlSettings.swift; sourceTree = "<group>"; };
@@ -247,6 +249,7 @@
 				C1EAF96B2ED7E13400549580 /* GRPCServer.swift */,
 				C1EAFABE2EE11B5D00549580 /* CameraCalibrationWizardView.swift */,
 				16688DE52B59F35F004CE12B /* 🥽AppModel.swift */,
+				C1B6715E2EE68D4000574B6F /* PersonaCaptureController.swift */,
 				C1EAFA842EDF477200549580 /* DropboxUploader.swift */,
 				C1EAFA382EDD2EA600549580 /* ExtrinsicCalibrationView.swift */,
 				C1EAFA862EDF477900549580 /* KeychainManager.swift */,
@@ -454,6 +457,7 @@
 				1642FAB52B4D54A60084F9ED /* 🛠️SettingPanel.swift in Sources */,
 				C1B6714D2EE220EF00574B6F /* GoogleDriveAuthManager.swift in Sources */,
 				16253CFB2B4E2FCB0028F0E2 /* 📏Unit.swift in Sources */,
+				C1B6715F2EE68D4000574B6F /* PersonaCaptureController.swift in Sources */,
 				165ADB512B4B71B0008A756F /* ContentView.swift in Sources */,
 				16EE5E9B2B576DB000D354ED /* 🧩Model.swift in Sources */,
 				16688DE62B59F35F004CE12B /* 🥽AppModel.swift in Sources */,
@@ -628,7 +632,7 @@
 				CODE_SIGN_ENTITLEMENTS = "Tracking Streamer/VisionProTeleop.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 14;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = ATTMC2WVK2;
 				ENABLE_PREVIEWS = YES;
@@ -667,7 +671,7 @@
 				CODE_SIGN_ENTITLEMENTS = "Tracking Streamer/VisionProTeleop.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 14;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = ATTMC2WVK2;
 				ENABLE_PREVIEWS = YES;

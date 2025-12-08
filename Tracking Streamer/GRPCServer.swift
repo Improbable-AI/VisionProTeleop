@@ -85,10 +85,17 @@ struct HandTrackingServiceImpl: Handtracking_HandTrackingService.SimpleServicePr
             let ip3 = Int(request.head.m03)
             let ip4 = Int(request.head.m10)
             let pythonIP = "\(ip1).\(ip2).\(ip3).\(ip4)"
-            print("🔍 Python client discovered at: \(pythonIP)")
-            print("💾 [DEBUG] Storing Python IP in DataManager...")
+            let versionCode = Int(request.head.m30)  // Library version (0 if old library)
+            print("🔍 Python client discovered at: \(pythonIP), version code: \(versionCode)")
+            print("💾 [DEBUG] Storing Python IP and version in DataManager...")
             await MainActor.run {
                 DataManager.shared.pythonClientIP = pythonIP
+                DataManager.shared.pythonLibraryVersionCode = versionCode
+                if versionCode > 0 && versionCode < DataManager.minimumPythonVersionCode {
+                    print("⚠️ [VERSION] Python library version \(versionCode) is older than minimum required \(DataManager.minimumPythonVersionCode)")
+                } else if versionCode == 0 {
+                    print("⚠️ [VERSION] Python library does not report version (likely < 2.2.2)")
+                }
             }
         } else if isWebRTCInfoOnly {
             // WebRTC server info message
@@ -104,11 +111,16 @@ struct HandTrackingServiceImpl: Handtracking_HandTrackingService.SimpleServicePr
             let videoEnabled = request.head.m21 > 0.5
             let simEnabled = request.head.m22 > 0.5
             let meshEnabled = request.head.m23 > 0.5
+            let versionCode = Int(request.head.m30)  // Library version (0 if old library)
             let host = "\(ip1).\(ip2).\(ip3).\(ip4)"
-            print("🎞️ WebRTC server available at: \(host):\(port) (video=\(videoEnabled), audio=\(audioEnabled), sim=\(simEnabled), mesh=\(meshEnabled))")
+            print("🎞️ WebRTC server available at: \(host):\(port) (video=\(videoEnabled), audio=\(audioEnabled), sim=\(simEnabled), mesh=\(meshEnabled), version=\(versionCode))")
             print("💾 [DEBUG] Storing WebRTC info in DataManager...")
             
             await MainActor.run {
+                // Update version if provided (WebRTC info may come after discovery)
+                if versionCode > 0 {
+                    DataManager.shared.pythonLibraryVersionCode = versionCode
+                }
                 let hadConnection = DataManager.shared.webrtcServerInfo != nil
                 DataManager.shared.webrtcServerInfo = (host: host, port: port)
                 DataManager.shared.stereoEnabled = stereoVideo
@@ -134,6 +146,39 @@ struct HandTrackingServiceImpl: Handtracking_HandTrackingService.SimpleServicePr
         // Register for benchmark events
         if !isWebRTCInfoOnly {
             BenchmarkEventDispatcher.shared.register(responseWriter: response)
+        }
+        
+        // Check version compatibility - block streaming if incompatible
+        let versionCode = Int(request.head.m30)
+        let isVersionCompatible = versionCode >= DataManager.minimumPythonVersionCode
+        
+        if !isVersionCompatible {
+            print("🚫 [VERSION] Blocking hand tracking stream - Python library version \(versionCode) is below minimum \(DataManager.minimumPythonVersionCode)")
+            print("🚫 [VERSION] User must upgrade: pip install --upgrade avp-stream")
+            
+            // Keep connection alive but don't send useful hand tracking data
+            // Periodically write empty updates to detect when client disconnects
+            while !Task.isCancelled {
+                do {
+                    // Send an empty update (all zeros) - this allows us to detect disconnection
+                    // The Python side will receive this but it won't contain valid tracking data
+                    try await response.write(Handtracking_HandUpdate())
+                    try await Task.sleep(nanoseconds: 500_000_000)  // Check every 0.5 seconds
+                } catch {
+                    print("🔌 [VERSION] Client disconnected while blocked: \(error)")
+                    break
+                }
+            }
+            
+            // Cleanup on disconnect (same as normal disconnect)
+            print("🧹 [VERSION] Cleaning up after blocked client disconnect")
+            await MainActor.run {
+                DataManager.shared.pythonClientIP = nil
+                DataManager.shared.pythonLibraryVersionCode = 0
+                DataManager.shared.webrtcServerInfo = nil
+                DataManager.shared.webrtcGeneration = -1
+            }
+            return
         }
         
         print("🔄 [DEBUG] Starting hand tracking data stream...")
@@ -170,6 +215,7 @@ struct HandTrackingServiceImpl: Handtracking_HandTrackingService.SimpleServicePr
             await MainActor.run {
                 print("🧹 [DEBUG] Cleaning up connection state after main client disconnect")
                 DataManager.shared.pythonClientIP = nil
+                DataManager.shared.pythonLibraryVersionCode = 0  // Reset version on disconnect
                 DataManager.shared.webrtcServerInfo = nil
                 DataManager.shared.webrtcGeneration = -1
             }

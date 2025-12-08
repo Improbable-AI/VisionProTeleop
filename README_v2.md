@@ -17,9 +17,12 @@ VisionProTeleop
   </a>
 </p>
 
-A complete ecosystem for using Apple Vision Pro in robotics research — from **real-world teleoperation** to **simulation control** to **egocentric dataset recording**. Stream hand/head tracking from Vision Pro, send video/audio/simulation back, and record everything to the cloud.
+A complete ecosystem for using Apple Vision Pro in robotics research — from **real-world teleoperation** to **simulation teleoperation** to **egocentric dataset recording**. Stream hand/head tracking from Vision Pro, send video/audio/simulation back, and record everything to the cloud.
 
 > **For a more detailed explanation, check out this short [paper](./assets/short_paper_new.pdf).**
+
+> The recently updated App Store version of Tracking Streamer requires python library `avp_stream` over 2.50.0. It will show a warning message on the app if the library is outdated. You can upgrade the library by running `pip install --upgrade avp_stream`.
+
 
 <!-- omit in toc -->
 ## Table of Contents
@@ -56,19 +59,30 @@ A complete ecosystem for using Apple Vision Pro in robotics research — from **
 
 This project provides:
 
-1. **Tracking Streamer** — A VisionOS app that streams hand/head tracking data and can record synchronized video + tracking data
-2. **Tracking Manager** — A companion iOS app for managing recordings, configuring Vision Pro settings, and sharing datasets
-3. **avp_stream** — A Python library for receiving tracking data and streaming video/audio/simulation back to Vision Pro
+1. **Tracking Streamer**: A **VisionOS** app that 
+  - streams hand/head tracking data to Python client
+  - receive video/audio streams with low latency from Python client
+  - present and receive simulation scenes (MuJoCo and Isaac) and its updates with native AR rendering using RealityKit
+  - record egocentric video with hand tracking with arbitrary UVC camera connected to Vision Pro
+  - (optionally) record every sessions to user's personal cloud storage 
+2. **Tracking Manager**: A companion **iOS** app for 
+  - managing and viewing recordings on their personal cloud storage
+  - configuring app settings for VisionOS app
+  - calibrating camera mounted on Vision Pro
+  - sharing recorded datasets with others
+  - viewing publicly shared datasets
+3. **avp_stream**: A **Python** library for 
+  - receiving tracking data from Vision Pro
+  - streaming video/audio/simulation back to Vision Pro
+
 
 Together, they enable three major workflows for robotics research:
 
 | Use Case | Description | Primary Tools |
 |----------|-------------|---------------|
-| **Real-World Teleoperation** | Control physical robots with hand tracking while viewing robot camera feeds | `avp_stream` + WebRTC streaming |
-| **Simulation Teleoperation** | Control simulated robots with MuJoCo rendered directly in AR | `avp_stream` + MuJoCo streaming |
+| **Real-World Teleoperation** | Control physical robots with hand tracking while viewing robot camera feeds | `avp_stream` + WebRTC streaming (or UVC camera) |
+| **Simulation Teleoperation** | Control simulated robots with MuJoCo/Isaac Lab rendered directly in AR | `avp_stream` + MuJoCo/Isaac Lab streaming |
 | **Egocentric Dataset Recording** | Record first-person manipulation videos with synchronized tracking | UVC camera + Developer Strap |
-
-
 
 
 

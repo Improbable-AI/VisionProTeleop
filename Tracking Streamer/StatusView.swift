@@ -53,6 +53,7 @@ enum ExpandedPanel: Equatable {
     case cloudStorageDebug
     case visualizations  // Hand/head visualization toggles
     case positionLayout  // Combined video view + controller position
+    case personaCapture  // Spatial Persona front camera preview
 }
 
 /// App mode: Teleop (network-based teleoperation) vs Egorecord (local UVC recording)
@@ -757,6 +758,82 @@ struct StatusOverlay: View {
                 .foregroundColor(.white.opacity(0.8))
         }
     }
+    
+    // MARK: - Version Incompatibility Warning
+    
+    private var versionWarningBanner: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Header with warning icon
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(.yellow)
+                    .opacity(flashingOpacity)
+                
+                Text("Python Library Update Required")
+                    .font(.callout)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+            }
+            
+            // Version info
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("Your version:")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.6))
+                    Spacer()
+                    Text(dataManager.pythonLibraryVersionString)
+                        .font(.system(.caption, design: .monospaced))
+                        .fontWeight(.medium)
+                        .foregroundColor(.red)
+                }
+                
+                HStack {
+                    Text("Minimum required:")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.6))
+                    Spacer()
+                    Text(DataManager.minimumPythonVersionString)
+                        .font(.system(.caption, design: .monospaced))
+                        .fontWeight(.medium)
+                        .foregroundColor(.green)
+                }
+            }
+            .padding(8)
+            .background(Color.black.opacity(0.3))
+            .cornerRadius(6)
+            
+            // Upgrade instructions
+            HStack(spacing: 4) {
+                Text("Run:")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.7))
+                Text("pip install --upgrade avp-stream")
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundColor(.cyan)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 4)
+                    .background(Color.black.opacity(0.4))
+                    .cornerRadius(4)
+            }
+            
+            // Warning message
+            Text("Hand tracking is blocked until you upgrade. Please update your Python library and restart.")
+                .font(.caption2)
+                .foregroundColor(.white.opacity(0.6))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.orange.opacity(0.2))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.orange.opacity(0.5), lineWidth: 1)
+                )
+        )
+    }
 
     private var streamDetailsSection: some View {
         HStack(spacing: 0) {
@@ -1056,6 +1133,11 @@ struct StatusOverlay: View {
             
             // Network info only shown in Teleop mode
             if appMode == .teleop {
+                // Version incompatibility warning (shown prominently when connected but incompatible)
+                if dataManager.shouldShowVersionWarning {
+                    versionWarningBanner
+                }
+                
                 Divider()
                     .background(Color.white.opacity(0.2))
                 
@@ -1183,6 +1265,21 @@ struct StatusOverlay: View {
                 ) {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                         expandedPanel = expandedPanel == .visualizations ? .none : .visualizations
+                    }
+                }
+                
+                // Persona Preview menu item
+                let personaController = PersonaCaptureController.shared
+                menuItem(
+                    icon: personaController.isRunning ? "person.crop.circle.fill" : "person.crop.circle",
+                    title: "Persona Preview",
+                    subtitle: personaController.isRunning ? "Live" : "Off",
+                    isExpanded: expandedPanel == .personaCapture,
+                    accentColor: .purple,
+                    iconColor: personaController.isRunning ? .green : nil
+                ) {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        expandedPanel = expandedPanel == .personaCapture ? .none : .personaCapture
                     }
                 }
             }
@@ -1409,6 +1506,8 @@ struct StatusOverlay: View {
                 cloudStorageDebugPanelContent
             case .visualizations:
                 visualizationsPanelContent
+            case .personaCapture:
+                personaCapturePanelContent
             case .none:
                 EmptyView()
             }
@@ -1430,6 +1529,7 @@ struct StatusOverlay: View {
         case .cameraCalibration: return "Camera Calibration"
         case .cloudStorageDebug: return "Cloud Storage Debug"
         case .visualizations: return "Visualizations"
+        case .personaCapture: return "Persona Preview"
         case .none: return ""
         }
     }
@@ -2599,6 +2699,24 @@ struct StatusOverlay: View {
                 .padding(.leading, 36)
         }
         .padding(.vertical, 4)
+    }
+    
+    // MARK: - Persona Capture Panel
+    
+    private var personaCapturePanelContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Description
+            Text("Preview your Spatial Persona using the front-facing camera.")
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.6))
+                .fixedSize(horizontal: false, vertical: true)
+            
+            Divider()
+                .background(Color.white.opacity(0.2))
+            
+            // Embed the PersonaPreviewView
+            PersonaPreviewView()
+        }
     }
     
     // MARK: - Unified Camera Calibration Panel

@@ -24,6 +24,15 @@ from avp_stream.mujoco_msg import mujoco_ar_pb2, mujoco_ar_pb2_grpc
 from scipy.spatial.transform import Rotation as R
 
 
+# =============================================================================
+# Version Information for Compatibility Checking
+# =============================================================================
+# Version is encoded as: major * 10000 + minor * 100 + patch
+# Example: 2.2.2 -> 20202, 3.0.0 -> 30000
+# This allows visionOS to compare versions and enforce minimum requirements
+LIBRARY_VERSION = "2.50.0"
+LIBRARY_VERSION_CODE = 25000  # 2*10000 + 50*100 + 0
+
 YUP2ZUP = np.array([[[1, 0, 0, 0], 
                     [0, 0, -1, 0], 
                     [0, 1, 0, 0],
@@ -536,6 +545,11 @@ class VisionProStreamer:
         self._attach_to_mat = np.eye(4)
         self._session_id = f"avpstream_{int(time.time())}"
         
+        # Isaac Lab simulation state
+        self._isaac_stage = None
+        self._isaac_bodies: Dict[str, str] = {}  # body_name -> prim_path
+        self._isaac_config: Optional[Dict[str, Any]] = None
+        
         # Sim benchmark state
         self._sim_benchmark_enabled = False
         self._sim_benchmark_seq = 0
@@ -781,6 +795,7 @@ class VisionProStreamer:
         request.Head.m02 = float(ip_parts[1])
         request.Head.m03 = float(ip_parts[2])
         request.Head.m10 = float(ip_parts[3])
+        request.Head.m30 = float(LIBRARY_VERSION_CODE)  # Send library version for compatibility check
         
         # Retry connection with exponential backoff
         max_retries = 10
@@ -1266,33 +1281,215 @@ class VisionProStreamer:
         if attach_to:
             self._log(f"  Position: [{attach_to[0]:.2f}, {attach_to[1]:.2f}, {attach_to[2]:.2f}]")
     
-    def update_sim(self):
+    def configure_isaac(
+        self,
+        stage,
+        relative_to: Optional[List[float]] = None,
+        include_ground: bool = False,
+        env_indices: Optional[List[int]] = None,
+        grpc_port: int = 50051,
+    ):
         """
-        Sync current MuJoCo simulation state to the VisionPro.
+        Configure Isaac Lab simulation streaming. Call this before start_webrtc().
         
-        Call this after each simulation step to update the 3D visualization.
-        The poses are streamed via gRPC to the MuJoCo AR viewer on VisionPro.
+        This enables streaming Isaac Lab simulation states to the VisionPro, displaying
+        a 3D scene that updates in real-time as the simulation runs.
+        
+        Args:
+            stage: USD stage from Isaac Sim (omni.usd.get_context().get_stage())
+            relative_to: 4-element array [x, y, z, yaw_degrees] or 7-element array
+                        [x, y, z, qw, qx, qy, qz] specifying position and orientation
+                        in Z-up coordinates for scene placement.
+            include_ground: Whether to include ground plane in USDZ export (default: False)
+            env_indices: List of environment indices to include (default: None = all)
+                        e.g., [0, 1, 2] will include env_0, env_1, env_2
+            grpc_port: gRPC port for USDZ transfer (default: 50051)
         
         Example::
+        
+            import omni
+            stage = omni.usd.get_context().get_stage()
+            
+            streamer.configure_isaac(
+                stage=stage,
+                relative_to=[0, 0, 0.8, 90],
+                include_ground=False,
+                env_indices=[0],
+            )
+            streamer.start_webrtc()
+            
+            while simulation_app.is_running():
+                sim.step()
+                streamer.update_sim()
+        """
+        
+        # Process relative_to parameter (same logic as configure_sim)
+        attach_to = None
+        if relative_to is not None:
+            if len(relative_to) == 4:
+                # [x, y, z, yaw_degrees] -> convert to [x, y, z, qw, qx, qy, qz]
+                yaw_deg = relative_to[3]
+                yaw_rad = np.radians(yaw_deg / 2)
+                qw = np.cos(yaw_rad)
+                qx = 0.0
+                qy = 0.0
+                qz = np.sin(yaw_rad)
+                attach_to = [relative_to[0], relative_to[1], relative_to[2], qw, qx, qy, qz]
+            elif len(relative_to) == 7:
+                attach_to = list(relative_to)
+            else:
+                raise ValueError(f"relative_to must be 4 or 7 elements, got {len(relative_to)}")
+            
+            # Build transformation matrix
+            self._attach_to_mat = np.eye(4)
+            self._attach_to_mat[:3, :3] = R.from_quat(attach_to[3:], scalar_first=True).as_matrix()
+            self._attach_to_mat[:3, 3] = attach_to[:3]
+        
+        # Store the Isaac stage
+        self._isaac_stage = stage
+        
+        # Extract body information from stage
+        self._isaac_bodies = self._get_isaac_bodies(stage, env_indices)
+        
+        # Store Isaac config (used by _load_and_send_scene)
+        self._isaac_config = {
+            "include_ground": include_ground,
+            "env_indices": env_indices,
+            "attach_to": attach_to,
+            "grpc_port": grpc_port,
+        }
+        
+        # Also set _sim_config so the streaming infrastructure knows sim is enabled
+        self._sim_config = {
+            "type": "isaac",
+            "attach_to": attach_to,
+            "grpc_port": grpc_port,
+        }
+        
+        # Automatically switch to simulation-relative coordinates
+        self.set_origin("sim")
+        
+        self._log(f"[CONFIG] Isaac Lab configured: {len(self._isaac_bodies)} bodies")
+        if attach_to:
+            self._log(f"  Position: [{attach_to[0]:.2f}, {attach_to[1]:.2f}, {attach_to[2]:.2f}]")
+    
+    def _get_isaac_bodies(self, stage, env_indices: Optional[List[int]] = None) -> Dict[str, str]:
+        """
+        Extract body prim paths from an Isaac Lab stage for pose streaming.
+        
+        Traverses the stage looking for prims with transforms (Xformable) that
+        represent bodies we want to animate. Focuses on prims under /World/envs/.
+        
+        Returns:
+            Dict mapping clean body name to prim path
+        """
+        from pxr import Usd, UsdGeom
+        
+        bodies = {}
+        
+        # Determine which env paths to scan
+        env_paths = []
+        if env_indices is not None:
+            env_paths = [f"/World/envs/env_{i}" for i in env_indices]
+        else:
+            # Discover all env_* prims
+            envs_prim = stage.GetPrimAtPath("/World/envs")
+            if envs_prim.IsValid():
+                for child in envs_prim.GetChildren():
+                    if child.GetName().startswith("env_"):
+                        env_paths.append(str(child.GetPath()))
+        
+        # Traverse each environment
+        for env_path in env_paths:
+            env_prim = stage.GetPrimAtPath(env_path)
+            if not env_prim.IsValid():
+                continue
+            
+            # Extract env index for naming
+            env_name = env_prim.GetName()  # e.g., "env_0"
+            
+            # Recursively find all Xformable prims
+            for prim in Usd.PrimRange(env_prim):
+                if not prim.IsValid():
+                    continue
+                
+                # Check if this prim is Xformable (has transform)
+                xformable = UsdGeom.Xformable(prim)
+                if not xformable:
+                    continue
+                
+                # Get the prim path and name
+                prim_path = str(prim.GetPath())
+                prim_name = prim.GetName()
+                
+                # Skip certain prims
+                if prim_name in ["defaultGroundPlane", "GroundPlane", "Light"]:
+                    continue
+                if "material" in prim_name.lower() or "shader" in prim_name.lower():
+                    continue
+                
+                # Create a clean name for Swift matching
+                # Strip the env prefix to get relative name
+                relative_path = prim_path.replace(env_path + "/", "")
+                # Clean name for JSON: replace / with _ and remove special chars
+                clean_name = relative_path.replace("/", "_").replace("-", "")
+                
+                # For multi-env, prefix with env index (for collision avoidance)
+                if len(env_paths) > 1:
+                    clean_name = f"{env_name}_{clean_name}"
+                
+                bodies[clean_name] = prim_path
+        
+        self._log(f"[ISAAC] Found {len(bodies)} bodies to track")
+        if self.verbose and bodies:
+            for name in list(bodies.keys())[:5]:  # Show first 5
+                self._log(f"  - {name}: {bodies[name]}")
+            if len(bodies) > 5:
+                self._log(f"  ... and {len(bodies) - 5} more")
+        
+        return bodies
+    
+    def update_sim(self):
+        """
+        Sync current simulation state to the VisionPro.
+        
+        Call this after each simulation step to update the 3D visualization.
+        Works with both MuJoCo (configure_sim) and Isaac Lab (configure_isaac).
+        
+        Example (MuJoCo)::
         
             while True:
                 mujoco.mj_step(model, data)
                 streamer.update_sim()
+        
+        Example (Isaac Lab)::
+        
+            while simulation_app.is_running():
+                sim.step()
+                streamer.update_sim()
         """
-        if self._mujoco_model is None or self._mujoco_data is None:
-            self._log("[SIM] Warning: No simulation configured. Call configure_sim() first.", force=True)
+        # Check which simulation backend is configured
+        is_isaac = self._isaac_stage is not None
+        is_mujoco = self._mujoco_model is not None and self._mujoco_data is not None
+        
+        if not is_isaac and not is_mujoco:
+            self._log("[SIM] Warning: No simulation configured. Call configure_sim() or configure_isaac() first.", force=True)
             return
         
         if not self._pose_stream_running:
             # Pose streaming not started yet
             return
         
-        # Get current poses
-        poses = self._get_mujoco_poses()
+        # Get current poses based on backend
+        if is_isaac:
+            poses = self._get_isaac_poses()
+            qpos = []  # Isaac doesn't have a simple qpos equivalent
+            ctrl = []
+        else:
+            poses = self._get_mujoco_poses()
+            qpos = self._mujoco_data.qpos.tolist()
+            ctrl = self._mujoco_data.ctrl.tolist()
         
-        # Get qpos and ctrl
-        qpos = self._mujoco_data.qpos.tolist()
-        ctrl = self._mujoco_data.ctrl.tolist()
         timestamp = time.time()
         
         # Update the current poses that the streaming thread will send
@@ -1323,6 +1520,54 @@ class VisionProStreamer:
                 "xpos": xpos,
                 "xquat": xquat,
             }
+        
+        return body_dict
+    
+    def _get_isaac_poses(self) -> Dict[str, Dict[str, Any]]:
+        """
+        Get current Isaac Lab body poses as a dictionary.
+        
+        Extracts world-space position and rotation for each tracked prim.
+        """
+        from pxr import UsdGeom, Gf
+        
+        body_dict = {}
+        stage = self._isaac_stage
+        
+        if stage is None:
+            return body_dict
+        
+        for clean_name, prim_path in self._isaac_bodies.items():
+            prim = stage.GetPrimAtPath(prim_path)
+            if not prim.IsValid():
+                continue
+            
+            xformable = UsdGeom.Xformable(prim)
+            if not xformable:
+                continue
+            
+            # Get world transform
+            try:
+                world_transform = xformable.ComputeLocalToWorldTransform(0)  # time=0
+                
+                # Extract translation
+                translation = world_transform.ExtractTranslation()
+                xpos = [translation[0], translation[1], translation[2]]
+                
+                # Extract rotation as quaternion (wxyz format for MuJoCo compatibility)
+                rotation = world_transform.ExtractRotationQuat()
+                # Gf.Quatd is (real, imaginary) = (w, (x, y, z))
+                w = rotation.GetReal()
+                imaginary = rotation.GetImaginary()
+                xquat = [w, imaginary[0], imaginary[1], imaginary[2]]
+                
+                body_dict[clean_name] = {
+                    "xpos": xpos,
+                    "xquat": xquat,
+                }
+            except Exception as e:
+                # Skip prims with invalid transforms
+                continue
         
         return body_dict
     
@@ -1451,13 +1696,67 @@ class VisionProStreamer:
         self._log(f"[SIM] Pose streaming stopped (sent {frame_count} updates)")
     
     def _load_and_send_scene(self):
-        """Load USDZ scene and send to VisionPro via gRPC."""
+        """Load USDZ scene and send to VisionPro via gRPC.
+        
+        Handles both MuJoCo and Isaac Lab scenes based on which configure_* was called.
+        """
         if self._sim_config is None:
             return False
         
-        xml_path = self._sim_config["xml_path"]
         attach_to = self._sim_config["attach_to"]
         grpc_port = self._sim_config["grpc_port"]
+        
+        # Check if this is an Isaac Lab scene
+        is_isaac = self._sim_config.get("type") == "isaac"
+        
+        if is_isaac:
+            # Isaac Lab: export stage to USDZ using our export utility
+            return self._load_and_send_isaac_scene(attach_to, grpc_port)
+        else:
+            # MuJoCo: convert XML to USDZ
+            return self._load_and_send_mujoco_scene(attach_to, grpc_port)
+    
+    def _load_and_send_isaac_scene(self, attach_to, grpc_port) -> bool:
+        """Export Isaac Lab stage to USDZ and send to VisionPro."""
+        import tempfile
+        
+        if self._isaac_stage is None or self._isaac_config is None:
+            self._log("[ISAAC] Error: No Isaac stage configured", force=True)
+            return False
+        
+        include_ground = self._isaac_config.get("include_ground", False)
+        env_indices = self._isaac_config.get("env_indices")
+        
+        # Create temp directory for USDZ export
+        tmp_dir = tempfile.mkdtemp(prefix="isaac_usdz_")
+        usdz_path = os.path.join(tmp_dir, "scene.usdz")
+        
+        try:
+            # Use our Isaac USDZ export utility
+            from avp_stream.utils.isaac_usdz_export import export_stage_to_usdz
+            
+            self._log(f"[ISAAC] Exporting stage to USDZ...")
+            usdz_path = export_stage_to_usdz(
+                stage=self._isaac_stage,
+                output_path=usdz_path,
+                include_ground=include_ground,
+                env_indices=env_indices,
+            )
+            self._log(f"[ISAAC] USDZ exported: {usdz_path}")
+            
+        except Exception as e:
+            self._log(f"[ISAAC] Error: Failed to export USDZ: {e}", force=True)
+            if self.verbose:
+                import traceback
+                traceback.print_exc()
+            return False
+        
+        # Send USDZ to VisionPro
+        return self._send_usdz_data(usdz_path, attach_to, grpc_port)
+    
+    def _load_and_send_mujoco_scene(self, attach_to, grpc_port) -> bool:
+        """Convert MuJoCo XML to USDZ and send to VisionPro."""
+        xml_path = self._sim_config["xml_path"]
         force_reload = self._sim_config.get("force_reload", False)
         
         # Check if USDZ already exists
@@ -2315,6 +2614,7 @@ class VisionProStreamer:
                     webrtc_msg.Head.m20 = 1.0 if audio_enabled else 0.0  # Audio enabled flag
                     webrtc_msg.Head.m21 = 1.0 if video_enabled else 0.0  # Video enabled flag
                     webrtc_msg.Head.m22 = 1.0 if sim_enabled else 0.0    # Sim enabled flag
+                    webrtc_msg.Head.m30 = float(LIBRARY_VERSION_CODE)    # Library version for compatibility check
                     
                     self._webrtc_info_to_send = webrtc_msg
 
