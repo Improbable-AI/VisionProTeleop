@@ -883,12 +883,31 @@ struct CombinedStreamingView: View {
         
         print("🔍 [indexMuJoCoBodyEntities] Starting recursive indexing...")
         
+        // Detect Isaac Lab mode for special orphan handling
+        let isIsaacLabMode = mujocoUsdzURL?.lowercased().contains("isaac_") ?? false
+        
         func indexRec(_ entity: Entity, parentPath: String) {
             if entity.name.isEmpty {
                 for child in entity.children {
                     indexRec(child, parentPath: parentPath)
                 }
                 return
+            }
+            
+            // For Isaac Lab: Hide orphan entities at root level during indexing
+            // These are artifacts from USD de-instancing that appear as duplicates
+            if isIsaacLabMode && parentPath.isEmpty {
+                let entityName = entity.name
+                // Skip and hide orphan prototypes (mesh_0, visuals, __Prototype*, etc.)
+                if entityName == "mesh_0" || entityName == "visuals" || entityName.hasPrefix("__Prototype") {
+                    entity.isEnabled = false
+                    print("🚫 [indexMuJoCoBodyEntities] Hiding orphan: '\(entityName)'")
+                    // Still traverse children in case there are valid entities underneath
+                    for child in entity.children {
+                        indexRec(child, parentPath: "")  // Continue with empty parent path
+                    }
+                    return  // Don't add THIS entity to dictionary
+                }
             }
             
             if let modelEntity = entity as? ModelEntity {
@@ -931,6 +950,43 @@ struct CombinedStreamingView: View {
         }
         
         indexRec(rootEntity, parentPath: "")
+        
+        // Hide orphan prototype entities (artifacts from USD de-instancing)
+        // These are entities like "visuals" at root level that aren't assigned to any Python body
+        let isIsaacLab = mujocoUsdzURL?.lowercased().contains("isaac_") ?? false
+        if isIsaacLab {
+            // Collect all Python body names that will receive pose updates
+            // These are paths with format: env_X/Robot/link_name
+            var validBodyPaths: Set<String> = []
+            for pathKey in mujocoBodyEntities.keys {
+                // Count path depth: env_0=1, env_0/G1=2, env_0/G1/pelvis=3
+                let depth = pathKey.components(separatedBy: "/").count
+                if depth >= 3 {  // Actual body links have 3+ components
+                    validBodyPaths.insert(pathKey)
+                }
+            }
+            
+            for (pathKey, entity) in mujocoBodyEntities {
+                // Orphan prototypes at root level (no "/" in path)
+                if !pathKey.contains("/") && (pathKey == "visuals" || pathKey == "mesh_0" || pathKey.hasPrefix("__Prototype")) {
+                    entity.isEnabled = false
+                    print("🚫 [indexMuJoCoBodyEntities] Hiding orphan prototype: '\(pathKey)'")
+                }
+                
+                // Robot root entities (env_X/RobotName) - these have duplicate geometry that won't move
+                // because pose streaming only updates child links (env_X/RobotName/link_name)
+                let components = pathKey.components(separatedBy: "/")
+                if components.count == 2 && components[0].hasPrefix("env_") {
+                    // This is a robot root like "env_0/G1" - hide it if it has geometry
+                    // The child links will be visible and receive pose updates
+                    if let modelEntity = entity as? ModelEntity, modelEntity.model != nil {
+                        entity.isEnabled = false
+                        print("🚫 [indexMuJoCoBodyEntities] Hiding robot root with geometry: '\(pathKey)'")
+                    }
+                }
+            }
+        }
+        
         print("📝 Indexed \(mujocoBodyEntities.count) entities")
     }
     
@@ -1010,29 +1066,82 @@ struct CombinedStreamingView: View {
             return []
         }
         
-        // Find leaf ModelEntities under this base
+        // Detect simulator type from filename (Python sends "isaac_scene.usdz" for Isaac Lab)
+        let isIsaacLab = mujocoUsdzURL?.lowercased().contains("isaac_") ?? false
+        
         var result: [String] = []
-        for child in baseEntity.children {
-            if let model = child as? ModelEntity {
-                if model.children.isEmpty, let key = entityPathByObjectID[ObjectIdentifier(model)] {
-                    result.append(key)
+        
+        if isIsaacLab {
+            // === ISAAC LAB: Find ALL visual children with valid transforms ===
+            // Try /visuals first (for imported USD assets like DexCube)
+            let visualsPrefix = base + "/visuals"
+            var visualCandidates: [String] = []
+            for swiftName in mujocoBodyEntities.keys {
+                if swiftName.hasPrefix(visualsPrefix) && !swiftName.contains("/collisions") && initialLocalTransforms[swiftName] != nil {
+                    visualCandidates.append(swiftName)
                 }
-            } else {
-                // Common pattern: importer creates a Node with same name; look one level deeper
-                if child.name == baseEntity.name {
-                    for grand in child.children {
-                        if let leaf = grand as? ModelEntity, leaf.children.isEmpty,
-                           let key = entityPathByObjectID[ObjectIdentifier(leaf)] {
-                            result.append(key)
+            }
+            // Sort by depth and add the shallowest visual children
+            visualCandidates.sort { $0.count < $1.count }
+            if !visualCandidates.isEmpty {
+                // Only add the shallowest level (all at same depth)
+                let shallowestDepth = visualCandidates.first!.components(separatedBy: "/").count
+                for candidate in visualCandidates {
+                    if candidate.components(separatedBy: "/").count == shallowestDepth {
+                        result.append(candidate)
+                    }
+                }
+            }
+            
+            // If no /visuals found, try direct children (for procedural assets like CuboidCfg)
+            // Include ALL direct children, not just the first one (some links have multiple meshes)
+            if result.isEmpty {
+                let childPrefix = base + "/"
+                var childCandidates: [String] = []
+                for swiftName in mujocoBodyEntities.keys {
+                    if swiftName.hasPrefix(childPrefix) && 
+                       !swiftName.contains("/collisions") && 
+                       initialLocalTransforms[swiftName] != nil {
+                        // Only consider direct children (depth 1)
+                        let suffix = String(swiftName.dropFirst(childPrefix.count))
+                        let depth = suffix.components(separatedBy: "/").count
+                        if depth == 1 && !suffix.contains("/") {  // Direct child only
+                            childCandidates.append(swiftName)
                         }
                     }
                 }
+                // Add ALL direct children (some links have both Cube and mesh_0)
+                for child in childCandidates {
+                    result.append(child)
+                }
+                if result.count > 0 {
+                    print("🔍 [targets] Found \(result.count) visual children for '\(pyName)': \(result)")
+                }
+            }
+        } else {
+            // === MUJOCO: Simple hierarchy - use original leaf finding ===
+            func findLeaves(_ entity: Entity) {
+                if let model = entity as? ModelEntity {
+                    let hasModelChildren = entity.children.contains { $0 is ModelEntity }
+                    if !hasModelChildren, let key = entityPathByObjectID[ObjectIdentifier(model)] {
+                        result.append(key)
+                        return
+                    }
+                }
+                for child in entity.children {
+                    findLeaves(child)
+                }
+            }
+            
+            for child in baseEntity.children {
+                findLeaves(child)
             }
         }
         
         // If no leaf targets found, use the base entity itself
         if result.isEmpty {
             result = [base]
+            print("⚠️ [targets] No children found for '\(pyName)', using base: '\(base)'")
         }
         
         pythonToSwiftTargets[pyName] = result
@@ -1043,7 +1152,8 @@ struct CombinedStreamingView: View {
     }
     
     /// Compute final transform for a specific target entity
-    private func computeFinalTransformForTarget(bodyName: String, values: [Float], axisCorrection: simd_quatf) -> simd_float4x4 {
+    /// Set skipLocalTransform=true for Isaac Lab entities that shouldn't have local offset applied
+    private func computeFinalTransformForTarget(bodyName: String, values: [Float], axisCorrection: simd_quatf, skipLocalTransform: Bool = false) -> simd_float4x4 {
         // Parse [x, y, z, qx, qy, qz, qw]
         let mjPos = SIMD3<Float>(values[0], values[1], values[2])
         let mjRot = simd_quatf(ix: values[3], iy: values[4], iz: values[5], r: values[6])
@@ -1071,9 +1181,13 @@ struct CombinedStreamingView: View {
         rkWorldTransform = simd_mul(matrix_float4x4(rkRot), rkWorldTransform)
         rkWorldTransform.columns.3 = SIMD4<Float>(rkPos, 1.0)
         
-        // Apply initial local transform from USDZ import
-        let yLocal = initialLocalTransforms[bodyName]?.matrix ?? matrix_identity_float4x4
-        return rkWorldTransform * yLocal
+        // Apply initial local transform from USDZ import (skip for Isaac Lab visual entities)
+        if skipLocalTransform {
+            return rkWorldTransform
+        } else {
+            let yLocal = initialLocalTransforms[bodyName]?.matrix ?? matrix_identity_float4x4
+            return rkWorldTransform * yLocal
+        }
     }
     
     /// Compute final transforms from WebRTC JSON format
@@ -1095,8 +1209,13 @@ struct CombinedStreamingView: View {
             if validMatches > 0 { 
                 nameMappingInitialized = true 
                 print("✅ Name mapping initialized with \(validMatches) valid matches")
+                // Note: Orphan hiding is now done during indexing (indexMuJoCoBodyEntities)
+                // which catches all duplicate mesh_0 entities at root level
             }
         }
+        
+        // Detect Isaac Lab mode from USDZ filename
+        let isIsaacLab = mujocoUsdzURL?.lowercased().contains("isaac_") ?? false
         
         let axisCorrection = simd_quatf(angle: -.pi / 2, axis: SIMD3<Float>(1, 0, 0))
         var finalTransforms: [String: simd_float4x4] = [:]
@@ -1110,7 +1229,19 @@ struct CombinedStreamingView: View {
             for bodyName in targetNames {
                 guard initialLocalTransforms[bodyName] != nil else { continue }
                 
-                let transform = computeFinalTransformForTarget(bodyName: bodyName, values: values, axisCorrection: axisCorrection)
+                // For Isaac Lab: Determine if this is a standalone rigid object or an articulated link
+                // Rigid objects have 2-component paths: "env_0/object", "env_0/target_pose"  
+                // Articulated links have 3+ component paths: "env_0/Franka/fr3_link6"
+                // Only skip local transform for rigid objects (to avoid position doubling)
+                let pathComponents = pyName.components(separatedBy: "/")
+                let isStandaloneRigidObject = isIsaacLab && pathComponents.count == 2
+                
+                let transform = computeFinalTransformForTarget(
+                    bodyName: bodyName, 
+                    values: values, 
+                    axisCorrection: axisCorrection,
+                    skipLocalTransform: isStandaloneRigidObject  // Only skip for rigid objects, not articulated links
+                )
                 finalTransforms[bodyName] = transform
             }
         }
@@ -1135,6 +1266,13 @@ struct CombinedStreamingView: View {
         }
         
         let sortedNames = transforms.keys.sorted { lhs, rhs in depth(for: lhs) < depth(for: rhs) }
+        
+        // Debug: log first frame of transforms
+        if transforms.count > 0 && !sortedNames.isEmpty {
+            let firstKey = sortedNames.first ?? "none"
+            let foundEntity = mujocoBodyEntities[firstKey] != nil
+            print("🔄 [applyTransforms] Applying \(transforms.count) transforms, first: '\(firstKey)', found: \(foundEntity), applyInWorldSpace: \(applyInWorldSpace)")
+        }
         
         for name in sortedNames {
             guard let entity = mujocoBodyEntities[name], let desiredWorld = transforms[name] else { continue }
@@ -1794,6 +1932,13 @@ private struct LifecycleModifiers: ViewModifier {
         print("🤖 [CombinedStreamingView] Teleoperation Mode - Full WebRTC support")
         
         videoStreamManager.onSimPosesReceived = { timestamp, poses, qpos, ctrl in
+            // Debug: log callback invocation
+            let poseCount = poses.count
+            let shouldLog = Int.random(in: 0..<100) == 0  // Log 1% of frames
+            if shouldLog {
+                print("📨 [Callback] onSimPosesReceived called with \(poseCount) poses")
+            }
+            
             // Record simulation data along with current hand tracking data
             RecordingManager.shared.recordSimulationData(
                 timestamp: timestamp, 
@@ -1805,6 +1950,12 @@ private struct LifecycleModifiers: ViewModifier {
             
             Task { @MainActor in
                 let transforms = computeMuJoCoFinalTransformsFromWebRTC(poses)
+                
+                // Debug: log transform computation
+                if shouldLog {
+                    print("🔄 [Callback] Computed \(transforms.count) transforms from \(poseCount) poses")
+                }
+                
                 mujocoFinalTransforms = transforms
                 mujocoPoseUpdateTrigger = UUID()
                 
@@ -1814,14 +1965,18 @@ private struct LifecycleModifiers: ViewModifier {
                     mujocoManager.poseStreamingViaWebRTC = true
                     mujocoManager.simEnabled = true
                     mujocoManager.updateConnectionStatus("Streaming via WebRTC")
+                    print("✅ [Callback] First pose received, poseStreamingViaWebRTC = true")
                 }
                 
                 if !hasSimPoses {
                     hasSimPoses = true
+                    print("✅ [Callback] hasSimPoses set to true")
                     tryAutoMinimize()
                 }
             }
         }
+        
+        print("📝 [setupTeleoperationMode] onSimPosesReceived callback registered")
         
         videoStreamManager.start(imageData: imageData)
         

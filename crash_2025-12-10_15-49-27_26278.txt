@@ -1,0 +1,33 @@
+[crash] Crash detected in pid 26278 thread 26278
+[crash] Crash metadata:
+[crash]  CarbSdkVersion = '179.0+release.7074.8ebfb055.gl'
+[crash]  CrashTime = 'Wed Dec 10 20:49:26 2025 GMT'
+[crash]  DumpId = 'd9b14b34-286f-4b84-9dee589b-27cd50b4'
+[crash]  LastUploadStatus = '200'
+[crash]  ProductName = 'Omniverse Telemetry Transmitter'
+[crash]  PythonTracebackStatus = 'Directed not to include traceback'
+[crash]  RetryCount = '0'
+[crash]  StartupTime = '1765399766'
+[crash]  UploadSuccessful = '0'
+[crash]  UptimeSeconds = '0'
+[crash]  UserStory = ''
+[crash]  UserStoryStatus = 'No user story tool binary specified'
+[crash]  Version = 'undefined'
+[crash]  commandLine = '/home/<username>/miniconda/envs/env_isaaclab/lib/python3.11/site-packages/isaacsim/extscache/omni.kit.telemetry-0.5.2+8131b85d.lx64.r.cp311/omni.telemetry.transmitter/omni.telemetry.transmitter --/telemetry/enableAnonymousData=fals[crash]  memoryStats = '(avail/total) RAM: 89.9502/94.07GB, Swap: 2/2GB, VM: 1.71799e+10/1.71799e+10GB'
+[crash]  runningInContainer = '0'
+[crash]  telemetrySessionId = '4682234751883254327'
+[crash]  terminatedByAbort = '0'
+[crash]  workingDirectory = '/home/<username>/workspace/VisionProTeleop'
+[crash]
+[crash] Crash files:
+[crash]  upload_file_minidump = './d9b14b34-286f-4b84-9dee589b-27cd50b4.dmp.zip'
+[crash]
+[crash] Thread 26278 backtrace follows:
+000: libc.so.6!__sigaction+0x50 (libc_sigaction.c:?)
+001: omni.telemetry.transmitter!rapidjson::GenericValue<rapidjson::UTF8<char>, rapidjson::MemoryPoolAllocator<rapidjson::CrtAllocator> >::MemberBegin() const+0x5c (/builds/omniverse/carbonite/_compiler/gmake2/omni.telemetry.transmitter.core/../../../_bui002: omni.telemetry.transmitter!valijson::adapters::GenericRapidJsonObject<rapidjson::GenericValue<rapidjson::UTF8<char>, rapidjson::MemoryPoolAllocator<rapidjson::CrtAllocator> > >::find(std::string const&) const+0x152 (/builds/omniverse/carbonite/_comp003: omni.telemetry.transmitter!void valijson::SchemaParser::populateSchema<valijson::adapters::GenericRapidJsonAdapter<rapidjson::GenericValue<rapidjson::UTF8<char>, rapidjson::MemoryPoolAllocator<rapidjson::CrtAllocator> > > >(valijson::Schema&, valijs004: omni.telemetry.transmitter!valijson::Subschema const* valijson::SchemaParser::makeOrReuseSchema<valijson::adapters::GenericRapidJsonAdapter<rapidjson::GenericValue<rapidjson::UTF8<char>, rapidjson::MemoryPoolAllocator<rapidjson::CrtAllocator> > > >(005: omni.telemetry.transmitter!valijson::Subschema const* valijson::SchemaParser::makeOrReuseSchema<valijson::adapters::GenericRapidJsonAdapter<rapidjson::GenericValue<rapidjson::UTF8<char>, rapidjson::MemoryPoolAllocator<rapidjson::CrtAllocator> > > >(006: omni.telemetry.transmitter!valijson::constraints::PropertiesConstraint valijson::SchemaParser::makePropertiesConstraint<valijson::adapters::GenericRapidJsonAdapter<rapidjson::GenericValue<rapidjson::UTF8<char>, rapidjson::MemoryPoolAllocator<rapidjs007: omni.telemetry.transmitter!void valijson::SchemaParser::populateSchema<valijson::adapters::GenericRapidJsonAdapter<rapidjson::GenericValue<rapidjson::UTF8<char>, rapidjson::MemoryPoolAllocator<rapidjson::CrtAllocator> > > >(valijson::Schema&, valijs008: omni.telemetry.transmitter!valijson::Subschema const* valijson::SchemaParser::makeOrReuseSchema<valijson::adapters::GenericRapidJsonAdapter<rapidjson::GenericValue<rapidjson::UTF8<char>, rapidjson::MemoryPoolAllocator<rapidjson::CrtAllocator> > > >(009: omni.telemetry.transmitter!valijson::Subschema const* valijson::SchemaParser::makeOrReuseSchema<valijson::adapters::GenericRapidJsonAdapter<rapidjson::GenericValue<rapidjson::UTF8<char>, rapidjson::MemoryPoolAllocator<rapidjson::CrtAllocator> > > >(010: omni.telemetry.transmitter!valijson::Subschema const* valijson::SchemaParser::makeOrReuseSchema<valijson::adapters::GenericRapidJsonAdapter<rapidjson::GenericValue<rapidjson::UTF8<char>, rapidjson::MemoryPoolAllocator<rapidjson::CrtAllocator> > > >(011: omni.telemetry.transmitter!valijson::constraints::AnyOfConstraint valijson::SchemaParser::makeAnyOfConstraint<valijson::adapters::GenericRapidJsonAdapter<rapidjson::GenericValue<rapidjson::UTF8<char>, rapidjson::MemoryPoolAllocator<rapidjson::CrtAll012: omni.telemetry.transmitter!void valijson::SchemaParser::populateSchema<valijson::adapters::GenericRapidJsonAdapter<rapidjson::GenericValue<rapidjson::UTF8<char>, rapidjson::MemoryPoolAllocator<rapidjson::CrtAllocator> > > >(valijson::Schema&, valijs013: omni.telemetry.transmitter!void valijson::SchemaParser::resolveThenPopulateSchema<valijson::adapters::GenericRapidJsonAdapter<rapidjson::GenericValue<rapidjson::UTF8<char>, rapidjson::MemoryPoolAllocator<rapidjson::CrtAllocator> > > >(valijson::Sche014: omni.telemetry.transmitter!void valijson::SchemaParser::populateSchema<valijson::adapters::GenericRapidJsonAdapter<rapidjson::GenericValue<rapidjson::UTF8<char>, rapidjson::MemoryPoolAllocator<rapidjson::CrtAllocator> > > >(valijson::adapters::Gener015: omni.telemetry.transmitter!addSchemaToTransmitter+0x7a2 (/opt/rh/devtoolset-7/root/usr/include/c++/7/bits/std_function.h:275)
+016: omni.telemetry.transmitter!omni::telemetry::loadSchemasFromZip(omni::telemetry::Transmitter*, omni::telemetry::Unzip*)+0x377 (/builds/omniverse/carbonite/_compiler/gmake2/omni.telemetry.transmitter.core/../../../source/tools/omni.telemetry.transmitt017: omni.telemetry.transmitter!downloadSchemas+0x1f5 (/builds/omniverse/carbonite/_compiler/gmake2/omni.telemetry.transmitter.core/../../../source/tools/omni.telemetry.transmitter/core/Network.cpp:762)
+018: omni.telemetry.transmitter!omni::telemetry::createTransmitter(omni::telemetry::State*, omni::telemetry::TransmitterCreateDesc const*)+0x661 (/builds/omniverse/carbonite/_compiler/gmake2/omni.telemetry.transmitter.core/../../../source/tools/omni.tele019: omni.telemetry.transmitter!createState+0x9ef (/builds/omniverse/carbonite/_compiler/gmake2/omni.telemetry.transmitter.core/../../../source/tools/omni.telemetry.transmitter/core/CApi.cpp:426)
+020: omni.telemetry.transmitter!main+0x4b7 (/builds/omniverse/carbonite/_compiler/gmake2/omni.telemetry.transmitter/../../../source/tools/omni.telemetry.transmitter/main.cpp:602 (discriminator 6))
+021: libc.so.6!__libc_init_first+0x90 (./csu/../sysdeps/nptl/libc_start_call_main.h:58)
+022: libc.so.6!__libc_start_main+0x80 (./csu/../csu/libc-start.c:128)
+023: omni.telemetry.transmitter!_start+0x29 (??:?)

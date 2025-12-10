@@ -485,6 +485,8 @@ class VisionProStreamer:
         Instantiates background threads immediately: (1) gRPC hand tracking stream and (2) HTTP info server for WebRTC discovery.
         """
 
+        print("NEW ONE")
+
         # Vision Pro IP 
         self.ip = ip
         self.record = record 
@@ -703,14 +705,32 @@ class VisionProStreamer:
     def _register_webrtc_sim_channel(self, channel):
         """Register the WebRTC data channel for simulation pose streaming."""
         self._webrtc_sim_channel = channel
+        self._log(f"[WEBRTC] Registering sim-poses channel (readyState={channel.readyState})", force=True)
 
         @channel.on("open")
         def _on_open():
             self._log("[WEBRTC] Sim-poses data channel opened", force=True)
             self._webrtc_sim_ready = True
-            # Start pose streaming once channel is ready
-            if self._sim_config is not None:
-                self._start_pose_streaming_webrtc()
+            
+            # Start pose streaming on the event loop (fixes Linux cross-thread issue)
+            import asyncio
+            
+            async def start_streaming_on_loop():
+                await asyncio.sleep(0.3)  # Small delay for channel stabilization
+                self._log("[WEBRTC] Starting pose streaming...", force=True)
+                if self._sim_config is not None and self._webrtc_sim_ready:
+                    if not self._pose_stream_running:
+                        self._pose_stream_running = True
+                        self._log("[SIM] Starting pose streaming via WebRTC data channel (async)...", force=True)
+                        # Use create_task since we're already on the event loop
+                        asyncio.create_task(self._pose_streaming_loop_webrtc_async())
+            
+            if self._webrtc_loop is not None:
+                asyncio.run_coroutine_threadsafe(start_streaming_on_loop(), self._webrtc_loop)
+            else:
+                # Fallback: start immediately with thread-based streaming
+                if self._sim_config is not None:
+                    self._start_pose_streaming_webrtc()
 
         @channel.on("close")
         def _on_close():
@@ -1283,11 +1303,12 @@ class VisionProStreamer:
     
     def configure_isaac(
         self,
-        stage,
+        scene,
         relative_to: Optional[List[float]] = None,
         include_ground: bool = False,
         env_indices: Optional[List[int]] = None,
         grpc_port: int = 50051,
+        stage = None,  # Optional, derived from scene if not provided
     ):
         """
         Configure Isaac Lab simulation streaming. Call this before start_webrtc().
@@ -1296,7 +1317,8 @@ class VisionProStreamer:
         a 3D scene that updates in real-time as the simulation runs.
         
         Args:
-            stage: USD stage from Isaac Sim (omni.usd.get_context().get_stage())
+            scene: Isaac Lab InteractiveScene object. Required for real-time pose updates
+                   and USD stage access.
             relative_to: 4-element array [x, y, z, yaw_degrees] or 7-element array
                         [x, y, z, qw, qx, qy, qz] specifying position and orientation
                         in Z-up coordinates for scene placement.
@@ -1304,14 +1326,12 @@ class VisionProStreamer:
             env_indices: List of environment indices to include (default: None = all)
                         e.g., [0, 1, 2] will include env_0, env_1, env_2
             grpc_port: gRPC port for USDZ transfer (default: 50051)
+            stage: (Deprecated) USD stage, automatically derived from scene.
         
         Example::
         
-            import omni
-            stage = omni.usd.get_context().get_stage()
-            
             streamer.configure_isaac(
-                stage=stage,
+                scene=my_env.scene,
                 relative_to=[0, 0, 0.8, 90],
                 include_ground=False,
                 env_indices=[0],
@@ -1320,8 +1340,20 @@ class VisionProStreamer:
             
             while simulation_app.is_running():
                 sim.step()
+                my_env.scene.update()
                 streamer.update_sim()
         """
+        import numpy as np
+        
+        # Get USD stage from scene or use provided stage
+        if stage is None:
+            # Derive stage from Isaac Lab scene
+            try:
+                import omni.usd
+                stage = omni.usd.get_context().get_stage()
+                self._log("[ISAAC] Stage derived from omni.usd context")
+            except Exception as e:
+                raise ValueError(f"Could not get USD stage: {e}. Make sure Isaac Sim is initialized.")
         
         # Process relative_to parameter (same logic as configure_sim)
         attach_to = None
@@ -1338,18 +1370,30 @@ class VisionProStreamer:
             elif len(relative_to) == 7:
                 attach_to = list(relative_to)
             else:
-                raise ValueError(f"relative_to must be 4 or 7 elements, got {len(relative_to)}")
+                raise ValueError("relative_to must be [x, y, z, yaw_degrees] or [x, y, z, qw, qx, qy, qz]")
             
             # Build transformation matrix
             self._attach_to_mat = np.eye(4)
             self._attach_to_mat[:3, :3] = R.from_quat(attach_to[3:], scalar_first=True).as_matrix()
             self._attach_to_mat[:3, 3] = attach_to[:3]
         
-        # Store the Isaac stage
+        # Store the Isaac stage and scene
         self._isaac_stage = stage
+        self._isaac_scene = scene
         
-        # Extract body information from stage
+        # Extract body information from stage (for USDZ export naming)
         self._isaac_bodies = self._get_isaac_bodies(stage, env_indices)
+        
+        # Build articulation body mappings if scene provided
+        self._isaac_articulations = {}
+        self._isaac_static_assets = {}  # Static assets (AssetBaseCfg) - sent only first few frames
+        self._isaac_static_frames_sent = 0  # Counter for static asset frames
+        self._isaac_static_frames_limit = 999999  # DEBUG: Send static poses always (was 5)
+        if scene is not None:
+            self._isaac_articulations = self._get_isaac_articulations(scene)
+            self._isaac_static_assets = self._get_isaac_static_assets(scene, env_indices)
+            self._log(f"[ISAAC] Found {len(self._isaac_articulations)} articulations with bodies")
+            self._log(f"[ISAAC] Found {len(self._isaac_static_assets)} static assets")
         
         # Store Isaac config (used by _load_and_send_scene)
         self._isaac_config = {
@@ -1369,9 +1413,258 @@ class VisionProStreamer:
         # Automatically switch to simulation-relative coordinates
         self.set_origin("sim")
         
-        self._log(f"[CONFIG] Isaac Lab configured: {len(self._isaac_bodies)} bodies")
+        self._log(f"[CONFIG] Isaac Lab configured: {len(self._isaac_bodies)} bodies, {len(self._isaac_articulations)} articulations")
         if attach_to:
             self._log(f"  Position: [{attach_to[0]:.2f}, {attach_to[1]:.2f}, {attach_to[2]:.2f}]")
+    
+    def _get_isaac_articulations(self, scene) -> Dict[str, Any]:
+        """
+        Get articulation objects from Isaac Lab scene for querying body poses.
+        
+        Returns dict mapping articulation name to (articulation, body_names) tuple.
+        """
+        articulations = {}
+        
+        # Isaac Lab InteractiveScene uses dictionary-style access: scene["Franka"]
+        # Try multiple methods to get asset keys
+        asset_keys = []
+        
+        # Method 1: scene.keys() (if it behaves like a dict)
+        if hasattr(scene, 'keys') and callable(getattr(scene, 'keys')):
+            try:
+                asset_keys = list(scene.keys())
+                self._log(f"[ISAAC] Found keys via scene.keys(): {asset_keys}")
+            except Exception as e:
+                self._log(f"[ISAAC] scene.keys() failed: {e}")
+        
+        # Method 2: scene.articulations dict
+        if not asset_keys and hasattr(scene, 'articulations'):
+            try:
+                asset_keys = list(scene.articulations.keys())
+                self._log(f"[ISAAC] Found keys via scene.articulations: {asset_keys}")
+            except Exception as e:
+                self._log(f"[ISAAC] scene.articulations failed: {e}")
+        
+        # Method 3: scene._all_assets (internal dict for all assets)
+        if not asset_keys and hasattr(scene, '_all_assets'):
+            try:
+                asset_keys = list(scene._all_assets.keys())
+                self._log(f"[ISAAC] Found keys via scene._all_assets: {asset_keys}")
+            except Exception as e:
+                self._log(f"[ISAAC] scene._all_assets failed: {e}")
+        
+        # Method 4: Known articulation names from config
+        if not asset_keys:
+            # Try common names
+            for name in ['Franka', 'Robot', 'robot', 'arm']:
+                try:
+                    asset = scene[name]
+                    if asset is not None:
+                        asset_keys.append(name)
+                except Exception:
+                    pass
+            if asset_keys:
+                self._log(f"[ISAAC] Found keys via hardcoded probe: {asset_keys}")
+        
+        self._log(f"[ISAAC] Scanning scene for articulations, found keys: {asset_keys}")
+        
+        for name in asset_keys:
+            try:
+                # Use dictionary-style access for InteractiveScene
+                asset = scene[name]
+                
+                # Check if it's an Articulation (has body_names)
+                if hasattr(asset, 'body_names') and hasattr(asset, 'data'):
+                    body_names = asset.body_names
+                    if body_names:
+                        # Extract the actual prim path prefix from the asset
+                        # Isaac Lab articulations have cfg.prim_path like "{ENV_REGEX_NS}/G1"
+                        # or _root_physx_view.prim_paths for actual paths like "/World/envs/env_0/G1"
+                        prim_prefix = None
+                        try:
+                            # Try to get actual prim path from the articulation view
+                            if hasattr(asset, '_root_physx_view') and asset._root_physx_view is not None:
+                                prim_paths = asset._root_physx_view.prim_paths
+                                if prim_paths and len(prim_paths) > 0:
+                                    # Extract just the robot name from path like "/World/envs/env_0/G1"
+                                    first_path = prim_paths[0]
+                                    # Remove /World/envs/env_X/ prefix to get robot name
+                                    parts = first_path.split('/')
+                                    if len(parts) >= 5 and parts[1] == 'World' and parts[2] == 'envs':
+                                        prim_prefix = parts[4]  # e.g., "G1"
+                                        self._log(f"[ISAAC] Extracted prim name '{prim_prefix}' from physx view path")
+                        except Exception as e:
+                            self._log(f"[ISAAC] Could not extract prim path from physx view: {e}")
+                        
+                        # Fallback to scene key name if prim path not found
+                        if prim_prefix is None:
+                            prim_prefix = name
+                        
+                        # Also try to get body prim paths for the full USD hierarchy
+                        body_prim_paths = {}
+                        try:
+                            # Method 1: Try _body_physx_view (may not exist in newer Isaac Lab)
+                            if hasattr(asset, '_body_physx_view') and asset._body_physx_view is not None:
+                                all_body_prim_paths = asset._body_physx_view.prim_paths
+                                # Map each body name to its full prim path
+                                for i, bname in enumerate(body_names):
+                                    if i < len(all_body_prim_paths):
+                                        full_path = all_body_prim_paths[i]
+                                        if "/World/envs/" in full_path:
+                                            relative_path = full_path.split("/World/envs/")[1]
+                                            parts = relative_path.split("/", 1)
+                                            if len(parts) > 1:
+                                                body_prim_paths[bname] = parts[1]
+                                self._log(f"[ISAAC] Extracted {len(body_prim_paths)} body prim paths from _body_physx_view")
+                            
+                            # Method 2: Fallback - traverse USD stage to find body prims
+                            if not body_prim_paths and hasattr(self, '_isaac_stage') and self._isaac_stage is not None:
+                                from pxr import Usd
+                                stage = self._isaac_stage
+                                root_path = f"/World/envs/env_0/{prim_prefix}"
+                                root_prim = stage.GetPrimAtPath(root_path)
+                                if root_prim and root_prim.IsValid():
+                                    # Search for each body_name in the hierarchy
+                                    for bname in body_names:
+                                        # Traverse all descendants to find prim with matching name
+                                        for prim in Usd.PrimRange(root_prim):
+                                            if prim.GetName() == bname:
+                                                full_path = str(prim.GetPath())
+                                                if "/World/envs/" in full_path:
+                                                    relative_path = full_path.split("/World/envs/")[1]
+                                                    parts = relative_path.split("/", 1)
+                                                    if len(parts) > 1:
+                                                        body_prim_paths[bname] = parts[1]
+                                                break
+                                    self._log(f"[ISAAC] Extracted {len(body_prim_paths)} body prim paths from USD stage traversal")
+                            
+                            if body_prim_paths:
+                                # Show a few examples
+                                examples = list(body_prim_paths.items())[:5]
+                                for bname, bpath in examples:
+                                    self._log(f"  - {bname} → {bpath}")
+                        except Exception as e:
+                            self._log(f"[ISAAC] Could not extract body prim paths: {e}")
+                        
+                        articulations[name] = {
+                            'asset': asset,
+                            'body_names': list(body_names),
+                            'type': 'articulation',
+                            'prim_name': prim_prefix,  # Store the actual prim name
+                            'body_prim_paths': body_prim_paths,  # Map body_name → full USD relative path
+                        }
+                        self._log(f"[ISAAC] Found articulation '{name}' (prim: '{prim_prefix}') with {len(body_names)} bodies: {list(body_names)[:5]}...")
+                
+                # Check if it's a RigidObject (has data.root_pos_w but no body_names)
+                elif hasattr(asset, 'data') and hasattr(asset.data, 'root_pos_w'):
+                    # RigidObject: extract prim name from physx view or asset path
+                    prim_name = name.lower()
+                    try:
+                        if hasattr(asset, '_root_physx_view') and asset._root_physx_view is not None:
+                            prim_paths = asset._root_physx_view.prim_paths
+                            if prim_paths and len(prim_paths) > 0:
+                                parts = prim_paths[0].split('/')
+                                if len(parts) >= 5:
+                                    prim_name = parts[4].lower()
+                                    self._log(f"[ISAAC] Rigid object prim name: '{prim_name}'")
+                    except Exception:
+                        pass
+                    
+                    articulations[name] = {
+                        'asset': asset,
+                        'body_names': [prim_name],
+                        'type': 'rigid_object',
+                        'prim_name': prim_name,
+                    }
+                    self._log(f"[ISAAC] Found rigid object '{name}' (prim: '{prim_name}')")
+                    
+            except Exception as e:
+                self._log(f"[ISAAC] Error accessing '{name}': {e}")
+        
+        return articulations
+    
+    def _get_isaac_static_assets(self, scene, env_indices: Optional[List[int]] = None) -> Dict[str, Dict[str, Any]]:
+        """
+        Get static assets (AssetBaseCfg) from Isaac Lab stage.
+        
+        Detects prims that exist in the USD stage but aren't tracked by articulations/rigid objects.
+        These are static scene elements like tables, walls, etc.
+        
+        Returns:
+            Dict mapping Swift-compatible name to pose info {xpos, xquat}
+        """
+        static_assets = {}
+        
+        if self._isaac_stage is None:
+            return static_assets
+        
+        from pxr import Usd, UsdGeom
+        
+        # Get the prim names that are already tracked as articulations/rigid objects
+        tracked_prim_names = set()
+        if self._isaac_articulations:
+            for art_info in self._isaac_articulations.values():
+                prim_name = art_info.get('prim_name', '')
+                if prim_name:
+                    tracked_prim_names.add(prim_name)
+        
+        self._log(f"[ISAAC] Tracked articulation prim names: {tracked_prim_names}")
+        
+        # Determine which environments to scan
+        env_idx = 0 if env_indices is None else env_indices[0]
+        env_path = f"/World/envs/env_{env_idx}"
+        
+        env_prim = self._isaac_stage.GetPrimAtPath(env_path)
+        if not env_prim or not env_prim.IsValid():
+            self._log(f"[ISAAC] Environment prim not found at {env_path}")
+            return static_assets
+        
+        # Scan immediate children of env_0 for static assets
+        for child in env_prim.GetChildren():
+            child_name = child.GetName()
+            
+            # Skip if already tracked as articulation/rigid object
+            if child_name in tracked_prim_names:
+                continue
+            
+            # Skip ground, light, and similar
+            if child_name.lower() in ['defaultgroundplane', 'groundplane', 'light', 'dome_light']:
+                continue
+            
+            # Skip materials, shaders, and looks
+            if 'material' in child_name.lower() or 'shader' in child_name.lower() or 'looks' in child_name.lower():
+                continue
+            
+            try:
+                xformable = UsdGeom.Xformable(child)
+                if not xformable:
+                    continue
+                
+                # Get world transform
+                xform_cache = UsdGeom.XformCache()
+                world_transform = xform_cache.GetLocalToWorldTransform(child)
+                translation = world_transform.ExtractTranslation()
+                xpos = [translation[0], translation[1], translation[2]]
+                
+                rotation = world_transform.ExtractRotationQuat()
+                w = rotation.GetReal()
+                imaginary = rotation.GetImaginary()
+                xquat = [w, imaginary[0], imaginary[1], imaginary[2]]
+                
+                # Create Swift-compatible name: env_0/Table
+                swift_name = f"env_{env_idx}/{child_name}"
+                
+                static_assets[swift_name] = {
+                    "xpos": xpos,
+                    "xquat": xquat,
+                    "prim_path": str(child.GetPath()),
+                }
+                self._log(f"[ISAAC] Static asset '{swift_name}': pos=[{xpos[0]:.3f}, {xpos[1]:.3f}, {xpos[2]:.3f}]", force=True)
+                
+            except Exception as e:
+                self._log(f"[ISAAC] Error getting static asset '{child_name}': {e}")
+        
+        return static_assets
     
     def _get_isaac_bodies(self, stage, env_indices: Optional[List[int]] = None) -> Dict[str, str]:
         """
@@ -1428,15 +1721,12 @@ class VisionProStreamer:
                 if "material" in prim_name.lower() or "shader" in prim_name.lower():
                     continue
                 
-                # Create a clean name for Swift matching
-                # Strip the env prefix to get relative name
-                relative_path = prim_path.replace(env_path + "/", "")
-                # Clean name for JSON: replace / with _ and remove special chars
-                clean_name = relative_path.replace("/", "_").replace("-", "")
-                
-                # For multi-env, prefix with env index (for collision avoidance)
-                if len(env_paths) > 1:
-                    clean_name = f"{env_name}_{clean_name}"
+                # Create a name that matches Swift's USDZ entity path indexing
+                # Swift indexes paths like: env_0/Franka/fr3_link6
+                # So we strip /World/envs/ prefix but keep the rest with / separators
+                relative_path = prim_path.replace("/World/envs/", "")
+                # Keep the / separators to match Swift's path format
+                clean_name = relative_path.replace("-", "")
                 
                 bodies[clean_name] = prim_path
         
@@ -1523,51 +1813,173 @@ class VisionProStreamer:
         
         return body_dict
     
+    _isaac_pose_debug_counter = 0  # Class-level counter for debug
+    
     def _get_isaac_poses(self) -> Dict[str, Dict[str, Any]]:
         """
         Get current Isaac Lab body poses as a dictionary.
         
-        Extracts world-space position and rotation for each tracked prim.
+        Uses articulation body data from the physics simulation (not USD stage).
         """
-        from pxr import UsdGeom, Gf
+        body_dict = {}
         
+        # Debug counter
+        VisionProStreamer._isaac_pose_debug_counter += 1
+        debug_this_frame = (VisionProStreamer._isaac_pose_debug_counter % 100 == 1)
+        
+        # Use articulation data if available (preferred - has live physics poses)
+        if hasattr(self, '_isaac_articulations') and self._isaac_articulations:
+            for art_name, art_info in self._isaac_articulations.items():
+                asset = art_info['asset']
+                body_names = art_info['body_names']
+                asset_type = art_info.get('type', 'articulation')
+                
+                try:
+                    # Only use first environment for now
+                    env_idx = 0
+                    
+                    if asset_type == 'rigid_object':
+                        # RigidObject: use root_pos_w and root_quat_w
+                        pos = asset.data.root_pos_w[env_idx].cpu().numpy()
+                        quat = asset.data.root_quat_w[env_idx].cpu().numpy()  # wxyz
+                        
+                        # Single-body: env_0/object
+                        swift_name = f"env_{env_idx}/{body_names[0]}"
+                        
+                        body_dict[swift_name] = {
+                            "xpos": pos.tolist(),
+                            "xquat": quat.tolist(),
+                        }
+                    else:
+                        # Articulation: use body_pos_w and body_quat_w
+                        body_pos = asset.data.body_pos_w  # (num_envs, num_bodies, 3)
+                        body_quat = asset.data.body_quat_w  # (num_envs, num_bodies, 4) wxyz
+                        
+                        # Check if this is a single-body asset (like a cube/object)
+                        is_single_body = len(body_names) == 1
+                        
+                        for body_idx, body_name in enumerate(body_names):
+                            # Create Swift-compatible path that matches USDZ entity hierarchy
+                            if is_single_body:
+                                # Single-body objects: env_0/object (matches USDZ directly)
+                                swift_name = f"env_{env_idx}/{body_name}"
+                            else:
+                                # Multi-body articulations: try to use actual USD prim path
+                                body_prim_paths = art_info.get('body_prim_paths', {})
+                                if body_name in body_prim_paths:
+                                    # Use the full USD hierarchy path: env_0/Robot/ee_link/palm_link
+                                    swift_name = f"env_{env_idx}/{body_prim_paths[body_name]}"
+                                else:
+                                    # Fallback to old method: env_0/Robot/palm_link
+                                    prim_name = art_info.get('prim_name', art_name)
+                                    swift_name = f"env_{env_idx}/{prim_name}/{body_name}"
+                            
+                            # Get position and quaternion for this body
+                            pos = body_pos[env_idx, body_idx].cpu().numpy()
+                            quat = body_quat[env_idx, body_idx].cpu().numpy()  # wxyz
+                            
+                            body_dict[swift_name] = {
+                                "xpos": pos.tolist(),
+                                "xquat": quat.tolist(),  # Already wxyz format
+                            }
+                except Exception as e:
+                    if debug_this_frame:
+                        print(f"[DEBUG] Error getting poses for {art_name}: {e}")
+                    continue
+        
+        # Fallback to USD stage if no articulation data (static poses)
+        elif self._isaac_stage is not None:
+            body_dict = self._get_isaac_poses_from_stage()
+        
+        # Include static assets for the first few frames only
+        if hasattr(self, '_isaac_static_assets') and self._isaac_static_assets:
+            if hasattr(self, '_isaac_static_frames_sent'):
+                if self._isaac_static_frames_sent < getattr(self, '_isaac_static_frames_limit', 5):
+                    # Include static asset poses
+                    for swift_name, pose_info in self._isaac_static_assets.items():
+                        body_dict[swift_name] = {
+                            "xpos": pose_info["xpos"],
+                            "xquat": pose_info["xquat"],
+                        }
+                    self._isaac_static_frames_sent += 1
+                    if debug_this_frame:
+                        print(f"[DEBUG] Including {len(self._isaac_static_assets)} static assets (frame {self._isaac_static_frames_sent}/{self._isaac_static_frames_limit})")
+        
+        # Debug: print poses every 100 frames
+        if debug_this_frame and body_dict:
+            print(f"[DEBUG] Isaac poses frame {VisionProStreamer._isaac_pose_debug_counter}: {len(body_dict)} bodies")
+            # Show link7 specifically (the end effector link)
+            for name, pose in body_dict.items():
+                if "link7" in name.lower() or "link6" in name.lower() or "hand" in name.lower():
+                    pos = pose["xpos"]
+                    print(f"  {name}: pos=[{pos[0]:.4f}, {pos[1]:.4f}, {pos[2]:.4f}]")
+            # Also show target_pose and object
+            for name, pose in body_dict.items():
+                if "target" in name.lower() or "object" in name.lower():
+                    pos = pose["xpos"]
+                    quat = pose["xquat"]
+                    print(f"  {name}: pos=[{pos[0]:.4f}, {pos[1]:.4f}, {pos[2]:.4f}], quat=[{quat[0]:.4f}, {quat[1]:.4f}, {quat[2]:.4f}, {quat[3]:.4f}]")
+        
+        return body_dict
+    
+    def _get_isaac_poses_from_stage(self) -> Dict[str, Dict[str, Any]]:
+        """Get poses from USD stage using PhysX runtime data (Isaac Lab only)."""
         body_dict = {}
         stage = self._isaac_stage
         
         if stage is None:
             return body_dict
         
-        for clean_name, prim_path in self._isaac_bodies.items():
-            prim = stage.GetPrimAtPath(prim_path)
-            if not prim.IsValid():
-                continue
+        def prim_path_to_swift_name(prim_path: str) -> str:
+            """Convert USD prim path to Swift entity name format.
             
-            xformable = UsdGeom.Xformable(prim)
-            if not xformable:
-                continue
+            USD path: /World/envs/env_0/Franka/fr3_link6
+            Swift expects: env_0/Franka/fr3_link6
+            """
+            # Strip /World/envs/ prefix to match USDZ hierarchy
+            if prim_path.startswith("/World/envs/"):
+                return prim_path[len("/World/envs/"):]
+            elif prim_path.startswith("/World/"):
+                return prim_path[len("/World/"):]
+            return prim_path.lstrip("/")
+        
+        try:
+            from pxr import UsdGeom, Usd
             
-            # Get world transform
-            try:
-                world_transform = xformable.ComputeLocalToWorldTransform(0)  # time=0
+            # Use XformCache to get transforms from USD stage
+            # Note: These won't update with physics simulation unless scene is provided
+            xform_cache = UsdGeom.XformCache(Usd.TimeCode.Default())
+            
+            for clean_name, prim_path in self._isaac_bodies.items():
+                swift_name = prim_path_to_swift_name(prim_path)
                 
-                # Extract translation
-                translation = world_transform.ExtractTranslation()
-                xpos = [translation[0], translation[1], translation[2]]
+                prim = stage.GetPrimAtPath(prim_path)
+                if not prim.IsValid():
+                    continue
                 
-                # Extract rotation as quaternion (wxyz format for MuJoCo compatibility)
-                rotation = world_transform.ExtractRotationQuat()
-                # Gf.Quatd is (real, imaginary) = (w, (x, y, z))
-                w = rotation.GetReal()
-                imaginary = rotation.GetImaginary()
-                xquat = [w, imaginary[0], imaginary[1], imaginary[2]]
+                xformable = UsdGeom.Xformable(prim)
+                if not xformable:
+                    continue
                 
-                body_dict[clean_name] = {
-                    "xpos": xpos,
-                    "xquat": xquat,
-                }
-            except Exception as e:
-                # Skip prims with invalid transforms
-                continue
+                try:
+                    xform_cache.Clear()
+                    world_transform = xform_cache.GetLocalToWorldTransform(prim)
+                    translation = world_transform.ExtractTranslation()
+                    xpos = [translation[0], translation[1], translation[2]]
+                    
+                    rotation = world_transform.ExtractRotationQuat()
+                    w = rotation.GetReal()
+                    imaginary = rotation.GetImaginary()
+                    xquat = [w, imaginary[0], imaginary[1], imaginary[2]]
+                    
+                    body_dict[swift_name] = {
+                        "xpos": xpos,
+                        "xquat": xquat,
+                    }
+                except Exception:
+                    continue
+        except Exception as e:
+            self._log(f"[ISAAC] Error in _get_isaac_poses_from_stage: {e}")
         
         return body_dict
     
@@ -1589,14 +2001,28 @@ class VisionProStreamer:
             self._log("[SIM] Waiting for WebRTC sim-poses channel to open...", force=True)
     
     def _start_pose_streaming_webrtc(self):
-        """Start the actual pose streaming loop via WebRTC."""
+        """Start the actual pose streaming loop via WebRTC.
+        
+        On Linux, cross-thread sends to aiortc data channels don't work reliably.
+        So we run the streaming loop as an async task on the event loop itself.
+        """
         if self._pose_stream_running:
             return
         
         self._log("[SIM] Starting pose streaming via WebRTC data channel...", force=True)
         self._pose_stream_running = True
-        self._pose_stream_thread = Thread(target=self._pose_streaming_loop_webrtc, daemon=True)
-        self._pose_stream_thread.start()
+        
+        # Run the streaming loop on the WebRTC event loop (fixes Linux cross-thread issue)
+        if self._webrtc_loop is not None:
+            import asyncio
+            asyncio.run_coroutine_threadsafe(
+                self._pose_streaming_loop_webrtc_async(),
+                self._webrtc_loop
+            )
+        else:
+            # Fallback to thread-based streaming (works on Mac)
+            self._pose_stream_thread = Thread(target=self._pose_streaming_loop_webrtc, daemon=True)
+            self._pose_stream_thread.start()
     
     def _stop_pose_streaming(self):
         """Stop pose streaming."""
@@ -1637,54 +2063,70 @@ class VisionProStreamer:
                         ctrl = []
                         timestamp = time.time()
 
-                    # Build compact JSON message for poses
-                    # Format: {"t": timestamp, "p": {"body_name": [x,y,z,qx,qy,qz,qw], ...}, "q": [...], "c": [...]}
-                    pose_dict = {}
-                    for body_name, pose_data in poses.items():
-                        if not body_name:
-                            continue
-                        # Pack position and quaternion into a list
-                        # [x, y, z, qx, qy, qz, qw] - 7 floats per body
-                        xpos = pose_data["xpos"]
-                        xquat = pose_data["xquat"]  # MuJoCo: w,x,y,z
-                        pose_dict[body_name] = [
-                            round(xpos[0], 5), round(xpos[1], 5), round(xpos[2], 5),
-                            round(xquat[1], 5), round(xquat[2], 5), round(xquat[3], 5), round(xquat[0], 5)  # x,y,z,w
-                        ]
+                    # Build binary message for poses (same format as async loop)
+                    import struct
+                    parts = []
                     
-                    if pose_dict:
-                        msg_data = {
-                            "t": timestamp, 
-                            "p": pose_dict,
-                            "q": [round(x, 5) for x in qpos],
-                            "c": [round(x, 5) for x in ctrl]
-                        }
+                    # Timestamp (8 bytes, double)
+                    parts.append(struct.pack('<d', timestamp))
+                    
+                    # Body count (2 bytes)
+                    valid_bodies = [(name, pose) for name, pose in poses.items() if name]
+                    parts.append(struct.pack('<H', len(valid_bodies)))
+                    
+                    # Bodies
+                    for body_name, pose_data in valid_bodies:
+                        xpos = pose_data["xpos"]
+                        xquat = pose_data["xquat"]  # w, x, y, z (MuJoCo format)
                         
-                        # Add benchmark data if enabled
-                        if self._sim_benchmark_enabled:
-                            sent_ms = int((time.perf_counter() - self._benchmark_epoch) * 1000)
-                            msg_data["b"] = {
-                                "s": self._sim_benchmark_seq,
-                                "t": sent_ms
-                            }
-                            self._sim_benchmark_seq += 1
+                        # Name (1 byte length + N bytes)
+                        name_bytes = body_name.encode('utf-8')[:255]
+                        parts.append(struct.pack('<B', len(name_bytes)))
+                        parts.append(name_bytes)
                         
-                        message = json.dumps(msg_data)
-                        try:
-                            # Send using the WebRTC event loop's thread-safe call
-                            if self._webrtc_loop is not None:
-                                self._webrtc_loop.call_soon_threadsafe(
-                                    self._webrtc_sim_channel.send, message
-                                )
-                            else:
-                                self._webrtc_sim_channel.send(message)
-                            frame_count += 1
-                            if frame_count == 1:
-                                self._log(f"[SIM] First sim pose sent via WebRTC ({len(pose_dict)} bodies)")
-                            elif frame_count % 500 == 0:
-                                self._log(f"[SIM] Sent {frame_count} sim pose updates")
-                        except Exception as e:
-                            self._log(f"[SIM] Warning: Failed to send pose via WebRTC: {e}")
+                        # 7 floats: x, y, z, qx, qy, qz, qw
+                        parts.append(struct.pack('<7f',
+                            float(xpos[0]), float(xpos[1]), float(xpos[2]),
+                            float(xquat[1]), float(xquat[2]), float(xquat[3]), float(xquat[0])
+                        ))
+                    
+                    # qpos (2 bytes count + N floats)
+                    parts.append(struct.pack('<H', len(qpos)))
+                    if qpos:
+                        parts.append(struct.pack(f'<{len(qpos)}f', *[float(x) for x in qpos]))
+                    
+                    # ctrl (2 bytes count + N floats)
+                    parts.append(struct.pack('<H', len(ctrl)))
+                    if ctrl:
+                        parts.append(struct.pack(f'<{len(ctrl)}f', *[float(x) for x in ctrl]))
+                    
+                    message = b''.join(parts)
+                    
+                    try:
+                        if self._webrtc_loop is not None:
+                            import asyncio
+                            
+                            async def async_send(ch, msg):
+                                ch.send(msg)
+                                await asyncio.sleep(0)
+                            
+                            future = asyncio.run_coroutine_threadsafe(
+                                async_send(self._webrtc_sim_channel, message),
+                                self._webrtc_loop
+                            )
+                            try:
+                                future.result(timeout=0.1)
+                            except TimeoutError:
+                                pass
+                        else:
+                            self._webrtc_sim_channel.send(message)
+                        frame_count += 1
+                        if frame_count == 1:
+                            self._log(f"[SIM] First sim pose sent ({len(valid_bodies)} bodies, {len(message)} bytes binary)", force=True)
+                        elif frame_count % 500 == 0:
+                            self._log(f"[SIM] Sent {frame_count} sim pose updates")
+                    except Exception as e:
+                        self._log(f"[SIM] Warning: Failed to send pose: {e}", force=True)
                 
                 time.sleep(0.008)  # ~120 Hz (faster than gRPC was)
         
@@ -1694,6 +2136,115 @@ class VisionProStreamer:
             self._pose_stream_running = False
         
         self._log(f"[SIM] Pose streaming stopped (sent {frame_count} updates)")
+    
+    async def _pose_streaming_loop_webrtc_async(self):
+        """Async version of pose streaming that runs on the event loop.
+        
+        This is needed on Linux where cross-thread sends to aiortc data channels
+        don't work reliably. By running on the event loop thread, sends work correctly.
+        """
+        import asyncio
+        self._log("[SIM] Pose streaming started (async, binary)", force=True)
+        frame_count = 0
+        
+        try:
+            while self._pose_stream_running:
+                if not self._webrtc_sim_ready or self._webrtc_sim_channel is None:
+                    await asyncio.sleep(0.1)
+                    continue
+                
+                with self._pose_stream_lock:
+                    current_data = self._current_poses.copy()
+                
+                if current_data:
+                    # Extract data components
+                    if "poses" in current_data and isinstance(current_data["poses"], dict):
+                        poses = current_data["poses"]
+                        qpos = current_data.get("qpos", [])
+                        ctrl = current_data.get("ctrl", [])
+                        timestamp = current_data.get("timestamp", time.time())
+                    else:
+                        poses = current_data
+                        qpos = []
+                        ctrl = []
+                        timestamp = time.time()
+
+                    # Build binary message for poses (much smaller than JSON)
+                    # Format:
+                    #   [timestamp: 8 bytes double]
+                    #   [body_count: 2 bytes uint16]
+                    #   For each body:
+                    #     [name_len: 1 byte uint8]
+                    #     [name: N bytes UTF-8]
+                    #     [x, y, z, qx, qy, qz, qw: 7 × 4 bytes float32]
+                    #   [qpos_count: 2 bytes uint16]
+                    #   [qpos values: N × 4 bytes float32]
+                    #   [ctrl_count: 2 bytes uint16]
+                    #   [ctrl values: N × 4 bytes float32]
+                    
+                    import struct
+                    
+                    # Start building binary message
+                    parts = []
+                    
+                    # Timestamp (8 bytes, double)
+                    parts.append(struct.pack('<d', timestamp))
+                    
+                    # Body count (2 bytes)
+                    valid_bodies = [(name, pose) for name, pose in poses.items() if name]
+                    parts.append(struct.pack('<H', len(valid_bodies)))
+                    
+                    # Bodies
+                    for body_name, pose_data in valid_bodies:
+                        xpos = pose_data["xpos"]
+                        xquat = pose_data["xquat"]  # w, x, y, z (MuJoCo format)
+                        
+                        # Name (1 byte length + N bytes)
+                        name_bytes = body_name.encode('utf-8')[:255]  # Max 255 chars
+                        parts.append(struct.pack('<B', len(name_bytes)))
+                        parts.append(name_bytes)
+                        
+                        # 7 floats: x, y, z, qx, qy, qz, qw
+                        parts.append(struct.pack('<7f',
+                            float(xpos[0]), float(xpos[1]), float(xpos[2]),
+                            float(xquat[1]), float(xquat[2]), float(xquat[3]), float(xquat[0])  # Convert wxyz to xyzw
+                        ))
+                    
+                    # qpos (2 bytes count + N floats)
+                    parts.append(struct.pack('<H', len(qpos)))
+                    if qpos:
+                        parts.append(struct.pack(f'<{len(qpos)}f', *[float(x) for x in qpos]))
+                    
+                    # ctrl (2 bytes count + N floats)
+                    parts.append(struct.pack('<H', len(ctrl)))
+                    if ctrl:
+                        parts.append(struct.pack(f'<{len(ctrl)}f', *[float(x) for x in ctrl]))
+                    
+                    message = b''.join(parts)
+                    
+                    # Send as single binary message
+                    try:
+                        self._webrtc_sim_channel.send(message)
+                        frame_count += 1
+                        if frame_count == 1:
+                            self._log(f"[SIM] First sim pose sent ({len(valid_bodies)} bodies, {len(message)} bytes binary)", force=True)
+                        elif frame_count % 500 == 0:
+                            self._log(f"[SIM] Sent {frame_count} sim pose updates")
+                    except Exception as e:
+                        self._log(f"[SIM] Warning: Failed to send pose: {e}", force=True)
+                
+                # Use async sleep to yield control and not block the event loop
+                await asyncio.sleep(0.008)  # ~120 Hz
+        
+        except asyncio.CancelledError:
+            self._log("[SIM] Pose streaming cancelled")
+        except Exception as e:
+            if self._pose_stream_running:
+                self._log(f"[SIM] Error: Pose streaming error: {e}", force=True)
+            self._pose_stream_running = False
+        
+        self._log(f"[SIM] Pose streaming stopped (sent {frame_count} updates)")
+
     
     def _load_and_send_scene(self):
         """Load USDZ scene and send to VisionPro via gRPC.
@@ -1729,7 +2280,7 @@ class VisionProStreamer:
         
         # Create temp directory for USDZ export
         tmp_dir = tempfile.mkdtemp(prefix="isaac_usdz_")
-        usdz_path = os.path.join(tmp_dir, "scene.usdz")
+        usdz_path = os.path.join(tmp_dir, "isaac_scene.usdz")  # isaac_ prefix tells VisionOS this is Isaac Lab
         
         try:
             # Use our Isaac USDZ export utility
@@ -2126,6 +2677,8 @@ class VisionProStreamer:
                 
                 # Create sim-poses data channel if simulation is configured
                 if streamer_instance._sim_config is not None:
+                    # Use unreliable mode for lowest latency (dropped frames are replaced by next update)
+                    # Chunking keeps messages small enough to avoid MTU fragmentation issues on Linux
                     sim_channel = pc.createDataChannel(
                         "sim-poses",
                         ordered=False,

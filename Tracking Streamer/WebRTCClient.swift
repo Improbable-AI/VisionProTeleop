@@ -403,13 +403,29 @@ extension WebRTCClient: LKRTCDataChannelDelegate {
     }
 
     func dataChannel(_ dataChannel: LKRTCDataChannel, didReceiveMessageWith buffer: LKRTCDataBuffer) {
+        // Debug: log EVERY data channel message at start
+        print("📥 [WebRTC] didReceiveMessageWith called: channel='\(dataChannel.label)', bytes=\(buffer.data.count)")
+        
         if dataChannel.label == "sim-poses" {
+            // Debug: log raw data reception
+            let dataSize = buffer.data.count
+            
             // Parse JSON pose data: {"t": timestamp, "p": {"body_name": [x,y,z,qx,qy,qz,qw], ...}, "b": {...}}
             guard let jsonString = String(data: buffer.data, encoding: .utf8),
                   let jsonData = jsonString.data(using: .utf8),
                   let parsed = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
                   let poses = parsed["p"] as? [String: [NSNumber]] else {
+                print("⚠️ [WebRTC sim-poses] Failed to parse \(dataSize) bytes")
                 return
+            }
+            
+            // Debug: log first frame
+            if poses.count > 0 {
+                // Only log occasionally to avoid spam
+                let shouldLog = Int.random(in: 0..<100) == 0
+                if shouldLog {
+                    print("📦 [WebRTC sim-poses] Received \(poses.count) body poses, \(dataSize) bytes")
+                }
             }
             
             // Check for benchmark data and echo back
@@ -451,6 +467,9 @@ extension WebRTCClient: LKRTCDataChannelDelegate {
                 DispatchQueue.main.async {
                     callback(timestamp, floatPoses, qpos, ctrl)
                 }
+            } else {
+                // Debug: callback not set
+                print("⚠️ [WebRTC sim-poses] Callback not set, dropping \(floatPoses.count) poses")
             }
         } else {
             print("DEBUG: Received \(buffer.data.count) bytes on data channel '\(dataChannel.label)' (ignored)")
