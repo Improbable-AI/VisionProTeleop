@@ -1230,15 +1230,15 @@ struct CombinedStreamingView: View {
                 guard initialLocalTransforms[bodyName] != nil else { continue }
                 
                 // For Isaac Lab: Determine if this is a standalone rigid object or an articulated link
-                // Rigid objects have 2-component paths: "env_0/object", "env_0/target_pose"
+                // Rigid objects have 2-component paths: "env_0/object", "env_0/target_pose"  
                 // Articulated links have 3+ component paths: "env_0/Franka/fr3_link6"
                 // Only skip local transform for rigid objects (to avoid position doubling)
                 let pathComponents = pyName.components(separatedBy: "/")
                 let isStandaloneRigidObject = isIsaacLab && pathComponents.count == 2
                 
                 let transform = computeFinalTransformForTarget(
-                    bodyName: bodyName,
-                    values: values,
+                    bodyName: bodyName, 
+                    values: values, 
                     axisCorrection: axisCorrection,
                     skipLocalTransform: isStandaloneRigidObject  // Only skip for rigid objects, not articulated links
                 )

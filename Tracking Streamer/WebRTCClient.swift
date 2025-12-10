@@ -409,6 +409,9 @@ extension WebRTCClient: LKRTCDataChannelDelegate {
     }
 
     func dataChannel(_ dataChannel: LKRTCDataChannel, didReceiveMessageWith buffer: LKRTCDataBuffer) {
+        // Debug: log EVERY data channel message at start
+        print("📥 [WebRTC] didReceiveMessageWith called: channel='\(dataChannel.label)', bytes=\(buffer.data.count)")
+        
         if dataChannel.label == "sim-poses" {
             simPosesMessageCount += 1
             
