@@ -701,7 +701,7 @@ struct ExtrinsicCalibrationViewNew: View {
                 if calibrationManager.canAdvanceToNextMarker {
                     // Proceed to next marker - directly advance without dialog for simplicity
                     Button(action: {
-                        print("📐 [UI] Proceed button tapped - advancing to next marker")
+                        dlog("📐 [UI] Proceed button tapped - advancing to next marker")
                         calibrationManager.advanceToNextMarker()
                         calibrationManager.rememberedMarkerPositions.removeAll()
                         
@@ -838,7 +838,7 @@ struct ExtrinsicCalibrationViewNew: View {
                         if leftSamples >= 20 {
                             if calibrationManager.canAdvanceToNextMarker {
                                 // Auto-advance to next marker
-                                print("📐 [Auto-Advance] Phone settled after moving - advancing to next marker")
+                                dlog("📐 [Auto-Advance] Phone settled after moving - advancing to next marker")
                                 calibrationManager.advanceToNextMarker()
                                 calibrationManager.rememberedMarkerPositions.removeAll()
                                 
@@ -846,7 +846,7 @@ struct ExtrinsicCalibrationViewNew: View {
                                 multipeerManager.switchToMarker(calibrationManager.currentMarkerId)
                             } else {
                                 // All markers complete - auto finish
-                                print("📐 [Auto-Advance] Phone settled after moving - all markers complete, finishing calibration")
+                                dlog("📐 [Auto-Advance] Phone settled after moving - all markers complete, finishing calibration")
                                 Task {
                                     await autoFinishCalibration()
                                 }

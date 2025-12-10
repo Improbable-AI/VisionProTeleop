@@ -161,7 +161,7 @@ class MultipeerCalibrationManager: NSObject, ObservableObject {
         browser = MCNearbyServiceBrowser(peer: peerID, serviceType: serviceType)
         browser.delegate = self
         
-        print("📡 [MultipeerCalibrationManager] Initialized for visionOS")
+        dlog("📡 [MultipeerCalibrationManager] Initialized for visionOS")
     }
     
     // MARK: - Connection Management
@@ -170,13 +170,13 @@ class MultipeerCalibrationManager: NSObject, ObservableObject {
     func startBrowsing() {
         browser.startBrowsingForPeers()
         connectionStatus = "Searching for iPhone..."
-        print("📡 [MultipeerCalibrationManager] Started browsing for peers")
+        dlog("📡 [MultipeerCalibrationManager] Started browsing for peers")
     }
     
     /// Stop browsing
     func stopBrowsing() {
         browser.stopBrowsingForPeers()
-        print("📡 [MultipeerCalibrationManager] Stopped browsing")
+        dlog("📡 [MultipeerCalibrationManager] Stopped browsing")
     }
     
     /// Disconnect from current peer
@@ -185,14 +185,14 @@ class MultipeerCalibrationManager: NSObject, ObservableObject {
         isConnected = false
         connectedDeviceName = nil
         connectionStatus = "Disconnected"
-        print("📡 [MultipeerCalibrationManager] Disconnected")
+        dlog("📡 [MultipeerCalibrationManager] Disconnected")
     }
     
     /// Connect to a specific peer
     func connect(to peer: MCPeerID) {
         browser.invitePeer(peer, to: session, withContext: nil, timeout: 30)
         connectionStatus = "Connecting to \(peer.displayName)..."
-        print("📡 [MultipeerCalibrationManager] Inviting peer: \(peer.displayName)")
+        dlog("📡 [MultipeerCalibrationManager] Inviting peer: \(peer.displayName)")
     }
     
     // MARK: - Command Sending
@@ -200,7 +200,7 @@ class MultipeerCalibrationManager: NSObject, ObservableObject {
     /// Send a command to the connected iPhone
     func sendCommand(_ command: CalibrationCommand) {
         guard isConnected, !session.connectedPeers.isEmpty else {
-            print("⚠️ [MultipeerCalibrationManager] Cannot send command - not connected")
+            dlog("⚠️ [MultipeerCalibrationManager] Cannot send command - not connected")
             return
         }
         
@@ -208,9 +208,9 @@ class MultipeerCalibrationManager: NSObject, ObservableObject {
             let message = try CalibrationMessage(command: command)
             let data = try JSONEncoder().encode(message)
             try session.send(data, toPeers: session.connectedPeers, with: .reliable)
-            print("📡 [MultipeerCalibrationManager] Sent command: \(command.description)")
+            dlog("📡 [MultipeerCalibrationManager] Sent command: \(command.description)")
         } catch {
-            print("❌ [MultipeerCalibrationManager] Failed to send command: \(error)")
+            dlog("❌ [MultipeerCalibrationManager] Failed to send command: \(error)")
         }
     }
     
@@ -256,11 +256,11 @@ extension MultipeerCalibrationManager: MCSessionDelegate {
                 connectedDeviceName = peerID.displayName
                 connectionStatus = "Connected to \(peerID.displayName)"
                 onConnectionChanged?(true)
-                print("📡 [MultipeerCalibrationManager] Connected to: \(peerID.displayName)")
+                dlog("📡 [MultipeerCalibrationManager] Connected to: \(peerID.displayName)")
                 
             case .connecting:
                 connectionStatus = "Connecting to \(peerID.displayName)..."
-                print("📡 [MultipeerCalibrationManager] Connecting to: \(peerID.displayName)")
+                dlog("📡 [MultipeerCalibrationManager] Connecting to: \(peerID.displayName)")
                 
             case .notConnected:
                 isConnected = session.connectedPeers.count > 0
@@ -269,7 +269,7 @@ extension MultipeerCalibrationManager: MCSessionDelegate {
                     connectionStatus = "Disconnected from \(peerID.displayName)"
                     onConnectionChanged?(false)
                 }
-                print("📡 [MultipeerCalibrationManager] Disconnected from: \(peerID.displayName)")
+                dlog("📡 [MultipeerCalibrationManager] Disconnected from: \(peerID.displayName)")
                 
             @unknown default:
                 break
@@ -290,11 +290,11 @@ extension MultipeerCalibrationManager: MCSessionDelegate {
                     
                     // Log only significant status changes
                     if !status.isPhoneStationary {
-                        print("📡 [MultipeerCalibrationManager] iPhone moving (motion: \(String(format: "%.2f", status.motionMagnitude)))")
+                        dlog("📡 [MultipeerCalibrationManager] iPhone moving (motion: \(String(format: "%.2f", status.motionMagnitude)))")
                     }
                 }
             } catch {
-                print("❌ [MultipeerCalibrationManager] Failed to decode message: \(error)")
+                dlog("❌ [MultipeerCalibrationManager] Failed to decode message: \(error)")
             }
         }
     }
@@ -313,7 +313,7 @@ extension MultipeerCalibrationManager: MCNearbyServiceBrowserDelegate {
         Task { @MainActor in
             if !availablePeers.contains(where: { $0.displayName == peerID.displayName }) {
                 availablePeers.append(peerID)
-                print("📡 [MultipeerCalibrationManager] Found peer: \(peerID.displayName)")
+                dlog("📡 [MultipeerCalibrationManager] Found peer: \(peerID.displayName)")
                 
                 // Auto-connect if it's an iPhone (starts with "iPhone")
                 if peerID.displayName.contains("iPhone") {
@@ -326,14 +326,14 @@ extension MultipeerCalibrationManager: MCNearbyServiceBrowserDelegate {
     nonisolated func browser(_ browser: MCNearbyServiceBrowser, lostPeer peerID: MCPeerID) {
         Task { @MainActor in
             availablePeers.removeAll { $0.displayName == peerID.displayName }
-            print("📡 [MultipeerCalibrationManager] Lost peer: \(peerID.displayName)")
+            dlog("📡 [MultipeerCalibrationManager] Lost peer: \(peerID.displayName)")
         }
     }
     
     nonisolated func browser(_ browser: MCNearbyServiceBrowser, didNotStartBrowsingForPeers error: Error) {
         Task { @MainActor in
             connectionStatus = "Failed to start browsing: \(error.localizedDescription)"
-            print("❌ [MultipeerCalibrationManager] Browser error: \(error)")
+            dlog("❌ [MultipeerCalibrationManager] Browser error: \(error)")
         }
     }
 }

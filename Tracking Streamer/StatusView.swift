@@ -121,11 +121,10 @@ struct StatusOverlay: View {
         self._previewStatusPosition = previewStatusPosition
         self._previewStatusActive = previewStatusActive
         self.mujocoManager = mujocoManager
-        print("🟢 [StatusView] StatusOverlay init called, hasFrames: \(hasFrames.wrappedValue), showVideoStatus: \(showVideoStatus), mujocoEnabled: \(mujocoManager != nil)")
+//        print("🟢 [StatusView] StatusOverlay init called, hasFrames: \(hasFrames.wrappedValue), showVideoStatus: \(showVideoStatus), mujocoEnabled: \(mujocoManager != nil)")
     }
     
     var body: some View {
-        print("🟡 [StatusView] StatusOverlay body called")
         return ZStack {
             Group {
                 if isMinimized {

@@ -24,7 +24,7 @@ class DropboxUploader {
     /// Get valid access token, refreshing if needed
     func getValidAccessToken() async -> String? {
         guard let accessToken = keychain.loadString(forKey: .dropboxAccessToken) else {
-            print("❌ [DropboxUploader] No access token in keychain")
+            dlog("❌ [DropboxUploader] No access token in keychain")
             return nil
         }
         
@@ -35,7 +35,7 @@ class DropboxUploader {
             
             // Refresh if expiring within 5 minutes
             if expiryDate.timeIntervalSinceNow < 300 {
-                print("🔄 [DropboxUploader] Token expiring soon, refreshing...")
+                dlog("🔄 [DropboxUploader] Token expiring soon, refreshing...")
                 return await refreshAccessToken()
             }
         }
@@ -46,7 +46,7 @@ class DropboxUploader {
     /// Refresh access token using refresh token
     private func refreshAccessToken() async -> String? {
         guard let refreshToken = keychain.loadString(forKey: .dropboxRefreshToken) else {
-            print("❌ [DropboxUploader] No refresh token available")
+            dlog("❌ [DropboxUploader] No refresh token available")
             return nil
         }
         
@@ -71,7 +71,7 @@ class DropboxUploader {
             
             guard let httpResponse = response as? HTTPURLResponse,
                   httpResponse.statusCode == 200 else {
-                print("❌ [DropboxUploader] Token refresh failed")
+                dlog("❌ [DropboxUploader] Token refresh failed")
                 return nil
             }
             
@@ -89,11 +89,11 @@ class DropboxUploader {
                 keychain.save(String(expiryDate.timeIntervalSince1970), forKey: .dropboxTokenExpiry)
             }
             
-            print("✅ [DropboxUploader] Token refreshed")
+            dlog("✅ [DropboxUploader] Token refreshed")
             return tokenResponse.access_token
             
         } catch {
-            print("❌ [DropboxUploader] Token refresh error: \(error)")
+            dlog("❌ [DropboxUploader] Token refresh error: \(error)")
             return nil
         }
     }
@@ -111,7 +111,7 @@ class DropboxUploader {
         }
         
         guard let fileData = try? Data(contentsOf: fileURL) else {
-            print("❌ [DropboxUploader] Cannot read file: \(fileURL)")
+            dlog("❌ [DropboxUploader] Cannot read file: \(fileURL)")
             return false
         }
         
@@ -141,15 +141,15 @@ class DropboxUploader {
             guard let httpResponse = response as? HTTPURLResponse,
                   httpResponse.statusCode == 200 else {
                 let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
-                print("❌ [DropboxUploader] Upload failed: HTTP \(statusCode)")
+                dlog("❌ [DropboxUploader] Upload failed: HTTP \(statusCode)")
                 return false
             }
             
-            print("✅ [DropboxUploader] Uploaded \(fileURL.lastPathComponent) to \(dropboxPath)")
+            dlog("✅ [DropboxUploader] Uploaded \(fileURL.lastPathComponent) to \(dropboxPath)")
             return true
             
         } catch {
-            print("❌ [DropboxUploader] Upload error: \(error)")
+            dlog("❌ [DropboxUploader] Upload error: \(error)")
             return false
         }
     }

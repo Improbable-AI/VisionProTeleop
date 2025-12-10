@@ -716,7 +716,7 @@ struct RecordingDetailView: View {
                 
                 showSimulation = true // Default to simulation view if available
             } catch {
-                print("⚠️ Failed to load simulation data: \(error)")
+                dlog("⚠️ Failed to load simulation data: \(error)")
             }
         }
         

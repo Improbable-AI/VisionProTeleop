@@ -81,7 +81,7 @@ class DropboxAuthManager: NSObject, ObservableObject {
             return
         }
         
-        print("🔐 [DropboxAuthManager] Starting OAuth flow on visionOS...")
+        dlog("🔐 [DropboxAuthManager] Starting OAuth flow on visionOS...")
         
         // Use ASWebAuthenticationSession for secure OAuth
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
@@ -101,7 +101,7 @@ class DropboxAuthManager: NSObject, ObservableObject {
                         } else {
                             self.authError = "Authentication failed: \(error.localizedDescription)"
                         }
-                        print("❌ [DropboxAuthManager] Auth error: \(error)")
+                        dlog("❌ [DropboxAuthManager] Auth error: \(error)")
                         return
                     }
                     
@@ -157,9 +157,9 @@ class DropboxAuthManager: NSObject, ObservableObject {
                   httpResponse.statusCode == 200 else {
                 let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
                 authError = "Token exchange failed (HTTP \(statusCode))"
-                print("❌ [DropboxAuthManager] Token exchange failed: HTTP \(statusCode)")
+                dlog("❌ [DropboxAuthManager] Token exchange failed: HTTP \(statusCode)")
                 if let body = String(data: data, encoding: .utf8) {
-                    print("   Response: \(body)")
+                    dlog("   Response: \(body)")
                 }
                 return
             }
@@ -182,14 +182,14 @@ class DropboxAuthManager: NSObject, ObservableObject {
             keychain.save(CloudStorageProvider.dropbox.rawValue, forKey: .selectedCloudProvider)
             
             codeVerifier = nil
-            print("✅ [DropboxAuthManager] Token exchange successful - tokens synced to iCloud Keychain")
+            dlog("✅ [DropboxAuthManager] Token exchange successful - tokens synced to iCloud Keychain")
             
             // Reload cloud storage settings to reflect the change
             CloudStorageSettings.shared.loadSettings()
             
         } catch {
             authError = "Token exchange failed: \(error.localizedDescription)"
-            print("❌ [DropboxAuthManager] Token exchange error: \(error)")
+            dlog("❌ [DropboxAuthManager] Token exchange error: \(error)")
         }
     }
     
@@ -205,7 +205,7 @@ class DropboxAuthManager: NSObject, ObservableObject {
         }
         
         CloudStorageSettings.shared.loadSettings()
-        print("✅ [DropboxAuthManager] Signed out from Dropbox")
+        dlog("✅ [DropboxAuthManager] Signed out from Dropbox")
     }
     
     // MARK: - PKCE Helpers

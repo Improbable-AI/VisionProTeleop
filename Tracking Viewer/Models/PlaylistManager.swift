@@ -185,7 +185,7 @@ class PlaylistManager: ObservableObject {
     /// Load playlists from disk
     func loadPlaylists() {
         guard let url = playlistsURL else {
-            print("⚠️ [PlaylistManager] No playlists URL available")
+            dlog("⚠️ [PlaylistManager] No playlists URL available")
             return
         }
         
@@ -193,7 +193,7 @@ class PlaylistManager: ObservableObject {
         try? fileManager.startDownloadingUbiquitousItem(at: url)
         
         guard fileManager.fileExists(atPath: url.path) else {
-            print("📂 [PlaylistManager] No playlists file found, starting fresh")
+            dlog("📂 [PlaylistManager] No playlists file found, starting fresh")
             return
         }
         
@@ -202,16 +202,16 @@ class PlaylistManager: ObservableObject {
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
             playlists = try decoder.decode([Playlist].self, from: data)
-            print("✅ [PlaylistManager] Loaded \(playlists.count) playlists")
+            dlog("✅ [PlaylistManager] Loaded \(playlists.count) playlists")
         } catch {
-            print("❌ [PlaylistManager] Failed to load playlists: \(error)")
+            dlog("❌ [PlaylistManager] Failed to load playlists: \(error)")
         }
     }
     
     /// Save playlists to disk
     func savePlaylists() {
         guard let url = playlistsURL else {
-            print("⚠️ [PlaylistManager] No playlists URL available")
+            dlog("⚠️ [PlaylistManager] No playlists URL available")
             return
         }
         
@@ -227,9 +227,9 @@ class PlaylistManager: ObservableObject {
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             let data = try encoder.encode(playlists)
             try data.write(to: url)
-            print("✅ [PlaylistManager] Saved \(playlists.count) playlists")
+            dlog("✅ [PlaylistManager] Saved \(playlists.count) playlists")
         } catch {
-            print("❌ [PlaylistManager] Failed to save playlists: \(error)")
+            dlog("❌ [PlaylistManager] Failed to save playlists: \(error)")
         }
     }
     

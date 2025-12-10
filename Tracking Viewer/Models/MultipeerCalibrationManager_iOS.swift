@@ -138,7 +138,7 @@ class MotionDetector: ObservableObject {
     var onMotionStateChanged: ((Bool, Double) -> Void)?
     
     init() {
-        print("📱 [MotionDetector] Initialized")
+        dlog("📱 [MotionDetector] Initialized")
     }
     
     deinit {
@@ -147,12 +147,12 @@ class MotionDetector: ObservableObject {
     
     func start() {
         guard !isRunning else {
-            print("📱 [MotionDetector] Already running")
+            dlog("📱 [MotionDetector] Already running")
             return
         }
         
         guard motionManager.isAccelerometerAvailable else {
-            print("❌ [MotionDetector] Accelerometer not available on this device!")
+            dlog("❌ [MotionDetector] Accelerometer not available on this device!")
             return
         }
         
@@ -164,7 +164,7 @@ class MotionDetector: ObservableObject {
         
         motionManager.startAccelerometerUpdates(to: .main) { [weak self] data, error in
             if let error = error {
-                print("❌ [MotionDetector] Accelerometer error: \(error)")
+                dlog("❌ [MotionDetector] Accelerometer error: \(error)")
                 return
             }
             guard let self = self, let data = data else { return }
@@ -176,7 +176,7 @@ class MotionDetector: ObservableObject {
             self?.updateMotionState()
         }
         
-        print("📱 [MotionDetector] Started motion detection (threshold: \(stationaryThreshold))")
+        dlog("📱 [MotionDetector] Started motion detection (threshold: \(stationaryThreshold))")
     }
     
     func stop() {
@@ -186,7 +186,7 @@ class MotionDetector: ObservableObject {
         updateTimer = nil
         isRunning = false
         accelerometerData = []
-        print("📱 [MotionDetector] Stopped motion detection")
+        dlog("📱 [MotionDetector] Stopped motion detection")
     }
     
     private func processAccelerometerData(_ acceleration: CMAcceleration) {
@@ -231,7 +231,7 @@ class MotionDetector: ObservableObject {
                     isStationary = true
                     isStabilizing = false
                     onMotionStateChanged?(true, motionMagnitude)
-                    print("📱 [MotionDetector] Phone is now STATIONARY (variance: \(String(format: "%.6f", variance)), threshold: \(stationaryThreshold))")
+                    dlog("📱 [MotionDetector] Phone is now STATIONARY (variance: \(String(format: "%.6f", variance)), threshold: \(stationaryThreshold))")
                 }
             }
         } else {
@@ -241,7 +241,7 @@ class MotionDetector: ObservableObject {
             if isStationary {
                 isStationary = false
                 onMotionStateChanged?(false, motionMagnitude)
-                print("📱 [MotionDetector] Phone is now MOVING (variance: \(String(format: "%.6f", variance)), threshold: \(stationaryThreshold))")
+                dlog("📱 [MotionDetector] Phone is now MOVING (variance: \(String(format: "%.6f", variance)), threshold: \(stationaryThreshold))")
             }
         }
     }
@@ -347,7 +347,7 @@ class MultipeerCalibrationManager_iOS: NSObject, ObservableObject {
         advertiser = MCNearbyServiceAdvertiser(peer: peerID, discoveryInfo: nil, serviceType: serviceType)
         advertiser.delegate = self
         
-        print("📱 [MultipeerCalibrationManager_iOS] Initialized for iOS")
+        dlog("📱 [MultipeerCalibrationManager_iOS] Initialized for iOS")
     }
     
     private func setupMotionDetector() {
@@ -366,13 +366,13 @@ class MultipeerCalibrationManager_iOS: NSObject, ObservableObject {
     func startAdvertising() {
         advertiser.startAdvertisingPeer()
         connectionStatus = "Waiting for Vision Pro..."
-        print("📱 [MultipeerCalibrationManager_iOS] Started advertising")
+        dlog("📱 [MultipeerCalibrationManager_iOS] Started advertising")
     }
     
     /// Stop advertising
     func stopAdvertising() {
         advertiser.stopAdvertisingPeer()
-        print("📱 [MultipeerCalibrationManager_iOS] Stopped advertising")
+        dlog("📱 [MultipeerCalibrationManager_iOS] Stopped advertising")
     }
     
     /// Disconnect from current peer
@@ -384,7 +384,7 @@ class MultipeerCalibrationManager_iOS: NSObject, ObservableObject {
         connectedDeviceName = nil
         isInCalibrationMode = false
         connectionStatus = "Disconnected"
-        print("📱 [MultipeerCalibrationManager_iOS] Disconnected")
+        dlog("📱 [MultipeerCalibrationManager_iOS] Disconnected")
     }
     
     // MARK: - Status Updates
@@ -400,7 +400,7 @@ class MultipeerCalibrationManager_iOS: NSObject, ObservableObject {
             }
         }
         
-        print("📱 [MultipeerCalibrationManager_iOS] Started status updates")
+        dlog("📱 [MultipeerCalibrationManager_iOS] Started status updates")
     }
     
     /// Stop sending status updates
@@ -408,7 +408,7 @@ class MultipeerCalibrationManager_iOS: NSObject, ObservableObject {
         statusTimer?.invalidate()
         statusTimer = nil
         motionDetector.stop()
-        print("📱 [MultipeerCalibrationManager_iOS] Stopped status updates")
+        dlog("📱 [MultipeerCalibrationManager_iOS] Stopped status updates")
     }
     
     /// Send current status to Vision Pro
@@ -434,7 +434,7 @@ class MultipeerCalibrationManager_iOS: NSObject, ObservableObject {
     // MARK: - Command Handling
     
     private func handleCommand(_ command: CalibrationCommand) {
-        print("📱 [MultipeerCalibrationManager_iOS] Received command: \(command.description)")
+        dlog("📱 [MultipeerCalibrationManager_iOS] Received command: \(command.description)")
         
         switch command {
         case .startCalibration(let markerIds):
@@ -532,11 +532,11 @@ extension MultipeerCalibrationManager_iOS: MCSessionDelegate {
                 connectedDeviceName = peerID.displayName
                 connectionStatus = "Connected to \(peerID.displayName)"
                 onConnectionChanged?(true)
-                print("📱 [MultipeerCalibrationManager_iOS] Connected to: \(peerID.displayName)")
+                dlog("📱 [MultipeerCalibrationManager_iOS] Connected to: \(peerID.displayName)")
                 
             case .connecting:
                 connectionStatus = "Connecting to \(peerID.displayName)..."
-                print("📱 [MultipeerCalibrationManager_iOS] Connecting to: \(peerID.displayName)")
+                dlog("📱 [MultipeerCalibrationManager_iOS] Connecting to: \(peerID.displayName)")
                 
             case .notConnected:
                 isConnected = session.connectedPeers.count > 0
@@ -547,7 +547,7 @@ extension MultipeerCalibrationManager_iOS: MCSessionDelegate {
                     stopStatusUpdates()
                     onConnectionChanged?(false)
                 }
-                print("📱 [MultipeerCalibrationManager_iOS] Disconnected from: \(peerID.displayName)")
+                dlog("📱 [MultipeerCalibrationManager_iOS] Disconnected from: \(peerID.displayName)")
                 
             @unknown default:
                 break
@@ -564,7 +564,7 @@ extension MultipeerCalibrationManager_iOS: MCSessionDelegate {
                     handleCommand(command)
                 }
             } catch {
-                print("❌ [MultipeerCalibrationManager_iOS] Failed to decode message: \(error)")
+                dlog("❌ [MultipeerCalibrationManager_iOS] Failed to decode message: \(error)")
             }
         }
     }
@@ -584,10 +584,10 @@ extension MultipeerCalibrationManager_iOS: MCNearbyServiceAdvertiserDelegate {
             // Auto-accept invitations from Vision Pro
             if peerID.displayName.contains("Vision") {
                 invitationHandler(true, session)
-                print("📱 [MultipeerCalibrationManager_iOS] Accepted invitation from: \(peerID.displayName)")
+                dlog("📱 [MultipeerCalibrationManager_iOS] Accepted invitation from: \(peerID.displayName)")
             } else {
                 invitationHandler(true, session)  // Accept all for now
-                print("📱 [MultipeerCalibrationManager_iOS] Accepted invitation from: \(peerID.displayName)")
+                dlog("📱 [MultipeerCalibrationManager_iOS] Accepted invitation from: \(peerID.displayName)")
             }
         }
     }
@@ -595,7 +595,7 @@ extension MultipeerCalibrationManager_iOS: MCNearbyServiceAdvertiserDelegate {
     nonisolated func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didNotStartAdvertisingPeer error: Error) {
         Task { @MainActor in
             connectionStatus = "Failed to advertise: \(error.localizedDescription)"
-            print("❌ [MultipeerCalibrationManager_iOS] Advertiser error: \(error)")
+            dlog("❌ [MultipeerCalibrationManager_iOS] Advertiser error: \(error)")
         }
     }
 }

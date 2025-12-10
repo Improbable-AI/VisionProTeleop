@@ -54,10 +54,10 @@ class HTTPFileServer: ObservableObject {
                             self?.port = port
                             self?.updateServerURL()
                             self?.isRunning = true
-                            print("🌐 [HTTPServer] Started on port \(port)")
+                            dlog("🌐 [HTTPServer] Started on port \(port)")
                         }
                     case .failed(let error):
-                        print("❌ [HTTPServer] Failed: \(error)")
+                        dlog("❌ [HTTPServer] Failed: \(error)")
                         self?.isRunning = false
                         self?.serverURL = nil
                     case .cancelled:
@@ -76,7 +76,7 @@ class HTTPFileServer: ObservableObject {
             listener?.start(queue: serverQueue)
             
         } catch {
-            print("❌ [HTTPServer] Failed to start: \(error)")
+            dlog("❌ [HTTPServer] Failed to start: \(error)")
         }
     }
     
@@ -94,7 +94,7 @@ class HTTPFileServer: ObservableObject {
         
         isRunning = false
         serverURL = nil
-        print("🛑 [HTTPServer] Stopped")
+        dlog("🛑 [HTTPServer] Stopped")
     }
     
     private func updateServerURL() {
@@ -165,7 +165,7 @@ class HTTPFileServer: ObservableObject {
             if let data = content, let request = String(data: data, encoding: .utf8) {
                 self.handleRequest(request, on: connection)
             } else if let error = error {
-                print("❌ [HTTPServer] Receive error: \(error)")
+                dlog("❌ [HTTPServer] Receive error: \(error)")
                 connection.cancel()
             }
         }
@@ -188,7 +188,7 @@ class HTTPFileServer: ObservableObject {
         let method = parts[0]
         let path = parts[1]
         
-        print("📥 [HTTPServer] \(method) \(path)")
+        dlog("📥 [HTTPServer] \(method) \(path)")
         
         Task { @MainActor in
             self.activeDownloads += 1
@@ -583,7 +583,7 @@ class HTTPFileServer: ObservableObject {
                 }
                 
                 let progressMsg = "Processing \(recordingIndex + 1)/\(recordings.count): \(recording.id)"
-                print("📦 [HTTPServer] \(progressMsg)")
+                dlog("📦 [HTTPServer] \(progressMsg)")
                 await MainActor.run {
                     statusMessage = progressMsg
                 }
@@ -593,7 +593,7 @@ class HTTPFileServer: ObservableObject {
                 do {
                     folderContents = try fileManager.contentsOfDirectory(at: recording.folderURL, includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey], options: [.skipsHiddenFiles])
                 } catch {
-                    print("⚠️ [HTTPServer] Failed to list \(recording.id): \(error)")
+                    dlog("⚠️ [HTTPServer] Failed to list \(recording.id): \(error)")
                     continue
                 }
                 
@@ -609,7 +609,7 @@ class HTTPFileServer: ObservableObject {
                     // Download from iCloud if needed
                     let downloaded = await RecordingsManager.shared.downloadFromiCloud(fileURL)
                     guard downloaded else {
-                        print("⚠️ [HTTPServer] Skipping \(fileURL.lastPathComponent) - not downloaded")
+                        dlog("⚠️ [HTTPServer] Skipping \(fileURL.lastPathComponent) - not downloaded")
                         continue
                     }
                     
@@ -693,12 +693,12 @@ class HTTPFileServer: ObservableObject {
             // Clean up temp file
             try? fileManager.removeItem(at: zipURL)
             
-            print("✅ [HTTPServer] Created ZIP with \(fileCount) files, \(ByteCountFormatter.string(fromByteCount: Int64(zipData.count), countStyle: .file))")
+            dlog("✅ [HTTPServer] Created ZIP with \(fileCount) files, \(ByteCountFormatter.string(fromByteCount: Int64(zipData.count), countStyle: .file))")
             
             return zipData
             
         } catch {
-            print("❌ [HTTPServer] Failed to create ZIP: \(error)")
+            dlog("❌ [HTTPServer] Failed to create ZIP: \(error)")
             try? fileManager.removeItem(at: zipURL)
             return nil
         }
@@ -868,7 +868,7 @@ class HTTPFileServer: ObservableObject {
     nonisolated private func sendResponse(_ data: Data, on connection: NWConnection) {
         connection.send(content: data, completion: .contentProcessed { [weak self] error in
             if let error = error {
-                print("❌ [HTTPServer] Send error: \(error)")
+                dlog("❌ [HTTPServer] Send error: \(error)")
             }
             connection.cancel()
             

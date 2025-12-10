@@ -353,9 +353,9 @@ class AnnotationsManager: ObservableObject {
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
             annotations = try decoder.decode([String: RecordingAnnotation].self, from: data)
-            print("✅ [AnnotationsManager] Loaded \(annotations.count) annotations")
+            dlog("✅ [AnnotationsManager] Loaded \(annotations.count) annotations")
         } catch {
-            print("❌ [AnnotationsManager] Failed to load annotations: \(error)")
+            dlog("❌ [AnnotationsManager] Failed to load annotations: \(error)")
         }
     }
     
@@ -374,7 +374,7 @@ class AnnotationsManager: ObservableObject {
             let data = try encoder.encode(annotations)
             try data.write(to: url)
         } catch {
-            print("❌ [AnnotationsManager] Failed to save annotations: \(error)")
+            dlog("❌ [AnnotationsManager] Failed to save annotations: \(error)")
         }
     }
     
@@ -391,9 +391,9 @@ class AnnotationsManager: ObservableObject {
         do {
             let data = try Data(contentsOf: url)
             allTags = try JSONDecoder().decode([Tag].self, from: data)
-            print("✅ [AnnotationsManager] Loaded \(allTags.count) tags")
+            dlog("✅ [AnnotationsManager] Loaded \(allTags.count) tags")
         } catch {
-            print("❌ [AnnotationsManager] Failed to load tags: \(error)")
+            dlog("❌ [AnnotationsManager] Failed to load tags: \(error)")
             createDefaultTags()
         }
     }
@@ -412,7 +412,7 @@ class AnnotationsManager: ObservableObject {
             let data = try encoder.encode(allTags)
             try data.write(to: url)
         } catch {
-            print("❌ [AnnotationsManager] Failed to save tags: \(error)")
+            dlog("❌ [AnnotationsManager] Failed to save tags: \(error)")
         }
     }
     

@@ -1,4 +1,4 @@
 
-from avp_stream.streamer import VisionProStreamer
+from avp_stream.new_streamer import VisionProStreamer
 
         

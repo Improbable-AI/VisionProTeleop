@@ -96,7 +96,7 @@ class CloudKitManager: ObservableObject {
         
         do {
             let savedRecord = try await publicDatabase.save(record)
-            print("✅ [CloudKit] Made recording public: \(title)")
+            dlog("✅ [CloudKit] Made recording public: \(title)")
             
             // Optimistically update local list
             if let newRecording = PublicRecording(from: savedRecord) {
@@ -107,7 +107,7 @@ class CloudKitManager: ObservableObject {
             
             return true
         } catch {
-            print("❌ [CloudKit] Failed to make recording public: \(error)")
+            dlog("❌ [CloudKit] Failed to make recording public: \(error)")
             errorMessage = "Failed to share recording: \(error.localizedDescription)"
             return false
         }
@@ -119,7 +119,7 @@ class CloudKitManager: ObservableObject {
         
         do {
             _ = try await publicDatabase.deleteRecord(withID: recordID)
-            print("✅ [CloudKit] Made recording private: \(recordingId)")
+            dlog("✅ [CloudKit] Made recording private: \(recordingId)")
             
             // Remove from local cache
             publicRecordings.removeAll { $0.id == recordingId }
@@ -128,15 +128,15 @@ class CloudKitManager: ObservableObject {
         } catch let error as CKError {
             // If record doesn't exist, that's fine (already private)
             if error.code == .unknownItem {
-                print("⚠️ [CloudKit] Recording already private: \(recordingId)")
+                dlog("⚠️ [CloudKit] Recording already private: \(recordingId)")
                 return true
             }
             
-            print("❌ [CloudKit] Failed to make recording private: \(error)")
+            dlog("❌ [CloudKit] Failed to make recording private: \(error)")
             errorMessage = "Failed to unshare recording: \(error.localizedDescription)"
             return false
         } catch {
-            print("❌ [CloudKit] Failed to make recording private: \(error)")
+            dlog("❌ [CloudKit] Failed to make recording private: \(error)")
             errorMessage = "Failed to unshare recording: \(error.localizedDescription)"
             return false
         }
@@ -153,10 +153,10 @@ class CloudKitManager: ObservableObject {
             if error.code == .unknownItem {
                 return false
             }
-            print("❌ [CloudKit] Error checking public status: \(error)")
+            dlog("❌ [CloudKit] Error checking public status: \(error)")
             return false
         } catch {
-            print("❌ [CloudKit] Error checking public status: \(error)")
+            dlog("❌ [CloudKit] Error checking public status: \(error)")
             return false
         }
     }
@@ -191,7 +191,7 @@ class CloudKitManager: ObservableObject {
                         recordings.append(publicRecording)
                     }
                 case .failure(let error):
-                    print("❌ [CloudKit] Failed to fetch record \(recordID): \(error)")
+                    dlog("❌ [CloudKit] Failed to fetch record \(recordID): \(error)")
                 }
             }
             
@@ -199,10 +199,10 @@ class CloudKitManager: ObservableObject {
             queryCursor = cursor
             hasMoreRecordings = cursor != nil
             
-            print("✅ [CloudKit] Fetched \(recordings.count) public recordings (hasMore: \(hasMoreRecordings))")
+            dlog("✅ [CloudKit] Fetched \(recordings.count) public recordings (hasMore: \(hasMoreRecordings))")
             
         } catch {
-            print("❌ [CloudKit] Failed to fetch public recordings: \(error)")
+            dlog("❌ [CloudKit] Failed to fetch public recordings: \(error)")
             errorMessage = "Failed to load public recordings: \(error.localizedDescription)"
         }
     }
@@ -226,7 +226,7 @@ class CloudKitManager: ObservableObject {
                         newRecordings.append(publicRecording)
                     }
                 case .failure(let error):
-                    print("❌ [CloudKit] Failed to fetch record \(recordID): \(error)")
+                    dlog("❌ [CloudKit] Failed to fetch record \(recordID): \(error)")
                 }
             }
             
@@ -234,10 +234,10 @@ class CloudKitManager: ObservableObject {
             queryCursor = newCursor
             hasMoreRecordings = newCursor != nil
             
-            print("✅ [CloudKit] Loaded \(newRecordings.count) more recordings (total: \(publicRecordings.count), hasMore: \(hasMoreRecordings))")
+            dlog("✅ [CloudKit] Loaded \(newRecordings.count) more recordings (total: \(publicRecordings.count), hasMore: \(hasMoreRecordings))")
             
         } catch {
-            print("❌ [CloudKit] Failed to load more recordings: \(error)")
+            dlog("❌ [CloudKit] Failed to load more recordings: \(error)")
         }
     }
     
@@ -249,7 +249,7 @@ class CloudKitManager: ObservableObject {
             let record = try await publicDatabase.record(for: recordID)
             return PublicRecording(from: record)
         } catch {
-            print("❌ [CloudKit] Failed to fetch recording: \(error)")
+            dlog("❌ [CloudKit] Failed to fetch recording: \(error)")
             return nil
         }
     }

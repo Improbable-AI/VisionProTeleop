@@ -61,7 +61,7 @@ class DropboxManager: NSObject, ObservableObject {
     func startOAuthFlow() async {
         guard appKey != "YOUR_DROPBOX_APP_KEY" else {
             authError = "Dropbox App Key not configured. Please set up a Dropbox app."
-            print("❌ [DropboxManager] App Key not configured")
+            dlog("❌ [DropboxManager] App Key not configured")
             return
         }
         
@@ -90,7 +90,7 @@ class DropboxManager: NSObject, ObservableObject {
             return
         }
         
-        print("🔐 [DropboxManager] Starting OAuth flow...")
+        dlog("🔐 [DropboxManager] Starting OAuth flow...")
         
         // Use ASWebAuthenticationSession for secure OAuth
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
@@ -110,7 +110,7 @@ class DropboxManager: NSObject, ObservableObject {
                         } else {
                             self.authError = "Authentication failed: \(error.localizedDescription)"
                         }
-                        print("❌ [DropboxManager] Auth error: \(error)")
+                        dlog("❌ [DropboxManager] Auth error: \(error)")
                         return
                     }
                     
@@ -135,7 +135,7 @@ class DropboxManager: NSObject, ObservableObject {
     /// Handle OAuth callback URL (for universal links or custom URL scheme)
     func handleCallback(url: URL) async -> Bool {
         guard let code = extractCode(from: url) else {
-            print("❌ [DropboxManager] No code in callback URL")
+            dlog("❌ [DropboxManager] No code in callback URL")
             return false
         }
         
@@ -177,9 +177,9 @@ class DropboxManager: NSObject, ObservableObject {
                   httpResponse.statusCode == 200 else {
                 let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
                 authError = "Token exchange failed (HTTP \(statusCode))"
-                print("❌ [DropboxManager] Token exchange failed: HTTP \(statusCode)")
+                dlog("❌ [DropboxManager] Token exchange failed: HTTP \(statusCode)")
                 if let body = String(data: data, encoding: .utf8) {
-                    print("   Response: \(body)")
+                    dlog("   Response: \(body)")
                 }
                 return
             }
@@ -194,18 +194,18 @@ class DropboxManager: NSObject, ObservableObject {
             )
             
             codeVerifier = nil
-            print("✅ [DropboxManager] Token exchange successful")
+            dlog("✅ [DropboxManager] Token exchange successful")
             
         } catch {
             authError = "Token exchange failed: \(error.localizedDescription)"
-            print("❌ [DropboxManager] Token exchange error: \(error)")
+            dlog("❌ [DropboxManager] Token exchange error: \(error)")
         }
     }
     
     /// Refresh the access token using the refresh token
     func refreshAccessToken() async -> String? {
         guard let refreshToken = KeychainManager.shared.loadString(forKey: .dropboxRefreshToken) else {
-            print("❌ [DropboxManager] No refresh token available")
+            dlog("❌ [DropboxManager] No refresh token available")
             return nil
         }
         
@@ -230,7 +230,7 @@ class DropboxManager: NSObject, ObservableObject {
             
             guard let httpResponse = response as? HTTPURLResponse,
                   httpResponse.statusCode == 200 else {
-                print("❌ [DropboxManager] Token refresh failed")
+                dlog("❌ [DropboxManager] Token refresh failed")
                 return nil
             }
             
@@ -244,11 +244,11 @@ class DropboxManager: NSObject, ObservableObject {
                 KeychainManager.shared.save(String(expiryDate.timeIntervalSince1970), forKey: .dropboxTokenExpiry)
             }
             
-            print("✅ [DropboxManager] Token refreshed")
+            dlog("✅ [DropboxManager] Token refreshed")
             return tokenResponse.accessToken
             
         } catch {
-            print("❌ [DropboxManager] Token refresh error: \(error)")
+            dlog("❌ [DropboxManager] Token refresh error: \(error)")
             return nil
         }
     }
@@ -268,7 +268,7 @@ class DropboxManager: NSObject, ObservableObject {
             
             // Refresh if expiring within 5 minutes
             if expiryDate.timeIntervalSinceNow < 300 {
-                print("🔄 [DropboxManager] Token expiring soon, refreshing...")
+                dlog("🔄 [DropboxManager] Token expiring soon, refreshing...")
                 return await refreshAccessToken()
             }
         }
@@ -303,7 +303,7 @@ class DropboxManager: NSObject, ObservableObject {
             return nil
             
         } catch {
-            print("❌ [DropboxManager] Failed to get account info: \(error)")
+            dlog("❌ [DropboxManager] Failed to get account info: \(error)")
             return nil
         }
     }
@@ -315,13 +315,13 @@ class DropboxManager: NSObject, ObservableObject {
     /// - Returns: Whether the upload succeeded
     func uploadFile(from fileURL: URL, to dropboxPath: String) async -> Bool {
         guard let accessToken = await getValidAccessToken() else {
-            print("❌ [DropboxManager] No valid access token for upload")
+            dlog("❌ [DropboxManager] No valid access token for upload")
             return false
         }
         
         // Read file data
         guard let fileData = try? Data(contentsOf: fileURL) else {
-            print("❌ [DropboxManager] Failed to read file: \(fileURL)")
+            dlog("❌ [DropboxManager] Failed to read file: \(fileURL)")
             return false
         }
         
@@ -352,15 +352,15 @@ class DropboxManager: NSObject, ObservableObject {
             guard let httpResponse = response as? HTTPURLResponse,
                   httpResponse.statusCode == 200 else {
                 let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
-                print("❌ [DropboxManager] Upload failed: HTTP \(statusCode)")
+                dlog("❌ [DropboxManager] Upload failed: HTTP \(statusCode)")
                 return false
             }
             
-            print("✅ [DropboxManager] Uploaded \(fileURL.lastPathComponent) to \(dropboxPath)")
+            dlog("✅ [DropboxManager] Uploaded \(fileURL.lastPathComponent) to \(dropboxPath)")
             return true
             
         } catch {
-            print("❌ [DropboxManager] Upload error: \(error)")
+            dlog("❌ [DropboxManager] Upload error: \(error)")
             return false
         }
     }
@@ -429,7 +429,7 @@ class DropboxManager: NSObject, ObservableObject {
         hasMoreRecordings = true
         
         guard let accessToken = await getValidAccessToken() else {
-            print("❌ [DropboxManager] No valid access token for listing")
+            dlog("❌ [DropboxManager] No valid access token for listing")
             return []
         }
         
@@ -457,7 +457,7 @@ class DropboxManager: NSObject, ObservableObject {
             guard let httpResponse = response as? HTTPURLResponse,
                   httpResponse.statusCode == 200 else {
                 let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
-                print("❌ [DropboxManager] List folder failed: HTTP \(statusCode)")
+                dlog("❌ [DropboxManager] List folder failed: HTTP \(statusCode)")
                 return []
             }
             
@@ -477,11 +477,11 @@ class DropboxManager: NSObject, ObservableObject {
             }
             
             let recordings = parseDropboxEntries(entries)
-            print("✅ [DropboxManager] Found \(recordings.count) recordings in Dropbox (hasMore: \(hasMoreRecordings))")
+            dlog("✅ [DropboxManager] Found \(recordings.count) recordings in Dropbox (hasMore: \(hasMoreRecordings))")
             return recordings
             
         } catch {
-            print("❌ [DropboxManager] List folder error: \(error)")
+            dlog("❌ [DropboxManager] List folder error: \(error)")
             return []
         }
     }
@@ -543,11 +543,11 @@ class DropboxManager: NSObject, ObservableObject {
             }
             
             let recordings = parseDropboxEntries(entries)
-            print("✅ [DropboxManager] Loaded \(recordings.count) more recordings (hasMore: \(hasMoreRecordings))")
+            dlog("✅ [DropboxManager] Loaded \(recordings.count) more recordings (hasMore: \(hasMoreRecordings))")
             return recordings
             
         } catch {
-            print("❌ [DropboxManager] Load more error: \(error)")
+            dlog("❌ [DropboxManager] Load more error: \(error)")
             return []
         }
     }
@@ -664,7 +664,7 @@ class DropboxManager: NSObject, ObservableObject {
             return true
             
         } catch {
-            print("❌ [DropboxManager] Download error: \(error)")
+            dlog("❌ [DropboxManager] Download error: \(error)")
             return false
         }
     }
@@ -700,7 +700,7 @@ class DropboxManager: NSObject, ObservableObject {
             return try decoder.decode(RecordingMetadata.self, from: data)
             
         } catch {
-            print("⚠️ [DropboxManager] Failed to download metadata: \(error)")
+            dlog("⚠️ [DropboxManager] Failed to download metadata: \(error)")
             return nil
         }
     }
@@ -736,7 +736,7 @@ class DropboxManager: NSObject, ObservableObject {
             return nil
             
         } catch {
-            print("❌ [DropboxManager] Get temporary link error: \(error)")
+            dlog("❌ [DropboxManager] Get temporary link error: \(error)")
             return nil
         }
     }
@@ -768,11 +768,11 @@ class DropboxManager: NSObject, ObservableObject {
                let links = json["links"] as? [[String: Any]],
                let firstLink = links.first,
                let url = firstLink["url"] as? String {
-                print("✅ [DropboxManager] Found existing shared link for: \(path)")
+                dlog("✅ [DropboxManager] Found existing shared link for: \(path)")
                 return url
             }
         } catch {
-            print("⚠️ [DropboxManager] No existing shared link found, creating new one")
+            dlog("⚠️ [DropboxManager] No existing shared link found, creating new one")
         }
         
         // Create new shared link
@@ -797,20 +797,20 @@ class DropboxManager: NSObject, ObservableObject {
             
             guard let httpResponse = response as? HTTPURLResponse,
                   httpResponse.statusCode == 200 else {
-                print("❌ [DropboxManager] Failed to create shared link")
+                dlog("❌ [DropboxManager] Failed to create shared link")
                 return nil
             }
             
             if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                let url = json["url"] as? String {
-                print("✅ [DropboxManager] Created shared link for: \(path)")
+                dlog("✅ [DropboxManager] Created shared link for: \(path)")
                 return url
             }
             
             return nil
             
         } catch {
-            print("❌ [DropboxManager] Create shared link error: \(error)")
+            dlog("❌ [DropboxManager] Create shared link error: \(error)")
             return nil
         }
     }
@@ -844,7 +844,7 @@ class DropboxManager: NSObject, ObservableObject {
             throw NSError(domain: "DropboxManager", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "Delete failed with status \(httpResponse.statusCode)"])
         }
         
-        print("✅ [DropboxManager] Deleted: \(path)")
+        dlog("✅ [DropboxManager] Deleted: \(path)")
     }
     
     // MARK: - PKCE Helpers

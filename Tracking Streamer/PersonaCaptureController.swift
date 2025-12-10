@@ -311,7 +311,7 @@ struct PersonaPreviewView: View {
                         do {
                             try await controller.start()
                         } catch {
-                            print("❌ [PersonaCapture] Failed to start: \(error)")
+                            dlog("❌ [PersonaCapture] Failed to start: \(error)")
                         }
                     }
                 }

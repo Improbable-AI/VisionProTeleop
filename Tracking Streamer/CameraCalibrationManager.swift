@@ -157,16 +157,16 @@ class CameraCalibrationManager: ObservableObject {
     /// Loads all calibrations from UserDefaults
     private func loadAllCalibrations() {
         guard let data = UserDefaults.standard.data(forKey: storageKey) else {
-            print("📷 [CameraCalibrationManager] No saved calibrations found")
+            dlog("📷 [CameraCalibrationManager] No saved calibrations found")
             return
         }
         
         do {
             let decoder = JSONDecoder()
             allCalibrations = try decoder.decode([String: CameraCalibrationData].self, from: data)
-            print("📷 [CameraCalibrationManager] Loaded \(allCalibrations.count) calibration(s)")
+            dlog("📷 [CameraCalibrationManager] Loaded \(allCalibrations.count) calibration(s)")
         } catch {
-            print("❌ [CameraCalibrationManager] Failed to load calibrations: \(error)")
+            dlog("❌ [CameraCalibrationManager] Failed to load calibrations: \(error)")
         }
     }
     
@@ -176,12 +176,12 @@ class CameraCalibrationManager: ObservableObject {
             let encoder = JSONEncoder()
             let data = try encoder.encode(allCalibrations)
             UserDefaults.standard.set(data, forKey: storageKey)
-            print("📷 [CameraCalibrationManager] Saved \(allCalibrations.count) calibration(s)")
+            dlog("📷 [CameraCalibrationManager] Saved \(allCalibrations.count) calibration(s)")
             
             // Also sync to iCloud for iPhone app
             syncToiCloud()
         } catch {
-            print("❌ [CameraCalibrationManager] Failed to save calibrations: \(error)")
+            dlog("❌ [CameraCalibrationManager] Failed to save calibrations: \(error)")
         }
     }
     
@@ -216,9 +216,9 @@ class CameraCalibrationManager: ObservableObject {
             let jsonData = try JSONSerialization.data(withJSONObject: results, options: [])
             NSUbiquitousKeyValueStore.default.set(jsonData, forKey: Self.iCloudIntrinsicResultsKey)
             NSUbiquitousKeyValueStore.default.synchronize()
-            print("☁️ [CameraCalibrationManager] Synced \(results.count) calibration(s) to iCloud")
+            dlog("☁️ [CameraCalibrationManager] Synced \(results.count) calibration(s) to iCloud")
         } catch {
-            print("❌ [CameraCalibrationManager] Failed to sync to iCloud: \(error)")
+            dlog("❌ [CameraCalibrationManager] Failed to sync to iCloud: \(error)")
         }
     }
     
@@ -230,7 +230,7 @@ class CameraCalibrationManager: ObservableObject {
     func loadCalibration(for deviceId: String) -> CameraCalibrationData? {
         if let calibration = allCalibrations[deviceId] {
             currentCalibration = calibration
-            print("📷 [CameraCalibrationManager] Loaded calibration for device: \(calibration.deviceName)")
+            dlog("📷 [CameraCalibrationManager] Loaded calibration for device: \(calibration.deviceName)")
             return calibration
         }
         currentCalibration = nil
@@ -249,7 +249,7 @@ class CameraCalibrationManager: ObservableObject {
             currentCalibration = nil
         }
         saveAllCalibrations()
-        print("📷 [CameraCalibrationManager] Deleted calibration for device: \(deviceId)")
+        dlog("📷 [CameraCalibrationManager] Deleted calibration for device: \(deviceId)")
     }
     
     // MARK: - Calibration Process
@@ -260,10 +260,10 @@ class CameraCalibrationManager: ObservableObject {
     ///   - deviceName: Human-readable name for the camera
     ///   - isStereo: Whether this is a stereo camera
     func startCalibration(deviceId: String, deviceName: String, isStereo: Bool) {
-        print("📷 [CameraCalibrationManager] ========== START CALIBRATION ==========")
-        print("📷 [CameraCalibrationManager] Device: \(deviceName) (id: \(deviceId))")
-        print("📷 [CameraCalibrationManager] Stereo: \(isStereo)")
-        print("📷 [CameraCalibrationManager] Checkerboard config: \(checkerboardConfig.innerCornersX)x\(checkerboardConfig.innerCornersY), square: \(checkerboardConfig.squareSize)m")
+        dlog("📷 [CameraCalibrationManager] ========== START CALIBRATION ==========")
+        dlog("📷 [CameraCalibrationManager] Device: \(deviceName) (id: \(deviceId))")
+        dlog("📷 [CameraCalibrationManager] Stereo: \(isStereo)")
+        dlog("📷 [CameraCalibrationManager] Checkerboard config: \(checkerboardConfig.innerCornersX)x\(checkerboardConfig.innerCornersY), square: \(checkerboardConfig.squareSize)m")
         
         calibrator = OpenCVCalibrator(
             checkerboardCornersX: Int32(checkerboardConfig.innerCornersX),
@@ -271,7 +271,7 @@ class CameraCalibrationManager: ObservableObject {
             squareSize: checkerboardConfig.squareSize
         )
         
-        print("📷 [CameraCalibrationManager] OpenCVCalibrator created: \(calibrator != nil)")
+        dlog("📷 [CameraCalibrationManager] OpenCVCalibrator created: \(calibrator != nil)")
         
         isCalibrating = true
         calibrationProgress = 0.0
@@ -282,8 +282,8 @@ class CameraCalibrationManager: ObservableObject {
         lastCornersRight = nil
         statusMessage = "Move the checkerboard around..."
         
-        print("📷 [CameraCalibrationManager] isCalibrating set to: \(isCalibrating)")
-        print("📷 [CameraCalibrationManager] ========== START CALIBRATION COMPLETE ==========")
+        dlog("📷 [CameraCalibrationManager] isCalibrating set to: \(isCalibrating)")
+        dlog("📷 [CameraCalibrationManager] ========== START CALIBRATION COMPLETE ==========")
     }
     
     /// Processes a stereo frame for calibration
@@ -341,7 +341,7 @@ class CameraCalibrationManager: ObservableObject {
         calibrationProgress = Float(samplesCollected) / Float(minSamples)
         statusMessage = "Captured sample \(samplesCollected)/\(minSamples)"
         
-        print("📷 [CameraCalibrationManager] Auto-captured sample #\(samplesCollected)")
+        dlog("📷 [CameraCalibrationManager] Auto-captured sample #\(samplesCollected)")
         
         return detection
     }
@@ -350,21 +350,21 @@ class CameraCalibrationManager: ObservableObject {
     /// - Parameter pixelBuffer: Mono camera frame
     /// - Returns: Detection result with visualization
     func processMonoFrame(_ pixelBuffer: CVPixelBuffer) -> CheckerboardDetection? {
-        print("🖼️ [CameraCalibrationManager] processMonoFrame called")
-        print("🖼️ [CameraCalibrationManager] isCalibrating: \(isCalibrating), calibrator: \(calibrator != nil)")
+        dlog("🖼️ [CameraCalibrationManager] processMonoFrame called")
+        dlog("🖼️ [CameraCalibrationManager] isCalibrating: \(isCalibrating), calibrator: \(calibrator != nil)")
         
         guard isCalibrating, let calibrator = calibrator else {
-            print("❌ [CameraCalibrationManager] Guard failed - isCalibrating: \(isCalibrating), calibrator: \(calibrator != nil)")
+            dlog("❌ [CameraCalibrationManager] Guard failed - isCalibrating: \(isCalibrating), calibrator: \(calibrator != nil)")
             return nil
         }
         
         let width = CVPixelBufferGetWidth(pixelBuffer)
         let height = CVPixelBufferGetHeight(pixelBuffer)
-        print("🖼️ [CameraCalibrationManager] Frame size: \(width)x\(height)")
+        dlog("🖼️ [CameraCalibrationManager] Frame size: \(width)x\(height)")
         
-        print("🔍 [CameraCalibrationManager] Calling detectCheckerboard...")
+        dlog("🔍 [CameraCalibrationManager] Calling detectCheckerboard...")
         let detection = calibrator.detectCheckerboard(monoFrame: pixelBuffer)
-        print("🔍 [CameraCalibrationManager] Detection result: \(detection != nil), foundLeft: \(detection?.foundLeft ?? false)")
+        dlog("🔍 [CameraCalibrationManager] Detection result: \(detection != nil), foundLeft: \(detection?.foundLeft ?? false)")
         
         guard let result = detection, result.foundLeft else {
             statusMessage = "Looking for checkerboard..."
@@ -405,7 +405,7 @@ class CameraCalibrationManager: ObservableObject {
         calibrationProgress = Float(samplesCollected) / Float(minSamples)
         statusMessage = "Captured sample \(samplesCollected)/\(minSamples)"
         
-        print("📷 [CameraCalibrationManager] Auto-captured sample #\(samplesCollected)")
+        dlog("📷 [CameraCalibrationManager] Auto-captured sample #\(samplesCollected)")
         
         return detection
     }
@@ -495,13 +495,13 @@ class CameraCalibrationManager: ObservableObject {
         statusMessage = "Calibration complete!"
         isCalibrating = false
         
-        print("✅ [CameraCalibrationManager] Calibration saved for: \(deviceName)")
-        print("   Left reproj error: \(leftIntrinsics.reprojectionError)")
+        dlog("✅ [CameraCalibrationManager] Calibration saved for: \(deviceName)")
+        dlog("   Left reproj error: \(leftIntrinsics.reprojectionError)")
         if let right = rightIntrinsics {
-            print("   Right reproj error: \(right.reprojectionError)")
+            dlog("   Right reproj error: \(right.reprojectionError)")
         }
         if let stereo = stereoExtrinsics {
-            print("   Stereo reproj error: \(stereo.stereoReprojectionError)")
+            dlog("   Stereo reproj error: \(stereo.stereoReprojectionError)")
         }
         
         return calibrationData
@@ -587,13 +587,13 @@ class CameraCalibrationManager: ObservableObject {
         statusMessage = "Calibration complete!"
         isCalibrating = false
         
-        print("✅ [CameraCalibrationManager] Calibration saved for: \(deviceName)")
-        print("   Left reproj error: \(leftIntrinsics.reprojectionError)")
+        dlog("✅ [CameraCalibrationManager] Calibration saved for: \(deviceName)")
+        dlog("   Left reproj error: \(leftIntrinsics.reprojectionError)")
         if let right = rightIntrinsics {
-            print("   Right reproj error: \(right.reprojectionError)")
+            dlog("   Right reproj error: \(right.reprojectionError)")
         }
         if let stereo = stereoExtrinsics {
-            print("   Stereo reproj error: \(stereo.stereoReprojectionError)")
+            dlog("   Stereo reproj error: \(stereo.stereoReprojectionError)")
         }
         
         return calibrationData
@@ -609,7 +609,7 @@ class CameraCalibrationManager: ObservableObject {
         statusMessage = ""
         lastCornersLeft = nil
         lastCornersRight = nil
-        print("📷 [CameraCalibrationManager] Calibration cancelled")
+        dlog("📷 [CameraCalibrationManager] Calibration cancelled")
     }
     
     // MARK: - Export/Import

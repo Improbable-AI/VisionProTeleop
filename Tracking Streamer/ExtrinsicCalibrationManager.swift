@@ -350,16 +350,16 @@ class ExtrinsicCalibrationManager: ObservableObject {
     
     private func loadAllCalibrations() {
         guard let data = UserDefaults.standard.data(forKey: storageKey) else {
-            print("📐 [ExtrinsicCalibrationManager] No saved calibrations found")
+            dlog("📐 [ExtrinsicCalibrationManager] No saved calibrations found")
             return
         }
         
         do {
             let decoder = JSONDecoder()
             allCalibrations = try decoder.decode([String: ExtrinsicCalibrationData].self, from: data)
-            print("📐 [ExtrinsicCalibrationManager] Loaded \(allCalibrations.count) calibration(s)")
+            dlog("📐 [ExtrinsicCalibrationManager] Loaded \(allCalibrations.count) calibration(s)")
         } catch {
-            print("❌ [ExtrinsicCalibrationManager] Failed to load calibrations: \(error)")
+            dlog("❌ [ExtrinsicCalibrationManager] Failed to load calibrations: \(error)")
         }
     }
     
@@ -368,12 +368,12 @@ class ExtrinsicCalibrationManager: ObservableObject {
             let encoder = JSONEncoder()
             let data = try encoder.encode(allCalibrations)
             UserDefaults.standard.set(data, forKey: storageKey)
-            print("📐 [ExtrinsicCalibrationManager] Saved \(allCalibrations.count) calibration(s)")
+            dlog("📐 [ExtrinsicCalibrationManager] Saved \(allCalibrations.count) calibration(s)")
             
             // Also sync to iCloud for iPhone app
             syncToiCloud()
         } catch {
-            print("❌ [ExtrinsicCalibrationManager] Failed to save calibrations: \(error)")
+            dlog("❌ [ExtrinsicCalibrationManager] Failed to save calibrations: \(error)")
         }
     }
     
@@ -382,7 +382,7 @@ class ExtrinsicCalibrationManager: ObservableObject {
     func loadCalibration(for deviceId: String) -> ExtrinsicCalibrationData? {
         if let calibration = allCalibrations[deviceId] {
             currentCalibration = calibration
-            print("📐 [ExtrinsicCalibrationManager] Loaded calibration for device: \(calibration.cameraDeviceName)")
+            dlog("📐 [ExtrinsicCalibrationManager] Loaded calibration for device: \(calibration.cameraDeviceName)")
             return calibration
         }
         currentCalibration = nil
@@ -399,7 +399,7 @@ class ExtrinsicCalibrationManager: ObservableObject {
             currentCalibration = nil
         }
         saveAllCalibrations()
-        print("📐 [ExtrinsicCalibrationManager] Deleted calibration for device: \(deviceId)")
+        dlog("📐 [ExtrinsicCalibrationManager] Deleted calibration for device: \(deviceId)")
     }
     
     // MARK: - ARKit Image Tracking Setup
@@ -412,13 +412,13 @@ class ExtrinsicCalibrationManager: ObservableObject {
             sizePixels: 1000,  // High resolution for ARKit
             dictionary: arucoDictionary
         ) else {
-            print("❌ [ExtrinsicCalibrationManager] Failed to generate marker \(markerId)")
+            dlog("❌ [ExtrinsicCalibrationManager] Failed to generate marker \(markerId)")
             return nil
         }
         
         guard let cgImageSource = CGImageSourceCreateWithData(imageData as CFData, nil),
               let cgImage = CGImageSourceCreateImageAtIndex(cgImageSource, 0, nil) else {
-            print("❌ [ExtrinsicCalibrationManager] Failed to create CGImage for marker \(markerId)")
+            dlog("❌ [ExtrinsicCalibrationManager] Failed to create CGImage for marker \(markerId)")
             return nil
         }
         
@@ -430,7 +430,7 @@ class ExtrinsicCalibrationManager: ObservableObject {
         )
         refImage.name = "aruco_\(markerId)"
         
-        print("📐 [ExtrinsicCalibrationManager] Created ARKit reference image for marker \(markerId) - size: \(cgImage.width)x\(cgImage.height), physical: \(markerSizeMeters)m")
+        dlog("📐 [ExtrinsicCalibrationManager] Created ARKit reference image for marker \(markerId) - size: \(cgImage.width)x\(cgImage.height), physical: \(markerSizeMeters)m")
         
         return refImage
     }
@@ -458,12 +458,12 @@ class ExtrinsicCalibrationManager: ObservableObject {
     ///   - deviceName: Human-readable device name
     ///   - isStereo: Whether this is a stereo camera (side-by-side format)
     func startCalibration(deviceId: String, deviceName: String, isStereo: Bool) async {
-        print("📐 [ExtrinsicCalibrationManager] ========== START EXTRINSIC CALIBRATION ==========")
-        print("📐 [ExtrinsicCalibrationManager] Device: \(deviceName) (id: \(deviceId))")
-        print("📐 [ExtrinsicCalibrationManager] Stereo: \(isStereo)")
-        print("📐 [ExtrinsicCalibrationManager] Marker size: \(markerSizeMeters)m (\(markerSizeMeters * 1000)mm)")
-        print("📐 [ExtrinsicCalibrationManager] Sequential workflow: markers \(markerIds)")
-        print("📐 [ExtrinsicCalibrationManager] Samples per position: \(samplesPerPosition)")
+        dlog("📐 [ExtrinsicCalibrationManager] ========== START EXTRINSIC CALIBRATION ==========")
+        dlog("📐 [ExtrinsicCalibrationManager] Device: \(deviceName) (id: \(deviceId))")
+        dlog("📐 [ExtrinsicCalibrationManager] Stereo: \(isStereo)")
+        dlog("📐 [ExtrinsicCalibrationManager] Marker size: \(markerSizeMeters)m (\(markerSizeMeters * 1000)mm)")
+        dlog("📐 [ExtrinsicCalibrationManager] Sequential workflow: markers \(markerIds)")
+        dlog("📐 [ExtrinsicCalibrationManager] Samples per position: \(samplesPerPosition)")
         
         // Store stereo mode
         isStereoCalibration = isStereo
@@ -497,7 +497,7 @@ class ExtrinsicCalibrationManager: ObservableObject {
         // ARKit will track whichever marker is visible
         do {
             let referenceImages = generateReferenceImages()
-            print("📐 [ExtrinsicCalibrationManager] Generated \(referenceImages.count) reference images for markers: \(referenceImages.compactMap { $0.name })")
+            dlog("📐 [ExtrinsicCalibrationManager] Generated \(referenceImages.count) reference images for markers: \(referenceImages.compactMap { $0.name })")
             
             guard !referenceImages.isEmpty else {
                 lastError = "Failed to generate reference images"
@@ -508,7 +508,7 @@ class ExtrinsicCalibrationManager: ObservableObject {
             arkitSession = ARKitSession()
             imageTrackingProvider = ImageTrackingProvider(referenceImages: referenceImages)
             
-            print("📐 [ExtrinsicCalibrationManager] ImageTrackingProvider created with \(referenceImages.count) images")
+            dlog("📐 [ExtrinsicCalibrationManager] ImageTrackingProvider created with \(referenceImages.count) images")
             
             guard ImageTrackingProvider.isSupported else {
                 lastError = "Image tracking is not supported on this device"
@@ -524,12 +524,12 @@ class ExtrinsicCalibrationManager: ObservableObject {
             }
             
             statusMessage = "Show marker ID \(currentMarkerId) on iPhone, look at it with Vision Pro"
-            print("📐 [ExtrinsicCalibrationManager] ARKit image tracking started - waiting for marker \(currentMarkerId)")
+            dlog("📐 [ExtrinsicCalibrationManager] ARKit image tracking started - waiting for marker \(currentMarkerId)")
             
         } catch {
             lastError = "Failed to start ARKit: \(error.localizedDescription)"
             isCalibrating = false
-            print("❌ [ExtrinsicCalibrationManager] ARKit setup failed: \(error)")
+            dlog("❌ [ExtrinsicCalibrationManager] ARKit setup failed: \(error)")
         }
     }
     
@@ -537,7 +537,7 @@ class ExtrinsicCalibrationManager: ObservableObject {
     /// Call this after collecting enough samples for the current marker
     func advanceToNextMarker() {
         guard currentMarkerIndex < markerIds.count - 1 else {
-            print("📐 [ExtrinsicCalibrationManager] Already at last marker")
+            dlog("📐 [ExtrinsicCalibrationManager] Already at last marker")
             return
         }
         
@@ -550,7 +550,7 @@ class ExtrinsicCalibrationManager: ObservableObject {
         lastCaptureTime = .distantPast
         
         statusMessage = "Now show marker ID \(currentMarkerId) at a DIFFERENT position"
-        print("📐 [ExtrinsicCalibrationManager] Advanced to marker \(currentMarkerId) (position \(currentMarkerIndex + 1)/\(markerIds.count))")
+        dlog("📐 [ExtrinsicCalibrationManager] Advanced to marker \(currentMarkerId) (position \(currentMarkerIndex + 1)/\(markerIds.count))")
     }
     
     /// Check if current marker position has enough samples
@@ -573,18 +573,18 @@ class ExtrinsicCalibrationManager: ObservableObject {
     private func processImageAnchorUpdates() async {
         guard let provider = imageTrackingProvider else { return }
         
-        print("📐 [ExtrinsicCalibrationManager] Started listening for image anchor updates...")
+        dlog("📐 [ExtrinsicCalibrationManager] Started listening for image anchor updates...")
         
         for await update in provider.anchorUpdates {
             let anchor = update.anchor
             
-            print("📐 [ExtrinsicCalibrationManager] Anchor update - name: \(anchor.referenceImage.name ?? "nil"), isTracked: \(anchor.isTracked), event: \(update.event)")
+            dlog("📐 [ExtrinsicCalibrationManager] Anchor update - name: \(anchor.referenceImage.name ?? "nil"), isTracked: \(anchor.isTracked), event: \(update.event)")
             
             // Extract marker ID from reference image name
             guard let name = anchor.referenceImage.name,
                   name.hasPrefix("aruco_"),
                   let markerId = Int(name.dropFirst(6)) else {
-                print("⚠️ [ExtrinsicCalibrationManager] Could not parse marker ID from anchor name: \(anchor.referenceImage.name ?? "nil")")
+                dlog("⚠️ [ExtrinsicCalibrationManager] Could not parse marker ID from anchor name: \(anchor.referenceImage.name ?? "nil")")
                 continue
             }
             
@@ -594,17 +594,17 @@ class ExtrinsicCalibrationManager: ObservableObject {
                     let transform = anchor.originFromAnchorTransform
                     arkitTrackedMarkers[markerId] = transform
                     rememberedMarkerPositions[markerId] = transform  // Remember for later!
-                    print("📐 [ExtrinsicCalibrationManager] Tracking marker \(markerId) - now have \(rememberedMarkerPositions.count) remembered markers")
+                    dlog("📐 [ExtrinsicCalibrationManager] Tracking marker \(markerId) - now have \(rememberedMarkerPositions.count) remembered markers")
                 } else {
                     // Remove from active tracking but KEEP in remembered positions
                     // Markers are stationary, so their world position doesn't change
                     arkitTrackedMarkers.removeValue(forKey: markerId)
-                    print("📐 [ExtrinsicCalibrationManager] Lost active tracking of marker \(markerId) (still remembered)")
+                    dlog("📐 [ExtrinsicCalibrationManager] Lost active tracking of marker \(markerId) (still remembered)")
                 }
             }
         }
         
-        print("📐 [ExtrinsicCalibrationManager] Stopped listening for image anchor updates")
+        dlog("📐 [ExtrinsicCalibrationManager] Stopped listening for image anchor updates")
     }
     
     /// Update head pose from ARKit (called from HeadTrackingSystem)
@@ -827,7 +827,7 @@ class ExtrinsicCalibrationManager: ObservableObject {
         let remembered = rememberedMarkerPositions.keys.sorted()
         let cameraDetected = cameraDetectedMarkers.keys.sorted()
         
-        print("📐 [ExtrinsicCalibrationManager] Target: ID \(targetMarkerId) | ARKit active: \(activeTracking), remembered: \(remembered) | Camera: \(cameraDetected)")
+        dlog("📐 [ExtrinsicCalibrationManager] Target: ID \(targetMarkerId) | ARKit active: \(activeTracking), remembered: \(remembered) | Camera: \(cameraDetected)")
         
         // Provide helpful status messages
         if !arkitHasMarker && !cameraHasMarker {
@@ -923,7 +923,7 @@ class ExtrinsicCalibrationManager: ObservableObject {
             statusMessage = "Marker \(targetMarkerId): \(samplesForMarker)/\(samplesPerPosition) samples"
         }
         
-        print("📐 [ExtrinsicCalibrationManager] Sample captured for marker \(targetMarkerId) - position \(currentMarkerIndex + 1): \(samplesForCurrentMarker)/\(samplesPerPosition), total: \(samplesCollected)")
+        dlog("📐 [ExtrinsicCalibrationManager] Sample captured for marker \(targetMarkerId) - position \(currentMarkerIndex + 1): \(samplesForCurrentMarker)/\(samplesPerPosition), total: \(samplesCollected)")
     }
     
     /// Finish calibration and compute the transform(s)
@@ -975,7 +975,7 @@ class ExtrinsicCalibrationManager: ObservableObject {
             
             // If we have a known baseline, enforce it
             if let baseline = knownStereoBaseline, baseline > 0 {
-                print("📐 [ExtrinsicCalibrationManager] Enforcing stereo baseline constraint: \(baseline * 100)cm")
+                dlog("📐 [ExtrinsicCalibrationManager] Enforcing stereo baseline constraint: \(baseline * 100)cm")
                 (leftTransform, rightTransform) = enforceBaselineConstraint(
                     leftTransform: leftTransform,
                     rightTransform: rightTransform!,
@@ -1026,16 +1026,16 @@ class ExtrinsicCalibrationManager: ObservableObject {
         arkitSession = nil
         imageTrackingProvider = nil
         
-        print("✅ [ExtrinsicCalibrationManager] Calibration saved for: \(deviceName)")
-        print("   Left reproj error: \(leftError) meters (\(leftSamples.count) samples)")
+        dlog("✅ [ExtrinsicCalibrationManager] Calibration saved for: \(deviceName)")
+        dlog("   Left reproj error: \(leftError) meters (\(leftSamples.count) samples)")
         if let rightError = rightError {
-            print("   Right reproj error: \(rightError) meters (\(rightSamples.count) samples)")
+            dlog("   Right reproj error: \(rightError) meters (\(rightSamples.count) samples)")
         }
-        print("   Markers used: \(uniqueMarkers)")
+        dlog("   Markers used: \(uniqueMarkers)")
         
         // Print transform details for verification
         let t = SIMD3<Float>(leftTransform.columns.3.x, leftTransform.columns.3.y, leftTransform.columns.3.z)
-        print("   Left T_head^camera translation: (\(String(format: "%.3f", t.x)), \(String(format: "%.3f", t.y)), \(String(format: "%.3f", t.z))) m")
+        dlog("   Left T_head^camera translation: (\(String(format: "%.3f", t.x)), \(String(format: "%.3f", t.y)), \(String(format: "%.3f", t.z))) m")
         
         // Extract rotation angles (Euler XYZ) for intuition
         let R = simd_float3x3(
@@ -1046,10 +1046,10 @@ class ExtrinsicCalibrationManager: ObservableObject {
         let pitch = asin(-R.columns.2.x) // rotation around Y
         let yaw = atan2(R.columns.2.y, R.columns.2.z) // rotation around X
         let roll = atan2(R.columns.1.x, R.columns.0.x) // rotation around Z
-        print("   Left rotation (XYZ Euler): X=\(String(format: "%.1f", yaw * 180 / .pi))°, Y=\(String(format: "%.1f", pitch * 180 / .pi))°, Z=\(String(format: "%.1f", roll * 180 / .pi))°")
+        dlog("   Left rotation (XYZ Euler): X=\(String(format: "%.1f", yaw * 180 / .pi))°, Y=\(String(format: "%.1f", pitch * 180 / .pi))°, Z=\(String(format: "%.1f", roll * 180 / .pi))°")
         
         if t.z > 0 {
-            print("   ⚠️ WARNING: translation.z > 0 - unusual for front-mounted camera")
+            dlog("   ⚠️ WARNING: translation.z > 0 - unusual for front-mounted camera")
         }
         
         return calibrationData
@@ -1105,7 +1105,7 @@ class ExtrinsicCalibrationManager: ObservableObject {
         }
         
         // Debug: print sample positions to verify scale/units
-        print("📐 [Calibration] Total samples: \(pointsInHead.count)")
+        dlog("📐 [Calibration] Total samples: \(pointsInHead.count)")
         
         // Compute statistics
         let headDistances = pointsInHead.map { simd_length($0) }
@@ -1113,22 +1113,22 @@ class ExtrinsicCalibrationManager: ObservableObject {
         let avgHeadDist = headDistances.reduce(0, +) / Float(headDistances.count)
         let avgCamDist = camDistances.reduce(0, +) / Float(camDistances.count)
         
-        print("📐 [Calibration] Average distance to marker:")
-        print("📐 [Calibration]   - Head frame:   \(String(format: "%.3f", avgHeadDist)) m")
-        print("📐 [Calibration]   - Camera frame: \(String(format: "%.3f", avgCamDist)) m")
-        print("📐 [Calibration]   - Ratio (cam/head): \(String(format: "%.3f", avgCamDist / avgHeadDist))")
+        dlog("📐 [Calibration] Average distance to marker:")
+        dlog("📐 [Calibration]   - Head frame:   \(String(format: "%.3f", avgHeadDist)) m")
+        dlog("📐 [Calibration]   - Camera frame: \(String(format: "%.3f", avgCamDist)) m")
+        dlog("📐 [Calibration]   - Ratio (cam/head): \(String(format: "%.3f", avgCamDist / avgHeadDist))")
         
         if abs(avgCamDist / avgHeadDist - 1.0) > 0.5 {
-            print("⚠️ [Calibration] WARNING: Large distance ratio suggests scale mismatch!")
-            print("⚠️ [Calibration] Check marker size setting (\(markerSizeMeters)m) matches physical marker")
+            dlog("⚠️ [Calibration] WARNING: Large distance ratio suggests scale mismatch!")
+            dlog("⚠️ [Calibration] Check marker size setting (\(markerSizeMeters)m) matches physical marker")
         }
         
         if let firstHead = pointsInHead.first, let firstCam = pointsInCamera.first,
            let lastHead = pointsInHead.last, let lastCam = pointsInCamera.last {
-            print("📐 [Calibration] First sample - Head frame: (\(String(format: "%.3f", firstHead.x)), \(String(format: "%.3f", firstHead.y)), \(String(format: "%.3f", firstHead.z))) m")
-            print("📐 [Calibration] First sample - Camera frame: (\(String(format: "%.3f", firstCam.x)), \(String(format: "%.3f", firstCam.y)), \(String(format: "%.3f", firstCam.z))) m")
-            print("📐 [Calibration] Last sample - Head frame: (\(String(format: "%.3f", lastHead.x)), \(String(format: "%.3f", lastHead.y)), \(String(format: "%.3f", lastHead.z))) m")
-            print("📐 [Calibration] Last sample - Camera frame: (\(String(format: "%.3f", lastCam.x)), \(String(format: "%.3f", lastCam.y)), \(String(format: "%.3f", lastCam.z))) m")
+            dlog("📐 [Calibration] First sample - Head frame: (\(String(format: "%.3f", firstHead.x)), \(String(format: "%.3f", firstHead.y)), \(String(format: "%.3f", firstHead.z))) m")
+            dlog("📐 [Calibration] First sample - Camera frame: (\(String(format: "%.3f", firstCam.x)), \(String(format: "%.3f", firstCam.y)), \(String(format: "%.3f", firstCam.z))) m")
+            dlog("📐 [Calibration] Last sample - Head frame: (\(String(format: "%.3f", lastHead.x)), \(String(format: "%.3f", lastHead.y)), \(String(format: "%.3f", lastHead.z))) m")
+            dlog("📐 [Calibration] Last sample - Camera frame: (\(String(format: "%.3f", lastCam.x)), \(String(format: "%.3f", lastCam.y)), \(String(format: "%.3f", lastCam.z))) m")
         }
         
         // Check point cloud spread (needed for good rotation estimation)
@@ -1136,13 +1136,13 @@ class ExtrinsicCalibrationManager: ObservableObject {
         let camCentroid = pointsInCamera.reduce(SIMD3<Float>.zero, +) / Float(pointsInCamera.count)
         let headSpread = pointsInHead.map { simd_length($0 - headCentroid) }.max() ?? 0
         let camSpread = pointsInCamera.map { simd_length($0 - camCentroid) }.max() ?? 0
-        print("📐 [Calibration] Point cloud spread (max dist from centroid):")
-        print("📐 [Calibration]   - Head frame:   \(String(format: "%.3f", headSpread)) m")
-        print("📐 [Calibration]   - Camera frame: \(String(format: "%.3f", camSpread)) m")
+        dlog("📐 [Calibration] Point cloud spread (max dist from centroid):")
+        dlog("📐 [Calibration]   - Head frame:   \(String(format: "%.3f", headSpread)) m")
+        dlog("📐 [Calibration]   - Camera frame: \(String(format: "%.3f", camSpread)) m")
         
         if headSpread < 0.05 {
-            print("⚠️ [Calibration] WARNING: Head frame points are tightly clustered!")
-            print("⚠️ [Calibration] Move the marker to more diverse positions for better rotation estimation.")
+            dlog("⚠️ [Calibration] WARNING: Head frame points are tightly clustered!")
+            dlog("⚠️ [Calibration] Move the marker to more diverse positions for better rotation estimation.")
         }
         
         // Kabsch finds T such that: P_camera_arkit = T * P_head
@@ -1152,8 +1152,8 @@ class ExtrinsicCalibrationManager: ObservableObject {
         
         // Debug: print the resulting transform
         let translation = SIMD3<Float>(T_head_to_camera.columns.3.x, T_head_to_camera.columns.3.y, T_head_to_camera.columns.3.z)
-        print("📐 [Calibration] Computed translation: (\(String(format: "%.3f", translation.x)), \(String(format: "%.3f", translation.y)), \(String(format: "%.3f", translation.z))) m")
-        print("📐 [Calibration] Translation magnitude: \(String(format: "%.3f", simd_length(translation))) m")
+        dlog("📐 [Calibration] Computed translation: (\(String(format: "%.3f", translation.x)), \(String(format: "%.3f", translation.y)), \(String(format: "%.3f", translation.z))) m")
+        dlog("📐 [Calibration] Translation magnitude: \(String(format: "%.3f", simd_length(translation))) m")
         
         // Test transform quality
         var avgError: Float = 0
@@ -1163,7 +1163,7 @@ class ExtrinsicCalibrationManager: ObservableObject {
             avgError += simd_length(predictedPos - pointsInCamera[i])
         }
         avgError /= Float(pointsInHead.count)
-        print("📐 [Calibration] Average reprojection error: \(String(format: "%.4f", avgError)) m")
+        dlog("📐 [Calibration] Average reprojection error: \(String(format: "%.4f", avgError)) m")
         
         // Sanity check: For a front-mounted forward-looking camera in ARKit convention,
         // Z should be POSITIVE (camera is in front of head, which is +Z direction in ARKit where Z points backward)
@@ -1179,7 +1179,7 @@ class ExtrinsicCalibrationManager: ObservableObject {
             let predicted = T_head_to_camera * SIMD4<Float>(firstHead, 1)
             let predictedPos = SIMD3<Float>(predicted.x, predicted.y, predicted.z)
             let error = simd_length(predictedPos - firstCam)
-            print("📐 [Calibration] Test - First point prediction error: \(String(format: "%.4f", error)) m")
+            dlog("📐 [Calibration] Test - First point prediction error: \(String(format: "%.4f", error)) m")
         }
         
         return T_head_to_camera
@@ -1190,7 +1190,7 @@ class ExtrinsicCalibrationManager: ObservableObject {
     /// Returns T such that: target ≈ T * source
     private func kabschAlgorithm(sourcePoints: [SIMD3<Float>], targetPoints: [SIMD3<Float>]) -> simd_float4x4 {
         guard sourcePoints.count == targetPoints.count, sourcePoints.count >= 3 else {
-            print("⚠️ [ExtrinsicCalibrationManager] Kabsch: need at least 3 point pairs")
+            dlog("⚠️ [ExtrinsicCalibrationManager] Kabsch: need at least 3 point pairs")
             return matrix_identity_float4x4
         }
         
@@ -1295,7 +1295,7 @@ class ExtrinsicCalibrationManager: ObservableObject {
         sgesdd_(&jobz, &m, &n, &matrix, &lda, &singularValues, &uMatrix, &ldu, &vtMatrix, &ldvt, &work, &lwork, &iwork, &info)
         
         if info != 0 {
-            print("⚠️ [ExtrinsicCalibrationManager] SVD failed with info = \(info)")
+            dlog("⚠️ [ExtrinsicCalibrationManager] SVD failed with info = \(info)")
             return (simd_float3x3(1), SIMD3<Float>(1, 1, 1), simd_float3x3(1))
         }
         
@@ -1335,11 +1335,11 @@ class ExtrinsicCalibrationManager: ObservableObject {
         let leftPos = SIMD3<Float>(leftCamInHead.columns.3.x, leftCamInHead.columns.3.y, leftCamInHead.columns.3.z)
         let rightPos = SIMD3<Float>(rightCamInHead.columns.3.x, rightCamInHead.columns.3.y, rightCamInHead.columns.3.z)
         
-        print("📐 [Baseline] Original positions - Left: (\(leftPos.x*100), \(leftPos.y*100), \(leftPos.z*100))cm, Right: (\(rightPos.x*100), \(rightPos.y*100), \(rightPos.z*100))cm")
+        dlog("📐 [Baseline] Original positions - Left: (\(leftPos.x*100), \(leftPos.y*100), \(leftPos.z*100))cm, Right: (\(rightPos.x*100), \(rightPos.y*100), \(rightPos.z*100))cm")
         
         // Compute current baseline
         let currentBaseline = rightPos.x - leftPos.x
-        print("📐 [Baseline] Current X baseline: \(currentBaseline * 100)cm, Target: \(baseline * 100)cm")
+        dlog("📐 [Baseline] Current X baseline: \(currentBaseline * 100)cm, Target: \(baseline * 100)cm")
         
         // Average rotation from both cameras (they should be the same for rigidly mounted stereo)
         let leftRot = simd_float3x3(
@@ -1365,7 +1365,7 @@ class ExtrinsicCalibrationManager: ObservableObject {
         
         // Current midpoint X
         let midpointX = (leftPos.x + rightPos.x) / 2
-        print("📐 [Baseline] Current midpoint X: \(midpointX * 100)cm (ideally ~0)")
+        dlog("📐 [Baseline] Current midpoint X: \(midpointX * 100)cm (ideally ~0)")
         
         // Enforce baseline with centering at x=0
         // Left camera at -baseline/2, right camera at +baseline/2
@@ -1375,7 +1375,7 @@ class ExtrinsicCalibrationManager: ObservableObject {
         let newLeftPos = SIMD3<Float>(newLeftX, avgY, avgZ)
         let newRightPos = SIMD3<Float>(newRightX, avgY, avgZ)
         
-        print("📐 [Baseline] Refined positions - Left: (\(newLeftPos.x*100), \(newLeftPos.y*100), \(newLeftPos.z*100))cm, Right: (\(newRightPos.x*100), \(newRightPos.y*100), \(newRightPos.z*100))cm")
+        dlog("📐 [Baseline] Refined positions - Left: (\(newLeftPos.x*100), \(newLeftPos.y*100), \(newLeftPos.z*100))cm, Right: (\(newRightPos.x*100), \(newRightPos.y*100), \(newRightPos.z*100))cm")
         
         // Build new camera poses in head frame
         var newLeftCamInHead = simd_float4x4(1)
@@ -1433,7 +1433,7 @@ class ExtrinsicCalibrationManager: ObservableObject {
         currentMarkerId = markerIds.first ?? 0
         samplesForCurrentMarker = 0
         
-        print("📐 [ExtrinsicCalibrationManager] Calibration cancelled")
+        dlog("📐 [ExtrinsicCalibrationManager] Calibration cancelled")
     }
     
     // MARK: - Helper Functions
@@ -1591,9 +1591,9 @@ class ExtrinsicCalibrationManager: ObservableObject {
             let jsonData = try JSONSerialization.data(withJSONObject: results, options: [])
             NSUbiquitousKeyValueStore.default.set(jsonData, forKey: Self.iCloudExtrinsicResultsKey)
             NSUbiquitousKeyValueStore.default.synchronize()
-            print("☁️ [ExtrinsicCalibrationManager] Synced \(results.count) calibration(s) to iCloud")
+            dlog("☁️ [ExtrinsicCalibrationManager] Synced \(results.count) calibration(s) to iCloud")
         } catch {
-            print("❌ [ExtrinsicCalibrationManager] Failed to sync to iCloud: \(error)")
+            dlog("❌ [ExtrinsicCalibrationManager] Failed to sync to iCloud: \(error)")
         }
     }
 }

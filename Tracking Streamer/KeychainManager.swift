@@ -41,7 +41,7 @@ class KeychainManager {
     @discardableResult
     func save(_ value: String, forKey key: KeychainKey, synchronizable: Bool = true) -> Bool {
         guard let data = value.data(using: .utf8) else {
-            print("❌ [KeychainManager] Failed to convert string to data")
+            dlog("❌ [KeychainManager] Failed to convert string to data")
             return false
         }
         return save(data, forKey: key, synchronizable: synchronizable)
@@ -66,10 +66,10 @@ class KeychainManager {
         let status = SecItemAdd(query as CFDictionary, nil)
         
         if status == errSecSuccess {
-            print("✅ [KeychainManager] Saved \(key.rawValue) to keychain (sync: \(synchronizable))")
+            dlog("✅ [KeychainManager] Saved \(key.rawValue) to keychain (sync: \(synchronizable))")
             return true
         } else {
-            print("❌ [KeychainManager] Failed to save \(key.rawValue): \(status)")
+            dlog("❌ [KeychainManager] Failed to save \(key.rawValue): \(status)")
             return false
         }
     }
@@ -96,13 +96,13 @@ class KeychainManager {
         let status = SecItemCopyMatching(query as CFDictionary, &dataTypeRef)
         
         if status == errSecSuccess, let data = dataTypeRef as? Data {
-            print("✅ [KeychainManager] Loaded \(key.rawValue) from keychain")
+            dlog("✅ [KeychainManager] Loaded \(key.rawValue) from keychain")
             return data
         } else if status == errSecItemNotFound {
-            print("ℹ️ [KeychainManager] Key \(key.rawValue) not found in keychain")
+            dlog("ℹ️ [KeychainManager] Key \(key.rawValue) not found in keychain")
             return nil
         } else {
-            print("❌ [KeychainManager] Failed to load \(key.rawValue): \(status)")
+            dlog("❌ [KeychainManager] Failed to load \(key.rawValue): \(status)")
             return nil
         }
     }

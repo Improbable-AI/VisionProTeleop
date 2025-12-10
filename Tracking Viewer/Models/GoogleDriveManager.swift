@@ -66,7 +66,7 @@ class GoogleDriveManager: NSObject, ObservableObject {
     func startOAuthFlow() async {
         guard !clientID.contains("YOUR_GOOGLE_CLIENT_ID") else {
             authError = "Google Client ID not configured. Please set up a Google Cloud project."
-            print("❌ [GoogleDriveManager] Client ID not configured")
+            dlog("❌ [GoogleDriveManager] Client ID not configured")
             return
         }
         
@@ -97,7 +97,7 @@ class GoogleDriveManager: NSObject, ObservableObject {
             return
         }
         
-        print("🔐 [GoogleDriveManager] Starting OAuth flow...")
+        dlog("🔐 [GoogleDriveManager] Starting OAuth flow...")
         
         // Use ASWebAuthenticationSession for secure OAuth
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
@@ -117,7 +117,7 @@ class GoogleDriveManager: NSObject, ObservableObject {
                         } else {
                             self.authError = "Authentication failed: \(error.localizedDescription)"
                         }
-                        print("❌ [GoogleDriveManager] Auth error: \(error)")
+                        dlog("❌ [GoogleDriveManager] Auth error: \(error)")
                         return
                     }
                     
@@ -142,7 +142,7 @@ class GoogleDriveManager: NSObject, ObservableObject {
     /// Handle OAuth callback URL (for universal links or custom URL scheme)
     func handleCallback(url: URL) async -> Bool {
         guard let code = extractCode(from: url) else {
-            print("❌ [GoogleDriveManager] No code in callback URL")
+            dlog("❌ [GoogleDriveManager] No code in callback URL")
             return false
         }
         
@@ -184,9 +184,9 @@ class GoogleDriveManager: NSObject, ObservableObject {
                   httpResponse.statusCode == 200 else {
                 let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
                 authError = "Token exchange failed (HTTP \(statusCode))"
-                print("❌ [GoogleDriveManager] Token exchange failed: HTTP \(statusCode)")
+                dlog("❌ [GoogleDriveManager] Token exchange failed: HTTP \(statusCode)")
                 if let body = String(data: data, encoding: .utf8) {
-                    print("   Response: \(body)")
+                    dlog("   Response: \(body)")
                 }
                 return
             }
@@ -201,18 +201,18 @@ class GoogleDriveManager: NSObject, ObservableObject {
             )
             
             codeVerifier = nil
-            print("✅ [GoogleDriveManager] Token exchange successful")
+            dlog("✅ [GoogleDriveManager] Token exchange successful")
             
         } catch {
             authError = "Token exchange failed: \(error.localizedDescription)"
-            print("❌ [GoogleDriveManager] Token exchange error: \(error)")
+            dlog("❌ [GoogleDriveManager] Token exchange error: \(error)")
         }
     }
     
     /// Refresh the access token using the refresh token
     func refreshAccessToken() async -> String? {
         guard let refreshToken = KeychainManager.shared.loadString(forKey: .googleDriveRefreshToken) else {
-            print("❌ [GoogleDriveManager] No refresh token available")
+            dlog("❌ [GoogleDriveManager] No refresh token available")
             return nil
         }
         
@@ -237,7 +237,7 @@ class GoogleDriveManager: NSObject, ObservableObject {
             
             guard let httpResponse = response as? HTTPURLResponse,
                   httpResponse.statusCode == 200 else {
-                print("❌ [GoogleDriveManager] Token refresh failed")
+                dlog("❌ [GoogleDriveManager] Token refresh failed")
                 return nil
             }
             
@@ -251,11 +251,11 @@ class GoogleDriveManager: NSObject, ObservableObject {
                 KeychainManager.shared.save(String(expiryDate.timeIntervalSince1970), forKey: .googleDriveTokenExpiry)
             }
             
-            print("✅ [GoogleDriveManager] Token refreshed")
+            dlog("✅ [GoogleDriveManager] Token refreshed")
             return tokenResponse.accessToken
             
         } catch {
-            print("❌ [GoogleDriveManager] Token refresh error: \(error)")
+            dlog("❌ [GoogleDriveManager] Token refresh error: \(error)")
             return nil
         }
     }
@@ -275,7 +275,7 @@ class GoogleDriveManager: NSObject, ObservableObject {
             
             // Refresh if expiring within 5 minutes
             if expiryDate.timeIntervalSinceNow < 300 {
-                print("🔄 [GoogleDriveManager] Token expiring soon, refreshing...")
+                dlog("🔄 [GoogleDriveManager] Token expiring soon, refreshing...")
                 return await refreshAccessToken()
             }
         }
@@ -310,7 +310,7 @@ class GoogleDriveManager: NSObject, ObservableObject {
             return nil
             
         } catch {
-            print("❌ [GoogleDriveManager] Failed to get account info: \(error)")
+            dlog("❌ [GoogleDriveManager] Failed to get account info: \(error)")
             return nil
         }
     }
@@ -339,7 +339,7 @@ class GoogleDriveManager: NSObject, ObservableObject {
             
             guard let httpResponse = response as? HTTPURLResponse,
                   httpResponse.statusCode == 200 else {
-                print("❌ [GoogleDriveManager] Failed to search for folder")
+                dlog("❌ [GoogleDriveManager] Failed to search for folder")
                 return nil
             }
             
@@ -347,7 +347,7 @@ class GoogleDriveManager: NSObject, ObservableObject {
                let files = json["files"] as? [[String: Any]],
                let firstFolder = files.first,
                let folderId = firstFolder["id"] as? String {
-                print("✅ [GoogleDriveManager] Found existing VisionProTeleop folder: \(folderId)")
+                dlog("✅ [GoogleDriveManager] Found existing VisionProTeleop folder: \(folderId)")
                 return folderId
             }
             
@@ -355,7 +355,7 @@ class GoogleDriveManager: NSObject, ObservableObject {
             return await createFolder(name: "VisionProTeleop", parentId: nil)
             
         } catch {
-            print("❌ [GoogleDriveManager] Error searching for folder: \(error)")
+            dlog("❌ [GoogleDriveManager] Error searching for folder: \(error)")
             return nil
         }
     }
@@ -388,20 +388,20 @@ class GoogleDriveManager: NSObject, ObservableObject {
             
             guard let httpResponse = response as? HTTPURLResponse,
                   httpResponse.statusCode == 200 else {
-                print("❌ [GoogleDriveManager] Failed to create folder")
+                dlog("❌ [GoogleDriveManager] Failed to create folder")
                 return nil
             }
             
             if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                let folderId = json["id"] as? String {
-                print("✅ [GoogleDriveManager] Created folder: \(name) with ID: \(folderId)")
+                dlog("✅ [GoogleDriveManager] Created folder: \(name) with ID: \(folderId)")
                 return folderId
             }
             
             return nil
             
         } catch {
-            print("❌ [GoogleDriveManager] Error creating folder: \(error)")
+            dlog("❌ [GoogleDriveManager] Error creating folder: \(error)")
             return nil
         }
     }
@@ -414,13 +414,13 @@ class GoogleDriveManager: NSObject, ObservableObject {
     /// - Returns: Whether the upload succeeded
     func uploadFile(from fileURL: URL, fileName: String, parentFolderId: String?) async -> Bool {
         guard let accessToken = await getValidAccessToken() else {
-            print("❌ [GoogleDriveManager] No valid access token for upload")
+            dlog("❌ [GoogleDriveManager] No valid access token for upload")
             return false
         }
         
         // Read file data
         guard let fileData = try? Data(contentsOf: fileURL) else {
-            print("❌ [GoogleDriveManager] Failed to read file: \(fileURL)")
+            dlog("❌ [GoogleDriveManager] Failed to read file: \(fileURL)")
             return false
         }
         
@@ -463,15 +463,15 @@ class GoogleDriveManager: NSObject, ObservableObject {
             guard let httpResponse = response as? HTTPURLResponse,
                   httpResponse.statusCode == 200 else {
                 let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
-                print("❌ [GoogleDriveManager] Upload failed: HTTP \(statusCode)")
+                dlog("❌ [GoogleDriveManager] Upload failed: HTTP \(statusCode)")
                 return false
             }
             
-            print("✅ [GoogleDriveManager] Uploaded \(fileName)")
+            dlog("✅ [GoogleDriveManager] Uploaded \(fileName)")
             return true
             
         } catch {
-            print("❌ [GoogleDriveManager] Upload error: \(error)")
+            dlog("❌ [GoogleDriveManager] Upload error: \(error)")
             return false
         }
     }
@@ -480,13 +480,13 @@ class GoogleDriveManager: NSObject, ObservableObject {
     func uploadRecording(folderURL: URL, recordingName: String) async -> Bool {
         // Get or create app folder
         guard let appFolderId = await getOrCreateAppFolder() else {
-            print("❌ [GoogleDriveManager] Failed to get app folder")
+            dlog("❌ [GoogleDriveManager] Failed to get app folder")
             return false
         }
         
         // Create recording folder
         guard let recordingFolderId = await createFolder(name: recordingName, parentId: appFolderId) else {
-            print("❌ [GoogleDriveManager] Failed to create recording folder")
+            dlog("❌ [GoogleDriveManager] Failed to create recording folder")
             return false
         }
         
@@ -524,7 +524,7 @@ class GoogleDriveManager: NSObject, ObservableObject {
         }
         
         guard let accessToken = await getValidAccessToken() else {
-            print("❌ [GoogleDriveManager] No valid access token for listing")
+            dlog("❌ [GoogleDriveManager] No valid access token for listing")
             return []
         }
         
@@ -574,11 +574,11 @@ class GoogleDriveManager: NSObject, ObservableObject {
             }
             
             let recordings = await parseGoogleDriveFiles(files)
-            print("✅ [GoogleDriveManager] Found \(recordings.count) recordings in Google Drive (hasMore: \(hasMoreRecordings))")
+            dlog("✅ [GoogleDriveManager] Found \(recordings.count) recordings in Google Drive (hasMore: \(hasMoreRecordings))")
             return recordings
             
         } catch {
-            print("❌ [GoogleDriveManager] List recordings error: \(error)")
+            dlog("❌ [GoogleDriveManager] List recordings error: \(error)")
             return []
         }
     }
@@ -647,11 +647,11 @@ class GoogleDriveManager: NSObject, ObservableObject {
             }
             
             let recordings = await parseGoogleDriveFiles(files)
-            print("✅ [GoogleDriveManager] Loaded \(recordings.count) more recordings (hasMore: \(hasMoreRecordings))")
+            dlog("✅ [GoogleDriveManager] Loaded \(recordings.count) more recordings (hasMore: \(hasMoreRecordings))")
             return recordings
             
         } catch {
-            print("❌ [GoogleDriveManager] Load more error: \(error)")
+            dlog("❌ [GoogleDriveManager] Load more error: \(error)")
             return []
         }
     }
@@ -801,7 +801,7 @@ class GoogleDriveManager: NSObject, ObservableObject {
             return true
             
         } catch {
-            print("❌ [GoogleDriveManager] Download error: \(error)")
+            dlog("❌ [GoogleDriveManager] Download error: \(error)")
             return false
         }
     }
@@ -832,14 +832,14 @@ class GoogleDriveManager: NSObject, ObservableObject {
             
             if let httpResponse = response as? HTTPURLResponse,
                (httpResponse.statusCode == 200 || httpResponse.statusCode == 201) {
-                print("✅ [GoogleDriveManager] Permissions updated successfully")
+                dlog("✅ [GoogleDriveManager] Permissions updated successfully")
             } else {
                 // Permission update failed, but we'll try to get the link anyway
                 // This handles cases where it's already shared or we have partial access issues (like 403 appNotAuthorizedToChild)
                 if let errorJson = try? JSONSerialization.jsonObject(with: permissionsData) as? [String: Any] {
-                    print("⚠️ [GoogleDriveManager] Warning: Failed to set public permissions. Status: \((response as? HTTPURLResponse)?.statusCode ?? 0). Body: \(errorJson)")
+                    dlog("⚠️ [GoogleDriveManager] Warning: Failed to set public permissions. Status: \((response as? HTTPURLResponse)?.statusCode ?? 0). Body: \(errorJson)")
                 } else {
-                    print("⚠️ [GoogleDriveManager] Warning: Failed to set public permissions. Status: \((response as? HTTPURLResponse)?.statusCode ?? 0)")
+                    dlog("⚠️ [GoogleDriveManager] Warning: Failed to set public permissions. Status: \((response as? HTTPURLResponse)?.statusCode ?? 0)")
                 }
             }
             
@@ -852,20 +852,20 @@ class GoogleDriveManager: NSObject, ObservableObject {
             
             guard let httpFileResponse = fileResponse as? HTTPURLResponse,
                   httpFileResponse.statusCode == 200 else {
-                print("❌ [GoogleDriveManager] Failed to get file link. Status: \((fileResponse as? HTTPURLResponse)?.statusCode ?? 0)")
+                dlog("❌ [GoogleDriveManager] Failed to get file link. Status: \((fileResponse as? HTTPURLResponse)?.statusCode ?? 0)")
                 return nil
             }
             
             if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                let webViewLink = json["webViewLink"] as? String {
-                print("✅ [GoogleDriveManager] Retrieved shared link for file: \(fileId)")
+                dlog("✅ [GoogleDriveManager] Retrieved shared link for file: \(fileId)")
                 return webViewLink
             }
             
             return nil
             
         } catch {
-            print("❌ [GoogleDriveManager] Create shared link error: \(error)")
+            dlog("❌ [GoogleDriveManager] Create shared link error: \(error)")
             return nil
         }
     }
@@ -893,14 +893,14 @@ class GoogleDriveManager: NSObject, ObservableObject {
             // Google Drive API returns 204 No Content on successful deletion
             guard httpResponse.statusCode == 204 else {
                 let errorMessage = "Failed to delete folder (HTTP \(httpResponse.statusCode))"
-                print("❌ [GoogleDriveManager] \(errorMessage)")
+                dlog("❌ [GoogleDriveManager] \(errorMessage)")
                 throw NSError(domain: "GoogleDriveManager", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: errorMessage])
             }
             
-            print("✅ [GoogleDriveManager] Deleted folder with ID: \(folderId)")
+            dlog("✅ [GoogleDriveManager] Deleted folder with ID: \(folderId)")
             
         } catch let error as NSError {
-            print("❌ [GoogleDriveManager] Delete folder error: \(error)")
+            dlog("❌ [GoogleDriveManager] Delete folder error: \(error)")
             throw error
         }
     }

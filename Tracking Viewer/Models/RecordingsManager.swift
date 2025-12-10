@@ -194,16 +194,16 @@ class RecordingsManager: ObservableObject {
             return
         }
         
-        print("📂 Loading recordings from Google Drive...")
+        dlog("📂 Loading recordings from Google Drive...")
         
         let fetchedRecordings = await GoogleDriveManager.shared.listRecordings()
         googleDriveRecordings = fetchedRecordings.sorted { ($0.modifiedDate ?? .distantPast) > ($1.modifiedDate ?? .distantPast) }
         hasMoreRecordings = GoogleDriveManager.shared.hasMoreRecordings
         
         if googleDriveRecordings.isEmpty {
-            print("📬 No recordings found in Google Drive")
+            dlog("📬 No recordings found in Google Drive")
         } else {
-            print("✅ Found \(googleDriveRecordings.count) recordings in Google Drive")
+            dlog("✅ Found \(googleDriveRecordings.count) recordings in Google Drive")
         }
     }
     
@@ -219,7 +219,7 @@ class RecordingsManager: ObservableObject {
         googleDriveRecordings.append(contentsOf: sortedMore)
         hasMoreRecordings = GoogleDriveManager.shared.hasMoreRecordings
         
-        print("✅ Loaded \(moreRecordings.count) more Google Drive recordings (total: \(googleDriveRecordings.count))")
+        dlog("✅ Loaded \(moreRecordings.count) more Google Drive recordings (total: \(googleDriveRecordings.count))")
     }
     
     /// Download a Google Drive recording video to local cache for viewing
@@ -351,7 +351,7 @@ class RecordingsManager: ObservableObject {
                     googleDriveThumbnailCache[recording.id] = thumbnail
                     return thumbnail
                 } catch {
-                    print("Failed to generate video thumbnail: \(error)")
+                    dlog("Failed to generate video thumbnail: \(error)")
                 }
             }
         }
@@ -378,16 +378,16 @@ class RecordingsManager: ObservableObject {
             return
         }
         
-        print("📂 Loading recordings from Dropbox...")
+        dlog("📂 Loading recordings from Dropbox...")
         
         let fetchedRecordings = await DropboxManager.shared.listRecordings()
         dropboxRecordings = fetchedRecordings.sorted { ($0.modifiedDate ?? .distantPast) > ($1.modifiedDate ?? .distantPast) }
         hasMoreRecordings = DropboxManager.shared.hasMoreRecordings
         
         if dropboxRecordings.isEmpty {
-            print("📬 No recordings found in Dropbox")
+            dlog("📬 No recordings found in Dropbox")
         } else {
-            print("✅ Found \(dropboxRecordings.count) recordings in Dropbox")
+            dlog("✅ Found \(dropboxRecordings.count) recordings in Dropbox")
         }
     }
     
@@ -403,7 +403,7 @@ class RecordingsManager: ObservableObject {
         dropboxRecordings.append(contentsOf: sortedMore)
         hasMoreRecordings = DropboxManager.shared.hasMoreRecordings
         
-        print("✅ Loaded \(moreRecordings.count) more Dropbox recordings (total: \(dropboxRecordings.count))")
+        dlog("✅ Loaded \(moreRecordings.count) more Dropbox recordings (total: \(dropboxRecordings.count))")
     }
     
     /// Download a Dropbox recording video to local cache for viewing
@@ -537,14 +537,14 @@ class RecordingsManager: ObservableObject {
             return
         }
         
-        print("📂 Scanning for recordings at: \(recordingsURL.path)")
+        dlog("📂 Scanning for recordings at: \(recordingsURL.path)")
         
         // Ensure the directory exists
         let fileManager = FileManager.default
         if !fileManager.fileExists(atPath: recordingsURL.path) {
             do {
                 try fileManager.createDirectory(at: recordingsURL, withIntermediateDirectories: true)
-                print("📁 Created recordings directory")
+                dlog("📁 Created recordings directory")
             } catch {
                 errorMessage = "Failed to create recordings folder: \(error.localizedDescription)"
                 return
@@ -555,7 +555,7 @@ class RecordingsManager: ObservableObject {
         do {
             try fileManager.startDownloadingUbiquitousItem(at: recordingsURL)
         } catch {
-            print("⚠️ Could not start iCloud download: \(error)")
+            dlog("⚠️ Could not start iCloud download: \(error)")
         }
         
         // Enumerate recording folders
@@ -609,11 +609,11 @@ class RecordingsManager: ObservableObject {
             // Sort by creation date (from folder attributes), newest first
             recordings = loadedRecordings.sorted { $0.createdAt > $1.createdAt }
             
-            print("✅ Found \(recordings.count) recordings (metadata will load lazily)")
+            dlog("✅ Found \(recordings.count) recordings (metadata will load lazily)")
             
         } catch {
             errorMessage = "Failed to scan recordings: \(error.localizedDescription)"
-            print("❌ Error scanning recordings: \(error)")
+            dlog("❌ Error scanning recordings: \(error)")
         }
     }
     
@@ -663,7 +663,7 @@ class RecordingsManager: ObservableObject {
                     }
                 }
             } catch {
-                print("⚠️ Failed to load metadata for \(recordingId): \(error)")
+                dlog("⚠️ Failed to load metadata for \(recordingId): \(error)")
             }
             
             await MainActor.run {
@@ -738,7 +738,7 @@ class RecordingsManager: ObservableObject {
         // First, ensure the file is downloaded from iCloud
         let downloaded = await downloadFromiCloud(videoURL)
         guard downloaded else {
-            print("⚠️ Video not yet downloaded from iCloud: \(videoURL.lastPathComponent)")
+            dlog("⚠️ Video not yet downloaded from iCloud: \(videoURL.lastPathComponent)")
             return nil
         }
         
@@ -757,7 +757,7 @@ class RecordingsManager: ObservableObject {
                     let thumbnail = UIImage(cgImage: cgImage)
                     continuation.resume(returning: thumbnail)
                 } catch {
-                    print("⚠️ Failed to generate thumbnail: \(error)")
+                    dlog("⚠️ Failed to generate thumbnail: \(error)")
                     continuation.resume(returning: nil)
                 }
             }
@@ -826,7 +826,7 @@ class RecordingsManager: ObservableObject {
                 return snapshot
                 
             } catch {
-                print("⚠️ Failed to generate USDZ thumbnail: \(error)")
+                dlog("⚠️ Failed to generate USDZ thumbnail: \(error)")
                 return nil
             }
         }
@@ -856,7 +856,7 @@ class RecordingsManager: ObservableObject {
         do {
             try fileManager.startDownloadingUbiquitousItem(at: url)
         } catch {
-            print("⚠️ Failed to start iCloud download: \(error)")
+            dlog("⚠️ Failed to start iCloud download: \(error)")
             return false
         }
         
@@ -881,7 +881,7 @@ class RecordingsManager: ObservableObject {
             try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
         }
         
-        print("⚠️ iCloud download timed out for: \(url.lastPathComponent)")
+        dlog("⚠️ iCloud download timed out for: \(url.lastPathComponent)")
         return false
     }
     
@@ -917,7 +917,7 @@ class RecordingsManager: ObservableObject {
         selectedRecordings.remove(recording)
         thumbnailCache.removeValue(forKey: recording.id)
         
-        print("🗑️ Deleted recording: \(recording.id)")
+        dlog("🗑️ Deleted recording: \(recording.id)")
     }
     
     /// Toggle selection for a recording
@@ -1056,9 +1056,9 @@ class RecordingsManager: ObservableObject {
         do {
             try await DropboxManager.shared.deleteFolder(path: recording.path)
             dropboxRecordings.removeAll { $0.id == recording.id }
-            print("🗑️ Deleted Dropbox recording: \(recording.name)")
+            dlog("🗑️ Deleted Dropbox recording: \(recording.name)")
         } catch {
-            print("❌ Failed to delete Dropbox recording: \(error)")
+            dlog("❌ Failed to delete Dropbox recording: \(error)")
             errorMessage = "Failed to delete: \(error.localizedDescription)"
         }
     }
@@ -1068,9 +1068,9 @@ class RecordingsManager: ObservableObject {
         do {
             try await CloudStorageManager.shared.deleteGoogleDriveFolder(folderId: recording.id)
             googleDriveRecordings.removeAll { $0.id == recording.id }
-            print("🗑️ Deleted Google Drive recording: \(recording.name)")
+            dlog("🗑️ Deleted Google Drive recording: \(recording.name)")
         } catch {
-            print("❌ Failed to delete Google Drive recording: \(error)")
+            dlog("❌ Failed to delete Google Drive recording: \(error)")
             errorMessage = "Failed to delete: \(error.localizedDescription)"
         }
     }
@@ -1121,7 +1121,7 @@ class RecordingsManager: ObservableObject {
                 try data.write(to: tempURL)
                 thumbnailAssetURL = tempURL
             } catch {
-                print("⚠️ Failed to save temp thumbnail: \(error)")
+                dlog("⚠️ Failed to save temp thumbnail: \(error)")
             }
         }
         

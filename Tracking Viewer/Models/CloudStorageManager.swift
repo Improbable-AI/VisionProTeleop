@@ -108,11 +108,11 @@ class CloudStorageManager: ObservableObject {
         if let providerString = keychain.loadString(forKey: .selectedCloudProvider),
            let provider = CloudStorageProvider(rawValue: providerString) {
             selectedProvider = provider
-            print("☁️ [CloudStorageManager] Loaded provider from keychain: \(provider.displayName)")
+            dlog("☁️ [CloudStorageManager] Loaded provider from keychain: \(provider.displayName)")
         } else {
             // Default to iCloud Drive
             selectedProvider = .iCloudDrive
-            print("☁️ [CloudStorageManager] No provider saved, defaulting to iCloud Drive")
+            dlog("☁️ [CloudStorageManager] No provider saved, defaulting to iCloud Drive")
         }
         
         // Check Dropbox authentication status
@@ -142,7 +142,7 @@ class CloudStorageManager: ObservableObject {
         // Save to keychain (syncs via iCloud Keychain)
         keychain.save(provider.rawValue, forKey: .selectedCloudProvider)
         
-        print("☁️ [CloudStorageManager] Selected provider: \(provider.displayName)")
+        dlog("☁️ [CloudStorageManager] Selected provider: \(provider.displayName)")
         
         // Post notification for other parts of the app
         NotificationCenter.default.post(name: .cloudStorageProviderChanged, object: provider)
@@ -180,11 +180,11 @@ class CloudStorageManager: ObservableObject {
             isDropboxAuthenticated = true
             // Load account info if available
             dropboxAccountInfo = keychain.loadString(forKey: .dropboxRefreshToken) != nil ? "Signed in" : nil
-            print("☁️ [CloudStorageManager] Dropbox: Authenticated")
+            dlog("☁️ [CloudStorageManager] Dropbox: Authenticated")
         } else {
             isDropboxAuthenticated = false
             dropboxAccountInfo = nil
-            print("☁️ [CloudStorageManager] Dropbox: Not authenticated")
+            dlog("☁️ [CloudStorageManager] Dropbox: Not authenticated")
         }
     }
     
@@ -211,7 +211,7 @@ class CloudStorageManager: ObservableObject {
             selectProvider(.iCloudDrive)
         }
         
-        print("☁️ [CloudStorageManager] Signed out of Dropbox")
+        dlog("☁️ [CloudStorageManager] Signed out of Dropbox")
     }
     
     /// Called when Dropbox OAuth completes successfully
@@ -230,7 +230,7 @@ class CloudStorageManager: ObservableObject {
         isDropboxAuthenticated = true
         errorMessage = nil
         
-        print("☁️ [CloudStorageManager] Dropbox authentication successful")
+        dlog("☁️ [CloudStorageManager] Dropbox authentication successful")
         
         // Fetch account info
         Task {
@@ -254,11 +254,11 @@ class CloudStorageManager: ObservableObject {
             isGoogleDriveAuthenticated = true
             // Load account info if available
             googleDriveAccountInfo = keychain.loadString(forKey: .googleDriveRefreshToken) != nil ? "Signed in" : nil
-            print("☁️ [CloudStorageManager] Google Drive: Authenticated")
+            dlog("☁️ [CloudStorageManager] Google Drive: Authenticated")
         } else {
             isGoogleDriveAuthenticated = false
             googleDriveAccountInfo = nil
-            print("☁️ [CloudStorageManager] Google Drive: Not authenticated")
+            dlog("☁️ [CloudStorageManager] Google Drive: Not authenticated")
         }
     }
     
@@ -284,7 +284,7 @@ class CloudStorageManager: ObservableObject {
             selectProvider(.iCloudDrive)
         }
         
-        print("☁️ [CloudStorageManager] Signed out of Google Drive")
+        dlog("☁️ [CloudStorageManager] Signed out of Google Drive")
     }
     
     /// Called when Google Drive OAuth completes successfully
@@ -303,7 +303,7 @@ class CloudStorageManager: ObservableObject {
         isGoogleDriveAuthenticated = true
         errorMessage = nil
         
-        print("☁️ [CloudStorageManager] Google Drive authentication successful")
+        dlog("☁️ [CloudStorageManager] Google Drive authentication successful")
         
         // Fetch account info
         Task {

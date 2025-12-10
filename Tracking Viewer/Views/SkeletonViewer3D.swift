@@ -74,7 +74,7 @@ struct SkeletonViewer3D: UIViewRepresentable {
         guard let leftHandNode = context.coordinator.leftHandNode,
               let rightHandNode = context.coordinator.rightHandNode,
               let headNode = context.coordinator.headNode else {
-            print("⚠️ [SkeletonViewer3D] Coordinator nodes not initialized")
+            dlog("⚠️ [SkeletonViewer3D] Coordinator nodes not initialized")
             return
         }
         
@@ -348,12 +348,12 @@ struct SkeletonViewer3D: UIViewRepresentable {
         }
         
         if validPositions < 25 {
-            print("⚠️ [SkeletonViewer3D] Only \(validPositions)/27 positions are valid")
+            dlog("⚠️ [SkeletonViewer3D] Only \(validPositions)/27 positions are valid")
             return
         }
         
         guard positions.count >= 27 else {
-            print("⚠️ [SkeletonViewer3D] Not enough positions: \(positions.count) < 27")
+            dlog("⚠️ [SkeletonViewer3D] Not enough positions: \(positions.count) < 27")
             return
         }
         
@@ -442,7 +442,7 @@ struct SkeletonViewer3D: UIViewRepresentable {
         }
         
         if validJointCount < 25 {
-            print("⚠️ [SkeletonViewer3D] Hand data has only \(validJointCount)/25 valid joint matrices")
+            dlog("⚠️ [SkeletonViewer3D] Hand data has only \(validJointCount)/25 valid joint matrices")
         }
         
         // Get world-space positions (25 joints, legacy format)
@@ -462,16 +462,16 @@ struct SkeletonViewer3D: UIViewRepresentable {
         }
         
         if !hasNonZeroPosition {
-            print("⚠️ [SkeletonViewer3D] All joint positions are at origin - check wrist matrix")
+            dlog("⚠️ [SkeletonViewer3D] All joint positions are at origin - check wrist matrix")
             return
         }
         
         if validPositions < 25 {
-            print("⚠️ [SkeletonViewer3D] Only \(validPositions)/25 positions are valid (non-NaN/Inf)")
+            dlog("⚠️ [SkeletonViewer3D] Only \(validPositions)/25 positions are valid (non-NaN/Inf)")
         }
         
         guard positions.count >= 25 else {
-            print("⚠️ [SkeletonViewer3D] Not enough positions: \(positions.count) < 25")
+            dlog("⚠️ [SkeletonViewer3D] Not enough positions: \(positions.count) < 25")
             return
         }
         

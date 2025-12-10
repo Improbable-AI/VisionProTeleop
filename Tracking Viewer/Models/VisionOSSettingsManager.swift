@@ -135,12 +135,12 @@ class VisionOSSettingsManager: ObservableObject {
                     switch reason {
                     case NSUbiquitousKeyValueStoreServerChange,
                          NSUbiquitousKeyValueStoreInitialSyncChange:
-                        print("☁️ [VisionOSSettings] Received external changes from iCloud (possibly from Vision Pro)")
+                        dlog("☁️ [VisionOSSettings] Received external changes from iCloud (possibly from Vision Pro)")
                         self.loadFromiCloud()
                     case NSUbiquitousKeyValueStoreQuotaViolationChange:
-                        print("⚠️ [VisionOSSettings] iCloud quota exceeded")
+                        dlog("⚠️ [VisionOSSettings] iCloud quota exceeded")
                     case NSUbiquitousKeyValueStoreAccountChange:
-                        print("ℹ️ [VisionOSSettings] iCloud account changed")
+                        dlog("ℹ️ [VisionOSSettings] iCloud account changed")
                         self.loadFromiCloud()
                     default:
                         break
@@ -164,7 +164,7 @@ class VisionOSSettingsManager: ObservableObject {
         isLoadingFromiCloud = true
         defer { isLoadingFromiCloud = false }
         
-        print("☁️ [VisionOSSettings] Loading settings from iCloud...")
+        dlog("☁️ [VisionOSSettings] Loading settings from iCloud...")
         
         // Visualization settings
         if let value = store.object(forKey: SettingKey.upperLimbVisible.rawValue) as? Bool {
@@ -211,7 +211,7 @@ class VisionOSSettingsManager: ObservableObject {
             lastSyncTime = Date(timeIntervalSince1970: timestamp)
         }
         
-        print("☁️ [VisionOSSettings] Loaded: hands=\(upperLimbVisible), headBeam=\(showHeadBeam), handJoints=\(showHandJoints)")
+        dlog("☁️ [VisionOSSettings] Loaded: hands=\(upperLimbVisible), headBeam=\(showHeadBeam), handJoints=\(showHandJoints)")
     }
     
     private func saveToiCloud<T>(_ key: SettingKey, value: T) {
@@ -224,7 +224,7 @@ class VisionOSSettingsManager: ObservableObject {
         store.synchronize()
         lastSyncTime = Date()
         
-        print("☁️ [VisionOSSettings] Saved \(key.rawValue) = \(value)")
+        dlog("☁️ [VisionOSSettings] Saved \(key.rawValue) = \(value)")
     }
     
     // MARK: - Public Methods

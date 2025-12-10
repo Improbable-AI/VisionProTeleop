@@ -191,9 +191,9 @@ struct HandTrackingServiceImpl: Handtracking_HandTrackingService.SimpleServicePr
             let handUpdate = fill_handUpdate()
             updateCount += 1
             
-            if updateCount == 1 || updateCount % 100 == 0 {
-                print("📤 [DEBUG] Sending hand update #\(updateCount)...")
-            }
+//            if updateCount == 1 || updateCount % 100 == 0 {
+//                print("📤 [DEBUG] Sending hand update #\(updateCount)...")
+//            }
             
             do {
                 try await response.write(handUpdate)
