@@ -12,6 +12,7 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
     private var handDataChannel: LKRTCDataChannel?
     private var simPosesDataChannel: LKRTCDataChannel?  // WebRTC data channel for sim pose streaming
     private var simPosesMessageCount: Int = 0  // Counter for debugging message flow
+    private var lastProcessedPoseTimestamp: Double = 0  // For dropping stale frames
     private var handStreamTask: Task<Void, Never>?
     private let handStreamIntervalNanoseconds: UInt64 = 2_000_000
     
@@ -409,14 +410,11 @@ extension WebRTCClient: LKRTCDataChannelDelegate {
     }
 
     func dataChannel(_ dataChannel: LKRTCDataChannel, didReceiveMessageWith buffer: LKRTCDataBuffer) {
-        // Debug: log EVERY data channel message at start
-        print("📥 [WebRTC] didReceiveMessageWith called: channel='\(dataChannel.label)', bytes=\(buffer.data.count)")
-        
         if dataChannel.label == "sim-poses" {
             simPosesMessageCount += 1
             
-            // Log first 10 messages, then every 100th to track flow
-            if simPosesMessageCount <= 10 || simPosesMessageCount % 100 == 0 {
+            // Log only first message and every 100th for debugging
+            if simPosesMessageCount == 1 || simPosesMessageCount % 100 == 0 {
                 print("📥 [WebRTC sim-poses] Message #\(simPosesMessageCount), bytes=\(buffer.data.count)")
             }
             
@@ -529,15 +527,28 @@ extension WebRTCClient: LKRTCDataChannelDelegate {
             
             // Call callback on main thread
             if let callback = onSimPosesReceived {
+                // Debug: log timestamp, body count, and first two body positions every 100th message
+                if simPosesMessageCount % 100 == 0 {
+                    let sortedBodies = floatPoses.keys.sorted()
+                    if sortedBodies.count >= 2 {
+                        let body0 = sortedBodies[0]
+                        let body1 = sortedBodies[1]
+                        let pos0 = floatPoses[body0]!
+                        let pos1 = floatPoses[body1]!
+                        print("🔍 [DEBUG] msg#\(simPosesMessageCount) ts=\(String(format: "%.3f", timestamp)) bodies=\(floatPoses.count)")
+                        print("   body0='\(body0)' pos=[\(String(format: "%.3f", pos0[0])),\(String(format: "%.3f", pos0[1])),\(String(format: "%.3f", pos0[2]))]")
+                        print("   body1='\(body1)' pos=[\(String(format: "%.3f", pos1[0])),\(String(format: "%.3f", pos1[1])),\(String(format: "%.3f", pos1[2]))]")
+                    }
+                }
+                
                 DispatchQueue.main.async {
                     callback(timestamp, floatPoses, qpos, ctrl)
                 }
             } else {
                 print("⚠️ [WebRTC sim-poses] Callback not set, dropping \(floatPoses.count) poses")
             }
-        } else {
-            print("DEBUG: Received \(buffer.data.count) bytes on data channel '\(dataChannel.label)' (ignored)")
         }
+        // Other data channels silently ignored
     }
 }
 
