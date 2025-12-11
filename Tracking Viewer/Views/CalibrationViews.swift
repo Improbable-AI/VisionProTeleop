@@ -278,7 +278,7 @@ struct ArucoMarkerDisplayView: View {
             // Always start motion detection when displaying markers
             // This enables the motion indicator even when not connected
             multipeerManager.startStatusUpdates()
-            print("📱 [ArucoMarkerDisplayView] Started - motion detection enabled")
+            dlog("📱 [ArucoMarkerDisplayView] Started - motion detection enabled")
         }
         .onDisappear {
             // Restore brightness
@@ -288,7 +288,7 @@ struct ArucoMarkerDisplayView: View {
             
             // Stop motion detection
             multipeerManager.stopStatusUpdates()
-            print("📱 [ArucoMarkerDisplayView] Stopped")
+            dlog("📱 [ArucoMarkerDisplayView] Stopped")
         }
         .alert("Move to New Position", isPresented: $showPositionChangeAlert) {
             Button("Cancel", role: .cancel) {}

@@ -24,7 +24,7 @@ class GoogleDriveUploader {
     /// Get valid access token, refreshing if needed
     func getValidAccessToken() async -> String? {
         guard let accessToken = keychain.loadString(forKey: .googleDriveAccessToken) else {
-            print("❌ [GoogleDriveUploader] No access token in keychain")
+            dlog("❌ [GoogleDriveUploader] No access token in keychain")
             return nil
         }
         
@@ -35,7 +35,7 @@ class GoogleDriveUploader {
             
             // Refresh if expiring within 5 minutes
             if expiryDate.timeIntervalSinceNow < 300 {
-                print("🔄 [GoogleDriveUploader] Token expiring soon, refreshing...")
+                dlog("🔄 [GoogleDriveUploader] Token expiring soon, refreshing...")
                 return await refreshAccessToken()
             }
         }
@@ -46,7 +46,7 @@ class GoogleDriveUploader {
     /// Refresh access token using refresh token
     private func refreshAccessToken() async -> String? {
         guard let refreshToken = keychain.loadString(forKey: .googleDriveRefreshToken) else {
-            print("❌ [GoogleDriveUploader] No refresh token available")
+            dlog("❌ [GoogleDriveUploader] No refresh token available")
             return nil
         }
         
@@ -71,7 +71,7 @@ class GoogleDriveUploader {
             
             guard let httpResponse = response as? HTTPURLResponse,
                   httpResponse.statusCode == 200 else {
-                print("❌ [GoogleDriveUploader] Token refresh failed")
+                dlog("❌ [GoogleDriveUploader] Token refresh failed")
                 return nil
             }
             
@@ -89,11 +89,11 @@ class GoogleDriveUploader {
                 keychain.save(String(expiryDate.timeIntervalSince1970), forKey: .googleDriveTokenExpiry)
             }
             
-            print("✅ [GoogleDriveUploader] Token refreshed")
+            dlog("✅ [GoogleDriveUploader] Token refreshed")
             return tokenResponse.access_token
             
         } catch {
-            print("❌ [GoogleDriveUploader] Token refresh error: \(error)")
+            dlog("❌ [GoogleDriveUploader] Token refresh error: \(error)")
             return nil
         }
     }
@@ -124,7 +124,7 @@ class GoogleDriveUploader {
             
             guard let httpResponse = response as? HTTPURLResponse,
                   httpResponse.statusCode == 200 else {
-                print("❌ [GoogleDriveUploader] Failed to search for folder")
+                dlog("❌ [GoogleDriveUploader] Failed to search for folder")
                 return nil
             }
             
@@ -132,7 +132,7 @@ class GoogleDriveUploader {
                let files = json["files"] as? [[String: Any]],
                let firstFolder = files.first,
                let folderId = firstFolder["id"] as? String {
-                print("✅ [GoogleDriveUploader] Found existing VisionProTeleop folder: \(folderId)")
+                dlog("✅ [GoogleDriveUploader] Found existing VisionProTeleop folder: \(folderId)")
                 return folderId
             }
             
@@ -140,7 +140,7 @@ class GoogleDriveUploader {
             return await createFolder(name: "VisionProTeleop", parentId: nil)
             
         } catch {
-            print("❌ [GoogleDriveUploader] Error searching for folder: \(error)")
+            dlog("❌ [GoogleDriveUploader] Error searching for folder: \(error)")
             return nil
         }
     }
@@ -173,20 +173,20 @@ class GoogleDriveUploader {
             
             guard let httpResponse = response as? HTTPURLResponse,
                   httpResponse.statusCode == 200 else {
-                print("❌ [GoogleDriveUploader] Failed to create folder")
+                dlog("❌ [GoogleDriveUploader] Failed to create folder")
                 return nil
             }
             
             if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                let folderId = json["id"] as? String {
-                print("✅ [GoogleDriveUploader] Created folder: \(name) with ID: \(folderId)")
+                dlog("✅ [GoogleDriveUploader] Created folder: \(name) with ID: \(folderId)")
                 return folderId
             }
             
             return nil
             
         } catch {
-            print("❌ [GoogleDriveUploader] Error creating folder: \(error)")
+            dlog("❌ [GoogleDriveUploader] Error creating folder: \(error)")
             return nil
         }
     }
@@ -205,7 +205,7 @@ class GoogleDriveUploader {
         }
         
         guard let fileData = try? Data(contentsOf: fileURL) else {
-            print("❌ [GoogleDriveUploader] Cannot read file: \(fileURL)")
+            dlog("❌ [GoogleDriveUploader] Cannot read file: \(fileURL)")
             return false
         }
         
@@ -248,15 +248,15 @@ class GoogleDriveUploader {
             guard let httpResponse = response as? HTTPURLResponse,
                   httpResponse.statusCode == 200 else {
                 let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
-                print("❌ [GoogleDriveUploader] Upload failed: HTTP \(statusCode)")
+                dlog("❌ [GoogleDriveUploader] Upload failed: HTTP \(statusCode)")
                 return false
             }
             
-            print("✅ [GoogleDriveUploader] Uploaded \(fileName)")
+            dlog("✅ [GoogleDriveUploader] Uploaded \(fileName)")
             return true
             
         } catch {
-            print("❌ [GoogleDriveUploader] Upload error: \(error)")
+            dlog("❌ [GoogleDriveUploader] Upload error: \(error)")
             return false
         }
     }
@@ -270,13 +270,13 @@ class GoogleDriveUploader {
     func uploadRecording(folderURL: URL, recordingName: String, progressCallback: ((Int, Int, String) -> Void)? = nil) async -> Bool {
         // Get or create app folder
         guard let appFolderId = await getOrCreateAppFolder() else {
-            print("❌ [GoogleDriveUploader] Failed to get app folder")
+            dlog("❌ [GoogleDriveUploader] Failed to get app folder")
             return false
         }
         
         // Create recording folder
         guard let recordingFolderId = await createFolder(name: recordingName, parentId: appFolderId) else {
-            print("❌ [GoogleDriveUploader] Failed to create recording folder")
+            dlog("❌ [GoogleDriveUploader] Failed to create recording folder")
             return false
         }
         

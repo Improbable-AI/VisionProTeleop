@@ -160,7 +160,7 @@ class CalibrationDisplayManager: ObservableObject {
         )
         
         // Now we can use self
-        print("📱 [CalibrationDisplayManager] Detected device: \(spec.displayName)")
+        dlog("📱 [CalibrationDisplayManager] Detected device: \(spec.displayName)")
         
         // Load saved state
         loadState()
@@ -191,7 +191,7 @@ class CalibrationDisplayManager: ObservableObject {
         
         // Start advertising immediately
         multipeerManager.startAdvertising()
-        print("📱 [CalibrationDisplayManager] Started Multipeer advertising")
+        dlog("📱 [CalibrationDisplayManager] Started Multipeer advertising")
     }
     
     private func handleVisionProCommand(_ command: CalibrationCommand) {
@@ -203,17 +203,17 @@ class CalibrationDisplayManager: ObservableObject {
                 sessionState.currentMarkerId = firstId
             }
             isDisplayingMarker = true
-            print("📱 [CalibrationDisplayManager] Received start calibration command, markers: \(markerIds)")
+            dlog("📱 [CalibrationDisplayManager] Received start calibration command, markers: \(markerIds)")
             
         case .switchToMarker(let markerId):
             // Switch to the specified marker
             setMarkerId(markerId)
-            print("📱 [CalibrationDisplayManager] Received switch to marker \(markerId)")
+            dlog("📱 [CalibrationDisplayManager] Received switch to marker \(markerId)")
             
         case .calibrationComplete:
             // Calibration finished
             isDisplayingMarker = false
-            print("📱 [CalibrationDisplayManager] Calibration complete")
+            dlog("📱 [CalibrationDisplayManager] Calibration complete")
             
         case .pauseCollection, .resumeCollection, .requestStatus,
              .showCheckerboard, .showAruco, .hideDisplay,
@@ -256,7 +256,7 @@ class CalibrationDisplayManager: ObservableObject {
             return
         }
         
-        print("☁️ [CalibrationDisplayManager] iCloud update received, reason: \(changeReason)")
+        dlog("☁️ [CalibrationDisplayManager] iCloud update received, reason: \(changeReason)")
         
         // Reload results from iCloud
         loadCalibrationResults()
@@ -269,7 +269,7 @@ class CalibrationDisplayManager: ObservableObject {
     
     /// Public method to refresh calibration results from iCloud
     func refreshFromiCloud() {
-        print("☁️ [CalibrationDisplayManager] Manual refresh from iCloud...")
+        dlog("☁️ [CalibrationDisplayManager] Manual refresh from iCloud...")
         NSUbiquitousKeyValueStore.default.synchronize()
         loadCalibrationResults()
     }
@@ -283,7 +283,7 @@ class CalibrationDisplayManager: ObservableObject {
         // Load manual points per mm if set
         if let manual = UserDefaults.standard.object(forKey: kManualPointsPerMMKey) as? Double, manual > 0 {
             manualPointsPerMM = manual
-            print("📱 [CalibrationDisplayManager] Loaded manual points/mm: \(manual)")
+            dlog("📱 [CalibrationDisplayManager] Loaded manual points/mm: \(manual)")
         }
         
         // Load calibration results from iCloud
@@ -304,9 +304,9 @@ class CalibrationDisplayManager: ObservableObject {
         if let data = store.data(forKey: kExtrinsicResultsKey) {
             do {
                 extrinsicResults = try JSONDecoder().decode([ExtrinsicCalibrationResult].self, from: data)
-                print("☁️ [CalibrationDisplayManager] Loaded \(extrinsicResults.count) extrinsic calibration(s)")
+                dlog("☁️ [CalibrationDisplayManager] Loaded \(extrinsicResults.count) extrinsic calibration(s)")
             } catch {
-                print("❌ [CalibrationDisplayManager] Failed to decode extrinsic results: \(error)")
+                dlog("❌ [CalibrationDisplayManager] Failed to decode extrinsic results: \(error)")
             }
         }
         
@@ -314,9 +314,9 @@ class CalibrationDisplayManager: ObservableObject {
         if let data = store.data(forKey: kIntrinsicResultsKey) {
             do {
                 intrinsicResults = try JSONDecoder().decode([IntrinsicCalibrationResult].self, from: data)
-                print("☁️ [CalibrationDisplayManager] Loaded \(intrinsicResults.count) intrinsic calibration(s)")
+                dlog("☁️ [CalibrationDisplayManager] Loaded \(intrinsicResults.count) intrinsic calibration(s)")
             } catch {
-                print("❌ [CalibrationDisplayManager] Failed to decode intrinsic results: \(error)")
+                dlog("❌ [CalibrationDisplayManager] Failed to decode intrinsic results: \(error)")
             }
         }
     }
@@ -330,18 +330,18 @@ class CalibrationDisplayManager: ObservableObject {
         // Calculate actual points per mm based on user's measurement
         let calculatedPointsPerMM = Double(measuredWidthPoints) / CreditCardDimensions.widthMM
         
-        print("📱 [CalibrationDisplayManager] Credit card validation complete")
-        print("📱 [CalibrationDisplayManager] Expected points/mm: \(displaySpec.pointsPerMM)")
-        print("📱 [CalibrationDisplayManager] Measured points/mm: \(calculatedPointsPerMM)")
+        dlog("📱 [CalibrationDisplayManager] Credit card validation complete")
+        dlog("📱 [CalibrationDisplayManager] Expected points/mm: \(displaySpec.pointsPerMM)")
+        dlog("📱 [CalibrationDisplayManager] Measured points/mm: \(calculatedPointsPerMM)")
         
         // If the difference is significant (>5%), use the measured value
         let difference = abs(calculatedPointsPerMM - displaySpec.pointsPerMM) / displaySpec.pointsPerMM
         if difference > 0.05 {
             manualPointsPerMM = calculatedPointsPerMM
-            print("📱 [CalibrationDisplayManager] Using measured points/mm (difference: \(Int(difference * 100))%)")
+            dlog("📱 [CalibrationDisplayManager] Using measured points/mm (difference: \(Int(difference * 100))%)")
         } else {
             manualPointsPerMM = nil
-            print("📱 [CalibrationDisplayManager] Using device spec (difference: \(Int(difference * 100))%)")
+            dlog("📱 [CalibrationDisplayManager] Using device spec (difference: \(Int(difference * 100))%)")
         }
         
         isDisplayValidated = true
@@ -431,7 +431,7 @@ class CalibrationDisplayManager: ObservableObject {
             store.set(data, forKey: kCalibrationSessionStateKey)
             store.synchronize()
         } catch {
-            print("❌ [CalibrationDisplayManager] Failed to broadcast session state: \(error)")
+            dlog("❌ [CalibrationDisplayManager] Failed to broadcast session state: \(error)")
         }
     }
     
@@ -499,7 +499,7 @@ class CalibrationDisplayManager: ObservableObject {
     private func getArucoMarkerBits(id: Int, dictionary: ArucoDictionary) -> [Int]? {
         // Only implement 4x4_50 for now (the default used by the Vision Pro app)
         guard dictionary == .dict4X4_50 else {
-            print("⚠️ [CalibrationDisplayManager] Only 4x4_50 dictionary is currently supported")
+            dlog("⚠️ [CalibrationDisplayManager] Only 4x4_50 dictionary is currently supported")
             return nil
         }
         

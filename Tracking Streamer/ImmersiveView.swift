@@ -28,7 +28,7 @@ struct ImmersiveView: View {
     
     var body: some View {
         RealityView { content, attachments in
-            print("🟢 [ImmersiveView] RealityView content block called")
+            dlog("🟢 [ImmersiveView] RealityView content block called")
             
             // Create the video display anchor (still used for head pose reference)
             let videoAnchor = AnchorEntity(.head)
@@ -73,10 +73,10 @@ struct ImmersiveView: View {
             
             // Attach the status UI to the container
             if let statusAttachment = attachments.entity(for: "status") {
-                print("🟢 [ImmersiveView] Status attachment found and attached")
+                dlog("🟢 [ImmersiveView] Status attachment found and attached")
                 statusAttachment.setParent(statusContainer)
             } else {
-                print("🔴 [ImmersiveView] Status attachment NOT found!")
+                dlog("🔴 [ImmersiveView] Status attachment NOT found!")
             }
             
             // Create preview status container entity (initially hidden)
@@ -93,11 +93,11 @@ struct ImmersiveView: View {
             
             // Attach the status preview UI to the preview container
             if let statusPreviewAttachment = attachments.entity(for: "statusPreview") {
-                print("🟢 [ImmersiveView] Status preview attachment found and attached")
+                dlog("🟢 [ImmersiveView] Status preview attachment found and attached")
                 statusPreviewAttachment.setParent(statusPreviewContainer)
                 statusPreviewContainer.isEnabled = false
             } else {
-                print("🔴 [ImmersiveView] Status preview attachment NOT found!")
+                dlog("🔴 [ImmersiveView] Status preview attachment NOT found!")
             }
         } update: { updateContent, attachments in
             // This will be triggered when updateTrigger changes (i.e., when new frames arrive)
@@ -137,8 +137,8 @@ struct ImmersiveView: View {
 
             // Check if we have actual frames available RIGHT NOW
             let framesAvailable = imageData.left != nil && imageData.right != nil
-            print("DEBUG: Update block called, left=\(imageData.left != nil), right=\(imageData.right != nil), framesAvailable=\(framesAvailable)")
-            print("🎬 [ImmersiveView] Preview z-distance: \(String(describing: previewZDistance))")
+            dlog("DEBUG: Update block called, left=\(imageData.left != nil), right=\(imageData.right != nil), framesAvailable=\(framesAvailable)")
+            dlog("🎬 [ImmersiveView] Preview z-distance: \(String(describing: previewZDistance))")
 
             let isFixed = dataManager.videoPlaneFixedToWorld
             let shouldShowPreview = previewZDistance != nil || previewActive
@@ -151,7 +151,7 @@ struct ImmersiveView: View {
                 // Ensure the panel lives under the world anchor so it stays put
                 if videoRoot.parent !== worldAnchor {
                     videoRoot.setParent(worldAnchor, preservingWorldTransform: false)
-                    print("🔒 [ImmersiveView] Reparented videoRoot to worldAnchor")
+                    dlog("🔒 [ImmersiveView] Reparented videoRoot to worldAnchor")
                 }
                 
                 if let lockedTransform = fixedWorldTransform {
@@ -212,7 +212,7 @@ struct ImmersiveView: View {
                         let xPos = previewStatusPosition?.x ?? dataManager.statusMinimizedXPosition
                         let yPos = previewStatusPosition?.y ?? dataManager.statusMinimizedYPosition
                         
-                        print("🎭 [ImmersiveView] Showing status preview at x=\(xPos), y=\(yPos)")
+                        dlog("🎭 [ImmersiveView] Showing status preview at x=\(xPos), y=\(yPos)")
                         statusPreviewContainer.isEnabled = true
                         var previewTransform = statusPreviewContainer.transform
                         previewTransform.translation = SIMD3<Float>(xPos, yPos, -1.0)
@@ -227,13 +227,13 @@ struct ImmersiveView: View {
             guard let imageLeft = imageData.left,
                   let imageRight = imageData.right else {
                 // No images yet - keep video plane hidden
-                print("DEBUG: No images yet, keeping video hidden")
+                dlog("DEBUG: No images yet, keeping video hidden")
                 skyBoxEntity?.isEnabled = false
                 hasFrames = false
                 return
             }
             
-            print("DEBUG: Images available, showing video")
+            dlog("DEBUG: Images available, showing video")
             
             guard let skyBox = skyBoxEntity else {
                 return
@@ -246,7 +246,7 @@ struct ImmersiveView: View {
             
             // Update plane geometry if aspect ratio changed
             if currentAspectRatio == nil || abs(currentAspectRatio! - aspectRatio) > 0.01 {
-                print("DEBUG: Updating plane geometry for aspect ratio: \(aspectRatio) (was: \(currentAspectRatio ?? 0))")
+                dlog("DEBUG: Updating plane geometry for aspect ratio: \(aspectRatio) (was: \(currentAspectRatio ?? 0))")
                 currentAspectRatio = aspectRatio
                 
                 // Use a fixed height and calculate width based on aspect ratio
@@ -287,7 +287,7 @@ struct ImmersiveView: View {
             
             // Check if stereo mode is enabled
             let isStereo = DataManager.shared.stereoEnabled
-            print("DEBUG: Stereo mode: \(isStereo)")
+            dlog("DEBUG: Stereo mode: \(isStereo)")
             
             if isStereo {
                 // Stereo mode: Use the loaded ShaderGraphMaterial from RealityKitContent
@@ -296,7 +296,7 @@ struct ImmersiveView: View {
                     guard let sphereEntity = stereoMaterialEntity,
                           var stereoMaterial = sphereEntity.components[ModelComponent.self]?.materials.first as? ShaderGraphMaterial else {
                         // Fallback if stereo material isn't loaded yet
-                        print("⚠️ WARNING: StereoMaterial not loaded yet, falling back to mono display")
+                        dlog("⚠️ WARNING: StereoMaterial not loaded yet, falling back to mono display")
                         var skyBoxMaterial = UnlitMaterial()
                         var textureOptions = TextureResource.CreateOptions(semantic: .hdrColor)
                         textureOptions.mipmapsMode = .none
@@ -326,9 +326,9 @@ struct ImmersiveView: View {
                     
                     // Apply the stereo material to the video plane
                     skyBox.components[ModelComponent.self]?.materials = [stereoMaterial]
-                    print("✅ DEBUG: Updated stereo textures successfully (left + right)")
+                    dlog("✅ DEBUG: Updated stereo textures successfully (left + right)")
                 } catch {
-                    print("❌ ERROR: Failed to load stereo textures: \(error)")
+                    dlog("❌ ERROR: Failed to load stereo textures: \(error)")
                 }
             } else {
                 // Mono mode: Use simple unlit material with alpha support
@@ -346,9 +346,9 @@ struct ImmersiveView: View {
                     skyBoxMaterial.color = .init(texture: .init(texture))
                     
                     skyBox.components[ModelComponent.self]?.materials = [skyBoxMaterial]
-                    print("DEBUG: Updated mono video texture successfully")
+                    dlog("DEBUG: Updated mono video texture successfully")
                 } catch {
-                    print("❌ ERROR: Failed to load mono texture: \(error)")
+                    dlog("❌ ERROR: Failed to load mono texture: \(error)")
                 }
             }
         } attachments: {
@@ -378,14 +378,14 @@ struct ImmersiveView: View {
             }
         }
         .onReceive(imageData.$left) { newImage in
-            print("DEBUG: onReceive triggered, new image: \(newImage != nil)")
+            dlog("DEBUG: onReceive triggered, new image: \(newImage != nil)")
             updateTrigger.toggle()
         }
         .task { appModel.run() }
         .task { await appModel.processDeviceAnchorUpdates() }
         .task(priority: .low) { await appModel.processReconstructionUpdates() }
         .onAppear {
-            print("DEBUG: ImmersiveView appeared, starting video stream")
+            dlog("DEBUG: ImmersiveView appeared, starting video stream")
             videoStreamManager.start(imageData: imageData)
             
             // Set up simulation data recording
@@ -408,18 +408,18 @@ struct ImmersiveView: View {
                         await MainActor.run {
                             self.stereoMaterialEntity = sphereEntity
                         }
-                        print("✅ [ImmersiveView] Loaded stereo material from RealityKitContent")
+                        dlog("✅ [ImmersiveView] Loaded stereo material from RealityKitContent")
                     } else {
-                        print("⚠️ [ImmersiveView] Could not find Sphere entity in Immersive scene")
+                        dlog("⚠️ [ImmersiveView] Could not find Sphere entity in Immersive scene")
                     }
                 } else {
-                    print("⚠️ [ImmersiveView] Could not load Immersive scene from RealityKitContent")
+                    dlog("⚠️ [ImmersiveView] Could not load Immersive scene from RealityKitContent")
                 }
             }
         }
         .onChange(of: dataManager.pythonClientIP) { oldValue, newValue in
             if newValue == nil {
-                print("🔌 [ImmersiveView] Python client disconnected - clearing state")
+                dlog("🔌 [ImmersiveView] Python client disconnected - clearing state")
                 // Clear the video frames
                 imageData.left = nil
                 imageData.right = nil
@@ -434,7 +434,7 @@ struct ImmersiveView: View {
         .onChange(of: dataManager.webrtcGeneration) { oldValue, newValue in
             if newValue < 0 {
                 // Disconnection detected
-                print("🔌 [ImmersiveView] WebRTC disconnected (generation: \(newValue)) - clearing state")
+                dlog("🔌 [ImmersiveView] WebRTC disconnected (generation: \(newValue)) - clearing state")
                 imageData.left = nil
                 imageData.right = nil
                 hasFrames = false
@@ -443,7 +443,7 @@ struct ImmersiveView: View {
                 videoStreamManager.stop()
             } else if newValue > 0 && oldValue != newValue {
                 // New connection or reconnection
-                print("🔄 [ImmersiveView] WebRTC generation changed to \(newValue), restarting stream...")
+                dlog("🔄 [ImmersiveView] WebRTC generation changed to \(newValue), restarting stream...")
                 videoStreamManager.stop()
                 // Give it a moment to cleanup
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -453,7 +453,7 @@ struct ImmersiveView: View {
         }
         .onChange(of: dataManager.videoPlaneFixedToWorld) { oldValue, isFixed in
             if isFixed {
-                print("🔒 [ImmersiveView] Fixed Mode ENABLED - Capturing Transform")
+                dlog("🔒 [ImmersiveView] Fixed Mode ENABLED - Capturing Transform")
                 // Capture head transform immediately when toggled
                 let headWorldMatrix = DataManager.shared.latestHandTrackingData.Head
                 
@@ -471,14 +471,14 @@ struct ImmersiveView: View {
                 // World = Head * Offset
                 let worldMatrix = simd_mul(headWorldMatrix, offsetTransform.matrix)
                 fixedWorldTransform = Transform(matrix: worldMatrix)
-                print("🔒 [ImmersiveView] Captured Fixed Transform: \(fixedWorldTransform?.translation ?? .zero)")
+                dlog("🔒 [ImmersiveView] Captured Fixed Transform: \(fixedWorldTransform?.translation ?? .zero)")
             } else {
-                print("🔓 [ImmersiveView] Fixed Mode DISABLED")
+                dlog("🔓 [ImmersiveView] Fixed Mode DISABLED")
                 fixedWorldTransform = nil
             }
         }
         .onDisappear {
-            print("DEBUG: ImmersiveView disappeared, stopping video stream")
+            dlog("DEBUG: ImmersiveView disappeared, stopping video stream")
             videoStreamManager.stop()
             fixedWorldTransform = nil
         }
@@ -524,6 +524,7 @@ class VideoStreamManager: ObservableObject {
     private var videoRenderer: VideoFrameRenderer?
     private var audioRenderer: AudioFrameRenderer?
     private var isRunning = false
+    private var connectionTask: Task<Void, Never>?  // Track the async connection task
     
     /// Callback for sim-poses data channel messages (JSON format from Python)
     /// Format: {"body_name": [x,y,z,qx,qy,qz,qw], ...}
@@ -538,16 +539,19 @@ class VideoStreamManager: ObservableObject {
         // If already running, we might want to restart if called explicitly, 
         // but for now let's respect the flag unless stop() was called.
         if isRunning {
-            print("⚠️ [DEBUG] VideoStreamManager.start() called but already running. Ignoring.")
+            dlog("⚠️ [DEBUG] VideoStreamManager.start() called but already running. Ignoring.")
             return 
         }
         isRunning = true
         
-        Task {
+        // Cancel any previous connection task that might still be running
+        connectionTask?.cancel()
+        
+        connectionTask = Task {
             do {
-                print("🎬 [DEBUG] VideoStreamManager.start() called")
-                print("⏳ [DEBUG] Waiting for Python client to connect via gRPC...")
-                print("💡 [DEBUG] Run your Python script now if you haven't already!")
+                dlog("🎬 [DEBUG] VideoStreamManager.start() called")
+                dlog("⏳ [DEBUG] Waiting for Python client to connect via gRPC...")
+                dlog("💡 [DEBUG] Run your Python script now if you haven't already!")
                 
                 // Wait for Python client to connect via gRPC
                 var pythonIP: String?
@@ -555,16 +559,22 @@ class VideoStreamManager: ObservableObject {
                 let maxAttempts = 600  // Wait up to 60 seconds (600 * 100ms)
                 
                 for i in 0..<maxAttempts {
+                    // Check if task was cancelled
+                    if Task.isCancelled {
+                        dlog("🛑 [DEBUG] Connection task cancelled during Python client wait")
+                        return
+                    }
+                    
                     if let ip = DataManager.shared.pythonClientIP {
                         pythonIP = ip
-                        print("✅ [DEBUG] Python client found after \(i * 100)ms")
+                        dlog("✅ [DEBUG] Python client found after \(i * 100)ms")
                         break
                     }
                     
                     // Print status every 5 seconds
                     if i > 0 && i % 50 == 0 {
                         let secondsWaited = i / 10
-                        print("⏳ [DEBUG] Still waiting for Python client... (\(secondsWaited)s elapsed)")
+                        dlog("⏳ [DEBUG] Still waiting for Python client... (\(secondsWaited)s elapsed)")
                     }
                     
                     try await Task.sleep(nanoseconds: 100_000_000)  // 100ms
@@ -572,38 +582,56 @@ class VideoStreamManager: ObservableObject {
                 }
                 
                 guard let pythonIP = pythonIP else {
-                    print("❌ [DEBUG] Timeout: Python client not connected after \(attempts * 100)ms")
-                    print("💡 [DEBUG] Make sure you run the Python script with VisionProStreamer")
+                    dlog("❌ [DEBUG] Timeout: Python client not connected after \(attempts * 100)ms")
+                    dlog("💡 [DEBUG] Make sure you run the Python script with VisionProStreamer")
                     return
                 }
                 
-                print("🔍 [DEBUG] Found Python client at: \(pythonIP)")
-                print("⏳ [DEBUG] Waiting for WebRTC server info via gRPC...")
+                // Check cancellation again
+                if Task.isCancelled {
+                    dlog("🛑 [DEBUG] Connection task cancelled after finding Python client")
+                    return
+                }
+                
+                dlog("🔍 [DEBUG] Found Python client at: \(pythonIP)")
+                dlog("⏳ [DEBUG] Waiting for WebRTC server info via gRPC...")
                 
                 // Wait for WebRTC server info to arrive via gRPC
                 var webrtcInfo: (host: String, port: Int)?
                 for attempt in 0..<60 {  // Try for 60 seconds
+                    // Check if task was cancelled
+                    if Task.isCancelled {
+                        dlog("🛑 [DEBUG] Connection task cancelled during WebRTC info wait")
+                        return
+                    }
+                    
                     if let info = DataManager.shared.webrtcServerInfo {
                         webrtcInfo = info
-                        print("✅ [DEBUG] WebRTC info received via gRPC: \(info.host):\(info.port)")
+                        dlog("✅ [DEBUG] WebRTC info received via gRPC: \(info.host):\(info.port)")
                         break
                     }
                     
                     if attempt % 10 == 0 && attempt > 0 {
-                        print("⏳ [DEBUG] Still waiting for WebRTC server info... (\(attempt)s elapsed)")
-                        print("💡 [DEBUG] Make sure start_streaming() was called in Python")
+                        dlog("⏳ [DEBUG] Still waiting for WebRTC server info... (\(attempt)s elapsed)")
+                        dlog("💡 [DEBUG] Make sure start_streaming() was called in Python")
                     }
                     
                     try await Task.sleep(nanoseconds: 1_000_000_000)  // 1 second
                 }
                 
                 guard let info = webrtcInfo else {
-                    print("❌ [DEBUG] Timeout: WebRTC server info not received")
-                    print("💡 [DEBUG] Make sure start_streaming() was called in Python")
+                    dlog("❌ [DEBUG] Timeout: WebRTC server info not received")
+                    dlog("💡 [DEBUG] Make sure start_streaming() was called in Python")
                     return
                 }
                 
-                print("🔗 [DEBUG] Connecting to WebRTC server at \(info.host):\(info.port)...")
+                // Final cancellation check before creating connection
+                if Task.isCancelled {
+                    dlog("🛑 [DEBUG] Connection task cancelled before WebRTC connection")
+                    return
+                }
+                
+                dlog("🔗 [DEBUG] Connecting to WebRTC server at \(info.host):\(info.port)...")
                 
                 // Connect to WebRTC server
                 let client = WebRTCClient()
@@ -612,7 +640,7 @@ class VideoStreamManager: ObservableObject {
                 // Handle connection state changes
                 client.onConnectionStateChanged = { [weak self] isConnected in
                     if !isConnected {
-                        print("🔴 [VideoStreamManager] WebRTC disconnected")
+                        dlog("🔴 [VideoStreamManager] WebRTC disconnected")
                         RecordingManager.shared.onVideoSourceDisconnected(reason: "WebRTC disconnected")
                     }
                 }
@@ -629,24 +657,28 @@ class VideoStreamManager: ObservableObject {
                 self.audioRenderer = audioRenderer
                 
                 try await client.connect(to: info.host, port: info.port)
-                print("✅ [DEBUG] WebRTC connection established!")
+                dlog("✅ [DEBUG] WebRTC connection established!")
                 let stereoVideo = DataManager.shared.stereoEnabled
                 let stereoAudio = DataManager.shared.stereoAudioEnabled
-                print("📊 [DEBUG] Stereo modes - Video: \(stereoVideo), Audio: \(stereoAudio)")
+                dlog("📊 [DEBUG] Stereo modes - Video: \(stereoVideo), Audio: \(stereoAudio)")
                 client.addVideoRenderer(videoRenderer)
                 client.addAudioRenderer(audioRenderer)
             } catch {
-                print("❌ [DEBUG] Failed to connect to WebRTC server: \(error)")
+                if Task.isCancelled {
+                    dlog("🛑 [DEBUG] Connection task was cancelled")
+                } else {
+                    dlog("❌ [DEBUG] Failed to connect to WebRTC server: \(error)")
+                }
             }
         }
     }
     
     private func queryWebRTCInfo(pythonIP: String) async throws -> (host: String, port: Int) {
         let urlString = "http://\(pythonIP):8888/webrtc_info"
-        print("🌐 [DEBUG] Querying URL: \(urlString)")
+        dlog("🌐 [DEBUG] Querying URL: \(urlString)")
         
         guard let url = URL(string: urlString) else {
-            print("❌ [DEBUG] Invalid URL: \(urlString)")
+            dlog("❌ [DEBUG] Invalid URL: \(urlString)")
             throw NSError(domain: "WebRTC", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])
         }
         
@@ -654,34 +686,40 @@ class VideoStreamManager: ObservableObject {
             let (data, response) = try await URLSession.shared.data(from: url)
             
             guard let httpResponse = response as? HTTPURLResponse else {
-                print("❌ [DEBUG] Response is not HTTPURLResponse")
+                dlog("❌ [DEBUG] Response is not HTTPURLResponse")
                 throw NSError(domain: "WebRTC", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response type"])
             }
             
-            print("📊 [DEBUG] HTTP Status: \(httpResponse.statusCode)")
+            dlog("📊 [DEBUG] HTTP Status: \(httpResponse.statusCode)")
             
             if httpResponse.statusCode != 200 {
                 let responseString = String(data: data, encoding: .utf8) ?? "(no data)"
-                print("❌ [DEBUG] HTTP error \(httpResponse.statusCode): \(responseString)")
+                dlog("❌ [DEBUG] HTTP error \(httpResponse.statusCode): \(responseString)")
                 throw NSError(domain: "WebRTC", code: -1, userInfo: [NSLocalizedDescriptionKey: "HTTP \(httpResponse.statusCode)"])
             }
             
             let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
-            print("📦 [DEBUG] Received JSON: \(json)")
+            dlog("📦 [DEBUG] Received JSON: \(json)")
             
             let host = json["host"] as! String
             let port = json["port"] as! Int
             
             return (host, port)
         } catch let error as NSError {
-            print("❌ [DEBUG] URL request failed: \(error.localizedDescription)")
-            print("💡 [DEBUG] Error domain: \(error.domain), code: \(error.code)")
+            dlog("❌ [DEBUG] URL request failed: \(error.localizedDescription)")
+            dlog("💡 [DEBUG] Error domain: \(error.domain), code: \(error.code)")
             throw error
         }
     }
     
     func stop() {
+        dlog("🛑 [DEBUG] VideoStreamManager.stop() called")
         isRunning = false
+        
+        // Cancel any running connection task
+        connectionTask?.cancel()
+        connectionTask = nil
+        
         webrtcClient?.disconnect()
         webrtcClient = nil
         videoRenderer = nil
@@ -821,7 +859,7 @@ class VideoFrameRenderer: NSObject, LKRTCVideoRenderer {
             sentTimestampMs: payload.sentTimestampMs,
             detectedAtNanoseconds: nowNanoseconds
         )
-        print("🧪 [Benchmark] Detected sequence \(payload.sequence) (sent_ms=\(payload.sentTimestampMs))")
+        dlog("🧪 [Benchmark] Detected sequence \(payload.sequence) (sent_ms=\(payload.sentTimestampMs))")
     }
 
     private func detectBenchmarkPayload(pixelBuffer: CVPixelBuffer) -> (sequence: UInt32, sentTimestampMs: UInt32)? {
@@ -1051,16 +1089,16 @@ class AudioFrameRenderer: NSObject, LKRTCAudioRenderer {
     
     override init() {
         super.init()
-        print("🔊 AudioFrameRenderer initialized")
+        dlog("🔊 AudioFrameRenderer initialized")
     }
     
     private func setupAudioEngine(format: AVAudioFormat) {
         guard audioEngine == nil else { return }
         
         let channelMode = format.channelCount == 2 ? "STEREO" : "MONO"
-        print("🔊 Setting up audio engine with format:")
-        print("   - Sample rate: \(format.sampleRate) Hz")
-        print("   - Channels: \(format.channelCount) [\(channelMode)]")
+        dlog("🔊 Setting up audio engine with format:")
+        dlog("   - Sample rate: \(format.sampleRate) Hz")
+        dlog("   - Channels: \(format.channelCount) [\(channelMode)]")
         
         // Update DataManager with sample rate
         DispatchQueue.main.async {
@@ -1071,7 +1109,7 @@ class AudioFrameRenderer: NSObject, LKRTCAudioRenderer {
         playerNode = AVAudioPlayerNode()
         
         guard let engine = audioEngine, let player = playerNode else {
-            print("❌ Failed to create audio engine or player node")
+            dlog("❌ Failed to create audio engine or player node")
             return
         }
         
@@ -1086,9 +1124,9 @@ class AudioFrameRenderer: NSObject, LKRTCAudioRenderer {
         do {
             try engine.start()
             player.play()
-            print("✅ Audio engine started successfully!")
+            dlog("✅ Audio engine started successfully!")
         } catch {
-            print("❌ Failed to start audio engine: \(error)")
+            dlog("❌ Failed to start audio engine: \(error)")
         }
         
         self.audioFormat = format
@@ -1125,7 +1163,7 @@ class AudioFrameRenderer: NSObject, LKRTCAudioRenderer {
         
         // Log only first buffer
         if bufferCount == 0 {
-            print("🔊 Audio streaming started")
+            dlog("🔊 Audio streaming started")
         }
         bufferCount += 1
     }

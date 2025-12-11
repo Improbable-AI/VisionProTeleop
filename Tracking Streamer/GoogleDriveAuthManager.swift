@@ -83,7 +83,7 @@ class GoogleDriveAuthManager: NSObject, ObservableObject {
             return
         }
         
-        print("🔐 [GoogleDriveAuthManager] Starting OAuth flow on visionOS...")
+        dlog("🔐 [GoogleDriveAuthManager] Starting OAuth flow on visionOS...")
         
         // Use ASWebAuthenticationSession for secure OAuth
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
@@ -103,7 +103,7 @@ class GoogleDriveAuthManager: NSObject, ObservableObject {
                         } else {
                             self.authError = "Authentication failed: \(error.localizedDescription)"
                         }
-                        print("❌ [GoogleDriveAuthManager] Auth error: \(error)")
+                        dlog("❌ [GoogleDriveAuthManager] Auth error: \(error)")
                         return
                     }
                     
@@ -159,9 +159,9 @@ class GoogleDriveAuthManager: NSObject, ObservableObject {
                   httpResponse.statusCode == 200 else {
                 let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
                 authError = "Token exchange failed (HTTP \(statusCode))"
-                print("❌ [GoogleDriveAuthManager] Token exchange failed: HTTP \(statusCode)")
+                dlog("❌ [GoogleDriveAuthManager] Token exchange failed: HTTP \(statusCode)")
                 if let body = String(data: data, encoding: .utf8) {
-                    print("   Response: \(body)")
+                    dlog("   Response: \(body)")
                 }
                 return
             }
@@ -184,14 +184,14 @@ class GoogleDriveAuthManager: NSObject, ObservableObject {
             keychain.save(CloudStorageProvider.googleDrive.rawValue, forKey: .selectedCloudProvider)
             
             codeVerifier = nil
-            print("✅ [GoogleDriveAuthManager] Token exchange successful - tokens synced to iCloud Keychain")
+            dlog("✅ [GoogleDriveAuthManager] Token exchange successful - tokens synced to iCloud Keychain")
             
             // Reload cloud storage settings to reflect the change
             CloudStorageSettings.shared.loadSettings()
             
         } catch {
             authError = "Token exchange failed: \(error.localizedDescription)"
-            print("❌ [GoogleDriveAuthManager] Token exchange error: \(error)")
+            dlog("❌ [GoogleDriveAuthManager] Token exchange error: \(error)")
         }
     }
     
@@ -207,7 +207,7 @@ class GoogleDriveAuthManager: NSObject, ObservableObject {
         }
         
         CloudStorageSettings.shared.loadSettings()
-        print("✅ [GoogleDriveAuthManager] Signed out from Google Drive")
+        dlog("✅ [GoogleDriveAuthManager] Signed out from Google Drive")
     }
     
     // MARK: - PKCE Helpers

@@ -28,7 +28,7 @@ struct SimulationViewer3D: UIViewRepresentable {
             context.coordinator.indexNodes(scene: scene)
             
         } catch {
-            print("❌ Failed to load USDZ: \(error)")
+            dlog("❌ Failed to load USDZ: \(error)")
         }
         
         return scnView
@@ -68,8 +68,8 @@ struct SimulationViewer3D: UIViewRepresentable {
             }
             
             traverse(rootNode)
-            print("✅ [SimulationViewer3D] Indexed \(nodeMap.count) nodes from USDZ")
-            print("   Node names: \(Array(nodeMap.keys).sorted().prefix(20))...")
+            dlog("✅ [SimulationViewer3D] Indexed \(nodeMap.count) nodes from USDZ")
+            dlog("   Node names: \(Array(nodeMap.keys).sorted().prefix(20))...")
         }
         
         func updateNodes(with frame: SimulationFrame) {
@@ -84,11 +84,11 @@ struct SimulationViewer3D: UIViewRepresentable {
                 nameMappingInitialized = true
                 
                 // Debug: Log name mapping
-                print("🔤 [SimulationViewer3D] Name mapping initialized:")
-                print("   Python names: \(pythonNames.sorted().prefix(10))...")
+                dlog("🔤 [SimulationViewer3D] Name mapping initialized:")
+                dlog("   Python names: \(pythonNames.sorted().prefix(10))...")
                 for (py, swift) in pythonToSwiftNameMap.sorted(by: { $0.key < $1.key }).prefix(10) {
                     let found = nodeMap[swift] != nil ? "✓" : "✗"
-                    print("   \(found) '\(py)' → '\(swift)'")
+                    dlog("   \(found) '\(py)' → '\(swift)'")
                 }
             }
             

@@ -322,7 +322,7 @@ extension 🥽AppModel {
                 try await self.session.run([self.handTracking, self.worldTracking, self.sceneReconstruction])
                 await self.processHandUpdates();
             } catch {
-                print(error)
+                dlog("\(error)")
             }
         }
 #endif

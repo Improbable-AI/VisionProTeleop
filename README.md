@@ -166,7 +166,7 @@ s = VisionProStreamer(ip = avp_ip)
 
 while True:
     r = s.latest
-    print(r['head'], r['right_wrist'], r['right_fingers'])
+    dlog(r['head'], r['right_wrist'], r['right_fingers'])
 ```
 
 
@@ -187,7 +187,7 @@ s.start_webrtc()  # Start streaming to Vision Pro
 
 while True:
     r = s.get_latest()
-    print(r['head'], r['right_wrist'], r['right_fingers'])
+    dlog(r['head'], r['right_wrist'], r['right_fingers'])
 ```
 
 **Example 1: Camera with custom processing:**

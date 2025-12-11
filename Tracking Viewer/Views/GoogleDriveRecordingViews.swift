@@ -728,44 +728,44 @@ struct GoogleDriveRecordingDetailView: View {
         isLoading = true
         loadError = nil
         
-        print("📂 Google Drive: Loading recording: \(recording.name)")
-        print("📂 hasVideo: \(recording.hasVideo), videoFileId: \(recording.videoFileId ?? "nil")")
-        print("📂 hasTrackingData: \(recording.hasTrackingData), trackingFileId: \(recording.trackingDataFileId ?? "nil")")
+        dlog("📂 Google Drive: Loading recording: \(recording.name)")
+        dlog("📂 hasVideo: \(recording.hasVideo), videoFileId: \(recording.videoFileId ?? "nil")")
+        dlog("📂 hasTrackingData: \(recording.hasTrackingData), trackingFileId: \(recording.trackingDataFileId ?? "nil")")
         
         // Download and load video
         if recording.hasVideo {
-            print("📂 Downloading video...")
+            dlog("📂 Downloading video...")
             if let url = await RecordingsManager.shared.downloadGoogleDriveVideo(for: recording) {
-                print("✅ Video downloaded to: \(url)")
+                dlog("✅ Video downloaded to: \(url)")
                 localVideoURL = url
                 await playbackController.setupPlayer(with: url, loop: true)
             } else {
-                print("❌ Failed to download video")
+                dlog("❌ Failed to download video")
             }
         }
         
         // Download and load tracking data
         if recording.hasTrackingData {
-            print("📂 Downloading tracking data...")
+            dlog("📂 Downloading tracking data...")
             if let url = await RecordingsManager.shared.downloadGoogleDriveTrackingData(for: recording) {
-                print("✅ Tracking data downloaded to: \(url)")
+                dlog("✅ Tracking data downloaded to: \(url)")
                 localTrackingURL = url
                 do {
                     let frames = try await TrackingDataLoader.loadTrackingData(from: url)
-                    print("✅ Loaded \(frames.count) frames")
+                    dlog("✅ Loaded \(frames.count) frames")
                     await playbackController.setTrackingData(frames)
                 } catch {
-                    print("❌ Failed to parse tracking data: \(error)")
+                    dlog("❌ Failed to parse tracking data: \(error)")
                     loadError = "Failed to load tracking data: \(error.localizedDescription)"
                 }
             } else {
-                print("❌ Failed to download tracking data")
+                dlog("❌ Failed to download tracking data")
                 loadError = "Failed to download tracking data"
             }
         }
         
         isLoading = false
-        print("📂 Loading complete. totalFrames: \(playbackController.totalFrames)")
+        dlog("📂 Loading complete. totalFrames: \(playbackController.totalFrames)")
         
         // Auto-play after everything is loaded
         if localVideoURL != nil || playbackController.totalFrames > 0 {
@@ -791,12 +791,12 @@ struct GoogleDriveRecordingDetailView: View {
             let success = await cloudKitManager.makeRecordingPrivate(recordingId: recording.id)
             if success {
                 isPublic = false
-                print("✅ Recording made private")
+                dlog("✅ Recording made private")
             }
         } else {
             // Make public - need to create shared link first
             guard let sharedURL = await GoogleDriveManager.shared.createSharedLink(fileId: recording.id) else {
-                print("❌ Failed to create shared link")
+                dlog("❌ Failed to create shared link")
                 return
             }
             
@@ -811,7 +811,7 @@ struct GoogleDriveRecordingDetailView: View {
             
             if success {
                 isPublic = true
-                print("✅ Recording made public")
+                dlog("✅ Recording made public")
             }
         }
     }

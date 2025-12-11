@@ -16,7 +16,7 @@ struct ViewControlSettings: View {
                     .foregroundColor(.white)
                 Spacer()
                 Button {
-                    print("❌ [ViewControlSettings] Close button pressed")
+                    dlog("❌ [ViewControlSettings] Close button pressed")
                     withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
                         isPresented = false
                     }
@@ -53,11 +53,11 @@ struct ViewControlSettings: View {
                         get: { -dataManager.videoPlaneZDistance },
                         set: { positiveValue in
                             let negativeValue = -positiveValue
-                            print("🎚️ [ViewControlSettings] Slider value changing to: \(positiveValue)m (internal: \(negativeValue))")
+                            dlog("🎚️ [ViewControlSettings] Slider value changing to: \(positiveValue)m (internal: \(negativeValue))")
                             dataManager.videoPlaneZDistance = negativeValue
                             // Update preview when dragging
                             previewZDistance = negativeValue
-                            print("🎚️ [ViewControlSettings] Preview z-distance set to: \(String(describing: previewZDistance))")
+                            dlog("🎚️ [ViewControlSettings] Preview z-distance set to: \(String(describing: previewZDistance))")
                             
                             // Cancel any existing hide task
                             hidePreviewTask?.cancel()
@@ -66,7 +66,7 @@ struct ViewControlSettings: View {
                             hidePreviewTask = Task { @MainActor in
                                 try? await Task.sleep(nanoseconds: 3_000_000_000)
                                 if !Task.isCancelled {
-                                    print("🎚️ [ViewControlSettings] Hiding preview after inactivity")
+                                    dlog("🎚️ [ViewControlSettings] Hiding preview after inactivity")
                                     previewZDistance = nil
                                 }
                             }
@@ -92,7 +92,7 @@ struct ViewControlSettings: View {
             HStack {
                 Spacer()
                 Button {
-                    print("🎚️ [ViewControlSettings] Reset button pressed")
+                    dlog("🎚️ [ViewControlSettings] Reset button pressed")
                     dataManager.videoPlaneZDistance = -10.0
                     previewZDistance = -10.0
                     

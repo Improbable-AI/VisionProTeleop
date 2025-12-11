@@ -335,7 +335,7 @@ class RecordingManager: ObservableObject {
     func loadCloudSettings() {
         CloudStorageSettings.shared.loadSettings()
         cloudProvider = CloudStorageSettings.shared.getActiveProvider()
-        print("☁️ [RecordingManager] Cloud provider: \(cloudProvider.displayName)")
+        dlog("☁️ [RecordingManager] Cloud provider: \(cloudProvider.displayName)")
     }
     
     // MARK: - Auto-Recording Control
@@ -345,7 +345,7 @@ class RecordingManager: ObservableObject {
     func onFirstVideoFrame() {
         guard autoRecordingEnabled && !isRecording && !userManuallyStopped else { return }
         
-        print("🔴 [RecordingManager] Auto-starting recording on first video frame")
+        dlog("🔴 [RecordingManager] Auto-starting recording on first video frame")
         isAutoRecording = true
         startRecording()
     }
@@ -358,7 +358,7 @@ class RecordingManager: ObservableObject {
         
         guard isRecording else { return }
         
-        print("🔴 [RecordingManager] Stopping recording due to: \(reason)")
+        dlog("🔴 [RecordingManager] Stopping recording due to: \(reason)")
         stopRecording()
         isAutoRecording = false
     }
@@ -367,7 +367,7 @@ class RecordingManager: ObservableObject {
     func stopRecordingManually() {
         guard isRecording else { return }
         
-        print("🔴 [RecordingManager] User manually stopped recording")
+        dlog("🔴 [RecordingManager] User manually stopped recording")
         userManuallyStopped = true // Prevent immediate auto-restart
         stopRecording()
         isAutoRecording = false
@@ -378,7 +378,7 @@ class RecordingManager: ObservableObject {
     func startRecording() {
         guard !isRecording else { return }
         
-        print("🔴 [RecordingManager] Starting recording (video-driven mode)...")
+        dlog("🔴 [RecordingManager] Starting recording (video-driven mode)...")
         
         // Reset state on background queue to avoid blocking
         recordingQueue.async { [weak self] in
@@ -414,7 +414,7 @@ class RecordingManager: ObservableObject {
             }
         }
         
-        print("🔴 [RecordingManager] Recording started with session ID: \(sessionID)")
+        dlog("🔴 [RecordingManager] Recording started with session ID: \(sessionID)")
     }
     
     /// Set up the video writer for MP4 output
@@ -463,7 +463,7 @@ class RecordingManager: ObservableObject {
         
         guard writer.startWriting() else {
             if let error = writer.error {
-                print("❌ [RecordingManager] Writer failed to start: \(error)")
+                dlog("❌ [RecordingManager] Writer failed to start: \(error)")
             }
             throw RecordingError.videoWriterSetupFailed
         }
@@ -475,7 +475,7 @@ class RecordingManager: ObservableObject {
         
         // Get the pixel buffer pool from the adaptor (will be available after starting session)
         
-        print("🎬 [RecordingManager] Video writer set up for \(Int(size.width))x\(Int(size.height))")
+        dlog("🎬 [RecordingManager] Video writer set up for \(Int(size.width))x\(Int(size.height))")
     }
     
     /// Create a pixel buffer from a UIImage using pool if available
@@ -542,7 +542,7 @@ class RecordingManager: ObservableObject {
     func stopRecording() {
         guard isRecording else { return }
         
-        print("🔴 [RecordingManager] Stopping recording...")
+        dlog("🔴 [RecordingManager] Stopping recording...")
         
         isRecording = false
         durationTimer?.invalidate()
@@ -556,9 +556,9 @@ class RecordingManager: ObservableObject {
             recordingDuration = Date().timeIntervalSince(startTime)
         }
         
-        print("🔴 [RecordingManager] Recording stopped.")
-        print("   Duration: \(String(format: "%.1f", recordingDuration))s")
-        print("   Frames: \(frameCount) (~\(String(format: "%.0f", Double(frameCount) / max(recordingDuration, 0.1))) fps)")
+        dlog("🔴 [RecordingManager] Recording stopped.")
+        dlog("   Duration: \(String(format: "%.1f", recordingDuration))s")
+        dlog("   Frames: \(frameCount) (~\(String(format: "%.0f", Double(frameCount) / max(recordingDuration, 0.1))) fps)")
         
         // Save the recording
         Task {
@@ -613,9 +613,9 @@ class RecordingManager: ObservableObject {
                     try self.setupVideoWriter(at: videoURL, size: videoFrame.size)
                     self.assetWriter?.startSession(atSourceTime: .zero)
                     self.isWriterSessionStarted = true
-                    print("🎬 [RecordingManager] Video writer session started")
+                    dlog("🎬 [RecordingManager] Video writer session started")
                 } catch {
-                    print("❌ [RecordingManager] Failed to set up video writer: \(error)")
+                    dlog("❌ [RecordingManager] Failed to set up video writer: \(error)")
                     return
                 }
             }
@@ -628,7 +628,7 @@ class RecordingManager: ObservableObject {
                 if presentationTime <= lastTime {
                     // If timestamp is not increasing, bump it slightly
                     presentationTime = CMTimeAdd(lastTime, CMTime(value: 1, timescale: 600))
-                    // print("⚠️ [RecordingManager] Adjusted timestamp for frame \(frameIndex) to maintain order")
+                    // dlog("⚠️ [RecordingManager] Adjusted timestamp for frame \(frameIndex) to maintain order")
                 }
             }
             self.lastPresentationTime = presentationTime
@@ -644,16 +644,16 @@ class RecordingManager: ObservableObject {
                     if adaptor.append(pixelBuffer, withPresentationTime: presentationTime) {
                         // Success
                         if frameIndex % 60 == 0 {
-                            print("DEBUG: Appended frame \(frameIndex) at \(presentationTime.seconds)s")
+                            dlog("DEBUG: Appended frame \(frameIndex) at \(presentationTime.seconds)s")
                         }
                     } else {
-                        print("⚠️ [RecordingManager] Failed to append frame \(frameIndex). Writer status: \(writer.status.rawValue), Error: \(String(describing: writer.error))")
+                        dlog("⚠️ [RecordingManager] Failed to append frame \(frameIndex). Writer status: \(writer.status.rawValue), Error: \(String(describing: writer.error))")
                     }
                 }
             } else if self.assetWriter?.status == .writing {
                 // Writer not ready, skip this frame but log occasionally
                 if frameIndex % 30 == 0 {
-                    print("⚠️ [RecordingManager] Writer busy, skipping frame \(frameIndex)")
+                    dlog("⚠️ [RecordingManager] Writer busy, skipping frame \(frameIndex)")
                 }
             }
             
@@ -701,7 +701,7 @@ class RecordingManager: ObservableObject {
     func onFirstSimulationFrame() {
         guard autoRecordingEnabled && !isRecording && !userManuallyStopped else { return }
         
-        print("🔴 [RecordingManager] Auto-starting recording on first simulation frame")
+        dlog("🔴 [RecordingManager] Auto-starting recording on first simulation frame")
         isAutoRecording = true
         startRecording()
     }
@@ -852,8 +852,8 @@ class RecordingManager: ObservableObject {
         isSaving = true
         defer { isSaving = false }
         
-        print("💾 [RecordingManager] Saving recording to \(storageLocation.rawValue)...")
-        print("   Frames to save: \(recordedFrames.count) (Video), \(simulationFrames.count) (Sim)")
+        dlog("💾 [RecordingManager] Saving recording to \(storageLocation.rawValue)...")
+        dlog("   Frames to save: \(recordedFrames.count) (Video), \(simulationFrames.count) (Sim)")
         
         do {
             // Use the folder we already created during recording
@@ -881,16 +881,16 @@ class RecordingManager: ObservableObject {
                     if let attributes = try? FileManager.default.attributesOfItem(atPath: videoURL.path),
                        let fileSize = attributes[.size] as? Int64 {
                         let sizeMB = Double(fileSize) / (1024 * 1024)
-                        print("🎬 [RecordingManager] Video saved: \(String(format: "%.1f", sizeMB)) MB")
+                        dlog("🎬 [RecordingManager] Video saved: \(String(format: "%.1f", sizeMB)) MB")
                     }
                 } else if let error = writer.error {
-                    print("❌ [RecordingManager] Video writer error: \(error)")
+                    dlog("❌ [RecordingManager] Video writer error: \(error)")
                 }
             } else {
                 if let writer = assetWriter {
-                    print("⚠️ [RecordingManager] Video writer not writing (Status: \(writer.status.rawValue)). Error: \(String(describing: writer.error))")
+                    dlog("⚠️ [RecordingManager] Video writer not writing (Status: \(writer.status.rawValue)). Error: \(String(describing: writer.error))")
                 } else {
-                    print("⚠️ [RecordingManager] No asset writer active")
+                    dlog("⚠️ [RecordingManager] No asset writer active")
                 }
             }
             
@@ -960,7 +960,7 @@ class RecordingManager: ObservableObject {
             }
             
             try trackingContent.write(to: trackingURL, atomically: true, encoding: .utf8)
-            print("💾 [RecordingManager] Tracking data saved")
+            dlog("💾 [RecordingManager] Tracking data saved")
             
             // Save simulation data if available
             if !simulationFrames.isEmpty {
@@ -975,7 +975,7 @@ class RecordingManager: ObservableObject {
                 }
                 
                 try simContent.write(to: simURL, atomically: true, encoding: .utf8)
-                print("💾 [RecordingManager] Simulation data saved: \(simulationFrames.count) frames")
+                dlog("💾 [RecordingManager] Simulation data saved: \(simulationFrames.count) frames")
             }
             
             // Copy USDZ file if available
@@ -986,9 +986,9 @@ class RecordingManager: ObservableObject {
                         try FileManager.default.removeItem(at: destURL)
                     }
                     try FileManager.default.copyItem(at: usdzURL, to: destURL)
-                    print("💾 [RecordingManager] USDZ file copied")
+                    dlog("💾 [RecordingManager] USDZ file copied")
                 } catch {
-                    print("⚠️ [RecordingManager] Failed to copy USDZ file: \(error)")
+                    dlog("⚠️ [RecordingManager] Failed to copy USDZ file: \(error)")
                     // Don't fail the whole save for this
                 }
             }
@@ -1017,9 +1017,9 @@ class RecordingManager: ObservableObject {
             lastRecordingURL = recordingFolder
             recordingError = nil
             
-            print("✅ [RecordingManager] Recording saved successfully to: \(recordingFolder.path)")
+            dlog("✅ [RecordingManager] Recording saved successfully to: \(recordingFolder.path)")
             
-            print("☁️ [RecordingManager] Calling uploadToCloudIfNeeded...")
+            dlog("☁️ [RecordingManager] Calling uploadToCloudIfNeeded...")
             // Upload to cloud storage if configured
             await uploadToCloudIfNeeded(recordingFolder: recordingFolder)
             
@@ -1029,7 +1029,7 @@ class RecordingManager: ObservableObject {
             
         } catch {
             recordingError = "Failed to save: \(error.localizedDescription)"
-            print("❌ [RecordingManager] Failed to save recording: \(error)")
+            dlog("❌ [RecordingManager] Failed to save recording: \(error)")
             
             // Clean up writer on error
             assetWriter = nil
@@ -1060,7 +1060,7 @@ class RecordingManager: ObservableObject {
         case .cloud:
             // Use iCloud Drive container for cloud sync
             guard let containerURL = fileManager.url(forUbiquityContainerIdentifier: nil) else {
-                print("⚠️ [RecordingManager] iCloud not available, falling back to Documents...")
+                dlog("⚠️ [RecordingManager] iCloud not available, falling back to Documents...")
                 guard let url = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
                     throw RecordingError.storageNotAvailable
                 }
@@ -1084,7 +1084,7 @@ class RecordingManager: ObservableObject {
         case .cloud:
             // Use the app's iCloud container - syncs to cloud
             guard let containerURL = fileManager.url(forUbiquityContainerIdentifier: nil) else {
-                print("⚠️ [RecordingManager] iCloud not available, falling back to Documents...")
+                dlog("⚠️ [RecordingManager] iCloud not available, falling back to Documents...")
                 guard let url = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
                     throw RecordingError.storageNotAvailable
                 }
@@ -1123,7 +1123,7 @@ class RecordingManager: ObservableObject {
         } else if let storageURL = try? getStorageURL() {
             urlToOpen = storageURL
         } else {
-            print("❌ [RecordingManager] Cannot determine storage location")
+            dlog("❌ [RecordingManager] Cannot determine storage location")
             return
         }
         
@@ -1133,11 +1133,11 @@ class RecordingManager: ObservableObject {
             Task { @MainActor in
                 if await UIApplication.shared.canOpenURL(filesURL) {
                     await UIApplication.shared.open(filesURL)
-                    print("📂 [RecordingManager] Opened Files app at: \(path)")
+                    dlog("📂 [RecordingManager] Opened Files app at: \(path)")
                 } else {
-                    print("⚠️ [RecordingManager] Cannot open shareddocuments URL, path: \(path)")
+                    dlog("⚠️ [RecordingManager] Cannot open shareddocuments URL, path: \(path)")
                     UIPasteboard.general.string = path
-                    print("📋 [RecordingManager] Path copied to clipboard: \(path)")
+                    dlog("📋 [RecordingManager] Path copied to clipboard: \(path)")
                 }
             }
         }
@@ -1184,11 +1184,11 @@ class RecordingManager: ObservableObject {
         // Refresh cloud settings in case they changed
         loadCloudSettings()
         
-        print("☁️ [RecordingManager] Upload requested. Provider: \(cloudProvider.displayName)")
+        dlog("☁️ [RecordingManager] Upload requested. Provider: \(cloudProvider.displayName)")
         
         // iCloud Drive doesn't need manual upload - files are in the iCloud container
         guard cloudProvider == .dropbox || cloudProvider == .googleDrive else {
-            print("☁️ [RecordingManager] Using iCloud Drive (or none) - no manual upload needed")
+            dlog("☁️ [RecordingManager] Using iCloud Drive (or none) - no manual upload needed")
             return
         }
         
@@ -1209,7 +1209,7 @@ class RecordingManager: ObservableObject {
         if cloudProvider == .dropbox {
             // Check if Dropbox is available
             guard DropboxUploader.shared.isAvailable() else {
-                print("⚠️ [RecordingManager] Dropbox selected but not configured - sign in via iOS app")
+                dlog("⚠️ [RecordingManager] Dropbox selected but not configured - sign in via iOS app")
                 return
             }
             
@@ -1219,7 +1219,7 @@ class RecordingManager: ObservableObject {
             cloudUploadCurrentFileName = ""
             cloudUploadProgress = "Preparing upload to Dropbox..."
             
-            print("☁️ [RecordingManager] Uploading to Dropbox...")
+            dlog("☁️ [RecordingManager] Uploading to Dropbox...")
             
             let success = await DropboxUploader.shared.uploadRecording(
                 folderURL: recordingFolder,
@@ -1232,15 +1232,15 @@ class RecordingManager: ObservableObject {
             
             if success {
                 cloudUploadProgress = "Uploaded to Dropbox ✓"
-                print("✅ [RecordingManager] Successfully uploaded to Dropbox")
+                dlog("✅ [RecordingManager] Successfully uploaded to Dropbox")
             } else {
                 cloudUploadProgress = "Dropbox upload failed"
-                print("❌ [RecordingManager] Failed to upload to Dropbox")
+                dlog("❌ [RecordingManager] Failed to upload to Dropbox")
             }
         } else if cloudProvider == .googleDrive {
             // Check if Google Drive is available
             guard GoogleDriveUploader.shared.isAvailable() else {
-                print("⚠️ [RecordingManager] Google Drive selected but not configured - sign in via iOS app")
+                dlog("⚠️ [RecordingManager] Google Drive selected but not configured - sign in via iOS app")
                 return
             }
             
@@ -1250,7 +1250,7 @@ class RecordingManager: ObservableObject {
             cloudUploadCurrentFileName = ""
             cloudUploadProgress = "Preparing upload to Google Drive..."
             
-            print("☁️ [RecordingManager] Uploading to Google Drive...")
+            dlog("☁️ [RecordingManager] Uploading to Google Drive...")
             
             let success = await GoogleDriveUploader.shared.uploadRecording(
                 folderURL: recordingFolder,
@@ -1263,10 +1263,10 @@ class RecordingManager: ObservableObject {
             
             if success {
                 cloudUploadProgress = "Uploaded to Google Drive ✓"
-                print("✅ [RecordingManager] Successfully uploaded to Google Drive")
+                dlog("✅ [RecordingManager] Successfully uploaded to Google Drive")
             } else {
                 cloudUploadProgress = "Google Drive upload failed"
-                print("❌ [RecordingManager] Failed to upload to Google Drive")
+                dlog("❌ [RecordingManager] Failed to upload to Google Drive")
             }
         }
     }

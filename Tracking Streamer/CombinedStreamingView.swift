@@ -57,6 +57,7 @@ struct CombinedStreamingView: View {
     @State private var mujocoFinalTransforms: [String: simd_float4x4] = [:]
     @State private var mujocoPoseUpdateTrigger: UUID = UUID()
     @State private var mujocoUsdzURL: String? = nil
+    @State private var cachedSortedBodyNames: [String] = []  // Cached sorted body names for consistent iteration
     
     // Hand joint visualization state
     @State private var handJointUpdateTrigger: UUID = UUID()
@@ -100,6 +101,7 @@ struct CombinedStreamingView: View {
                 mujocoUsdzURL: $mujocoUsdzURL,
                 mujocoFinalTransforms: $mujocoFinalTransforms,
                 mujocoPoseUpdateTrigger: $mujocoPoseUpdateTrigger,
+                mujocoBodyEntities: $mujocoBodyEntities,
                 computeMuJoCoFinalTransformsFromWebRTC: computeMuJoCoFinalTransformsFromWebRTC,
                 computeMuJoCoFinalTransforms: computeMuJoCoFinalTransforms,
                 tryAutoMinimize: tryAutoMinimize
@@ -789,9 +791,9 @@ struct CombinedStreamingView: View {
     /// Check if all required streams are ready and auto-minimize if conditions are met
     private func tryAutoMinimize() {
         print("🔍 [AutoMinimize] Checking... hasAutoMinimized=\(hasAutoMinimized), userInteracted=\(userInteracted)")
-        guard !hasAutoMinimized && !userInteracted else { 
+        guard !hasAutoMinimized && !userInteracted else {
             print("🔍 [AutoMinimize] Early exit: already minimized or user interacted")
-            return 
+            return
         }
         
         let dm = DataManager.shared
@@ -1099,8 +1101,8 @@ struct CombinedStreamingView: View {
                 let childPrefix = base + "/"
                 var childCandidates: [String] = []
                 for swiftName in mujocoBodyEntities.keys {
-                    if swiftName.hasPrefix(childPrefix) && 
-                       !swiftName.contains("/collisions") && 
+                    if swiftName.hasPrefix(childPrefix) &&
+                       !swiftName.contains("/collisions") &&
                        initialLocalTransforms[swiftName] != nil {
                         // Only consider direct children (depth 1)
                         let suffix = String(swiftName.dropFirst(childPrefix.count))
@@ -1206,33 +1208,38 @@ struct CombinedStreamingView: View {
                 if let swift = pythonToSwiftNameMap[py], mujocoBodyEntities[swift] != nil { return acc + 1 }
                 return acc
             }
-            if validMatches > 0 { 
-                nameMappingInitialized = true 
-                print("✅ Name mapping initialized with \(validMatches) valid matches")
-                // Note: Orphan hiding is now done during indexing (indexMuJoCoBodyEntities)
-                // which catches all duplicate mesh_0 entities at root level
+            if validMatches > 0 {
+                nameMappingInitialized = true
+                // Cache sorted body names for consistent iteration order
+                cachedSortedBodyNames = Array(poses.keys).sorted()
+                print("✅ Name mapping initialized with \(validMatches) valid matches, cached \(cachedSortedBodyNames.count) sorted names")
             }
         }
         
-        // Detect Isaac Lab mode from USDZ filename
+        // Detect Isaac Lab mode from USDZ filename (cache this check)
         let isIsaacLab = mujocoUsdzURL?.lowercased().contains("isaac_") ?? false
         
+        // Pre-compute axis correction (constant)
         let axisCorrection = simd_quatf(angle: -.pi / 2, axis: SIMD3<Float>(1, 0, 0))
-        var finalTransforms: [String: simd_float4x4] = [:]
         
-        for (pyName, values) in poses {
-            guard values.count >= 7 else { continue }
+        // Pre-allocate with estimated capacity to reduce allocations
+        var finalTransforms: [String: simd_float4x4] = [:]
+        finalTransforms.reserveCapacity(poses.count * 2)  // Typically 1-2 targets per pose
+        
+        // Use cached sorted order for consistent iteration (O(1) vs O(n log n) per frame)
+        // Fall back to unsorted if cache is empty (shouldn't happen after initialization)
+        let bodyNamesToProcess = cachedSortedBodyNames.isEmpty ? Array(poses.keys) : cachedSortedBodyNames
+        
+        for pyName in bodyNamesToProcess {
+            guard let values = poses[pyName], values.count >= 7 else { continue }
             
-            // Get all target entities for this Python body
+            // Get all target entities for this Python body (cached after first call)
             let targetNames = targets(for: pyName)
             
             for bodyName in targetNames {
                 guard initialLocalTransforms[bodyName] != nil else { continue }
                 
                 // For Isaac Lab: Determine if this is a standalone rigid object or an articulated link
-                // Rigid objects have 2-component paths: "env_0/object", "env_0/target_pose"  
-                // Articulated links have 3+ component paths: "env_0/Franka/fr3_link6"
-                // Only skip local transform for rigid objects (to avoid position doubling)
                 let pathComponents = pyName.components(separatedBy: "/")
                 let isStandaloneRigidObject = isIsaacLab && pathComponents.count == 2
                 
@@ -1240,7 +1247,7 @@ struct CombinedStreamingView: View {
                     bodyName: bodyName, 
                     values: values, 
                     axisCorrection: axisCorrection,
-                    skipLocalTransform: isStandaloneRigidObject  // Only skip for rigid objects, not articulated links
+                    skipLocalTransform: isStandaloneRigidObject
                 )
                 finalTransforms[bodyName] = transform
             }
@@ -1250,42 +1257,13 @@ struct CombinedStreamingView: View {
     }
     
     private func applyMuJoCoTransforms(_ transforms: [String: simd_float4x4]) {
-        var depthCache: [String: Int] = [:]
-        
-        func depth(for name: String) -> Int {
-            if let d = depthCache[name] { return d }
-            guard let entity = mujocoBodyEntities[name] else { depthCache[name] = 0; return 0 }
-            var d = 0
-            var p = entity.parent
-            while let parent = p {
-                d += 1
-                p = parent.parent
-            }
-            depthCache[name] = d
-            return d
-        }
-        
-        let sortedNames = transforms.keys.sorted { lhs, rhs in depth(for: lhs) < depth(for: rhs) }
-        
-        // Debug: log first frame of transforms
-        if transforms.count > 0 && !sortedNames.isEmpty {
-            let firstKey = sortedNames.first ?? "none"
-            let foundEntity = mujocoBodyEntities[firstKey] != nil
-            print("🔄 [applyTransforms] Applying \(transforms.count) transforms, first: '\(firstKey)', found: \(foundEntity), applyInWorldSpace: \(applyInWorldSpace)")
-        }
-        
-        for name in sortedNames {
-            guard let entity = mujocoBodyEntities[name], let desiredWorld = transforms[name] else { continue }
+        // Direct application without depth sorting - world transforms are independent
+        for (name, desiredWorld) in transforms {
+            guard let entity = mujocoBodyEntities[name] else { continue }
             
-            if applyInWorldSpace {
-                let prevLocalScale = entity.scale
-                entity.setTransformMatrix(desiredWorld, relativeTo: nil)
-                if let parent = entity.parent {
-                    entity.setScale(prevLocalScale, relativeTo: parent)
-                } else {
-                    entity.setScale(prevLocalScale, relativeTo: nil)
-                }
-            }
+            let prevLocalScale = entity.scale
+            entity.setTransformMatrix(desiredWorld, relativeTo: nil)
+            entity.scale = prevLocalScale  // Preserve scale
         }
     }
     
@@ -1302,7 +1280,7 @@ struct CombinedStreamingView: View {
             } else {
                 newMap[py] = py
             }
-        }
+    }
         
         pythonToSwiftNameMap = newMap
     }
@@ -1899,6 +1877,7 @@ private struct LifecycleModifiers: ViewModifier {
     @Binding var mujocoUsdzURL: String?
     @Binding var mujocoFinalTransforms: [String: simd_float4x4]
     @Binding var mujocoPoseUpdateTrigger: UUID
+    @Binding var mujocoBodyEntities: [String: ModelEntity]
     
     var computeMuJoCoFinalTransformsFromWebRTC: ([String: [Float]]) -> [String: simd_float4x4]
     var computeMuJoCoFinalTransforms: ([String: MujocoAr_BodyPose]) -> [String: simd_float4x4]
@@ -1932,47 +1911,45 @@ private struct LifecycleModifiers: ViewModifier {
         print("🤖 [CombinedStreamingView] Teleoperation Mode - Full WebRTC support")
         
         videoStreamManager.onSimPosesReceived = { timestamp, poses, qpos, ctrl in
-            // Debug: log callback invocation
-            let poseCount = poses.count
-            let shouldLog = Int.random(in: 0..<100) == 0  // Log 1% of frames
-            if shouldLog {
-                print("📨 [Callback] onSimPosesReceived called with \(poseCount) poses")
+            // Record simulation data on background thread to avoid blocking main thread
+            DispatchQueue.global(qos: .utility).async {
+                RecordingManager.shared.recordSimulationData(
+                    timestamp: timestamp,
+                    poses: poses,
+                    qpos: qpos,
+                    ctrl: ctrl,
+                    trackingData: DataManager.shared.latestHandTrackingData
+                )
             }
             
-            // Record simulation data along with current hand tracking data
-            RecordingManager.shared.recordSimulationData(
-                timestamp: timestamp, 
-                poses: poses, 
-                qpos: qpos, 
-                ctrl: ctrl, 
-                trackingData: DataManager.shared.latestHandTrackingData
-            )
+            // Compute and apply transforms directly (already on main thread from WebRTCClient)
+            // This ensures all bodies get the same frame's transforms atomically
+            let transforms = computeMuJoCoFinalTransformsFromWebRTC(poses)
             
-            Task { @MainActor in
-                let transforms = computeMuJoCoFinalTransformsFromWebRTC(poses)
-                
-                // Debug: log transform computation
-                if shouldLog {
-                    print("🔄 [Callback] Computed \(transforms.count) transforms from \(poseCount) poses")
-                }
-                
-                mujocoFinalTransforms = transforms
+            // Apply transforms in consistent sorted order to prevent visual artifacts
+            // The sorted keys are cheap since transforms dict uses String keys which sort fast
+            for name in transforms.keys.sorted() {
+                guard let desiredWorld = transforms[name], let entity = mujocoBodyEntities[name] else { continue }
+                entity.setTransformMatrix(desiredWorld, relativeTo: nil)
+            }
+            
+            // Update state for UI stats (no dispatch needed, already on main)
+            if mujocoManager.bodyCount == 0 {
                 mujocoPoseUpdateTrigger = UUID()
-                
-                mujocoManager.recordPoseUpdate(bodyCount: poses.count)
-                
-                if !mujocoManager.poseStreamingViaWebRTC {
-                    mujocoManager.poseStreamingViaWebRTC = true
-                    mujocoManager.simEnabled = true
-                    mujocoManager.updateConnectionStatus("Streaming via WebRTC")
-                    print("✅ [Callback] First pose received, poseStreamingViaWebRTC = true")
-                }
-                
-                if !hasSimPoses {
-                    hasSimPoses = true
-                    print("✅ [Callback] hasSimPoses set to true")
-                    tryAutoMinimize()
-                }
+            }
+            
+            mujocoManager.recordPoseUpdate(bodyCount: poses.count)
+            
+            if !mujocoManager.poseStreamingViaWebRTC {
+                mujocoManager.poseStreamingViaWebRTC = true
+                mujocoManager.simEnabled = true
+                mujocoManager.updateConnectionStatus("Streaming via WebRTC")
+                print("✅ [Callback] First pose received")
+            }
+            
+            if !hasSimPoses {
+                hasSimPoses = true
+                tryAutoMinimize()
             }
         }
         
@@ -2101,10 +2078,8 @@ private struct StateChangeModifiers: ViewModifier {
                 }
             }
             .onChange(of: mujocoPoseUpdateTrigger) { _, _ in
-                Task {
-                    try? await Task.sleep(nanoseconds: 1_000_000)
-                    mujocoFinalTransforms = [:]
-                }
+                // Trigger is only used to force RealityView update on first pose
+                // No clearing needed - transforms are continuously updated via applyMuJoCoTransforms()
             }
             .onChange(of: dataManager.pythonClientIP) { _, newValue in
                 if newValue == nil { handlePythonClientDisconnected() }

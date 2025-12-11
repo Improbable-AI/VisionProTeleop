@@ -8,6 +8,12 @@ private let dontShowSignInAgainKey = "dontShowSignInAgain"  // User opted out of
 private let dontShowIOSPromoAgainKey = "dontShowIOSPromoAgain"  // User opted out of iOS promo views
 private let hasSignedInOnVisionOSKey = "hasSignedInOnVisionOS"  // Track if sign-in happened on visionOS
 
+func dlog(_ msg: @autoclosure () -> String) {
+    #if DEBUG
+    print(msg())
+    #endif
+}
+
 /// Onboarding flow state for first-time users
 enum OnboardingState: Equatable {
     case mainView                           // Initial START screen
@@ -959,7 +965,7 @@ struct IOSAppShowcaseView: View {
                     player?.play()
                 }
             } catch {
-                print("⚠️ Failed to load demo video: \(error)")
+                dlog("⚠️ Failed to load demo video: \(error)")
             }
         }
     }

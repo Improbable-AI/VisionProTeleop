@@ -111,7 +111,7 @@ struct UnifiedRecordingThumbnailView: View {
                         if recording.source != .iCloudDrive {
                             let isPublic = cloudKitManager.publicRecordings.contains { 
                                 let match = $0.recordingId == recording.id
-                                if match { print("✅ Found public match: \($0.recordingId)") }
+                                if match { dlog("✅ Found public match: \($0.recordingId)") }
                                 return match
                             }
                             
@@ -1038,7 +1038,7 @@ struct UnifiedRecordingDetailView: View {
             let success = await cloudKitManager.makeRecordingPrivate(recordingId: recording.id)
             if success {
                 isPublic = false
-                print("✅ Recording made private")
+                dlog("✅ Recording made private")
             }
         } else {
             // Make public - need to create shared link first
@@ -1058,7 +1058,7 @@ struct UnifiedRecordingDetailView: View {
             }
             
             guard let url = sharedURL, let prov = provider else {
-                print("❌ Failed to create shared link")
+                dlog("❌ Failed to create shared link")
                 return
             }
             
@@ -1085,7 +1085,7 @@ struct UnifiedRecordingDetailView: View {
             
             if success {
                 isPublic = true
-                print("✅ Recording made public")
+                dlog("✅ Recording made public")
             }
         }
     }
@@ -1123,7 +1123,7 @@ struct UnifiedRecordingDetailView: View {
             try data.write(to: fileURL)
             return fileURL
         } catch {
-            print("❌ Failed to save temp thumbnail: \(error)")
+            dlog("❌ Failed to save temp thumbnail: \(error)")
             return nil
         }
     }
@@ -1134,7 +1134,7 @@ struct UnifiedRecordingDetailView: View {
         isLoading = true
         loadError = nil
         
-        print("🎬 Loading recording: \(recording.name) from \(recording.source.displayName)")
+        dlog("🎬 Loading recording: \(recording.name) from \(recording.source.displayName)")
         
         switch recording.source {
         case .iCloudDrive:
@@ -1152,7 +1152,7 @@ struct UnifiedRecordingDetailView: View {
             playbackController.play()
         }
         
-        print("🎬 Loading complete. totalFrames: \(playbackController.totalFrames)")
+        dlog("🎬 Loading complete. totalFrames: \(playbackController.totalFrames)")
     }
     
     private func loadiCloudData() async {
@@ -1191,7 +1191,7 @@ struct UnifiedRecordingDetailView: View {
                     }
                 }
             } catch {
-                print("⚠️ Failed to load simulation data: \(error)")
+                dlog("⚠️ Failed to load simulation data: \(error)")
             }
         }
     }
@@ -1231,7 +1231,7 @@ struct UnifiedRecordingDetailView: View {
                     decoder.dateDecodingStrategy = .iso8601
                     loadedMetadata = try decoder.decode(RecordingMetadata.self, from: data)
                 } catch {
-                    print("⚠️ Failed to parse metadata: \(error)")
+                    dlog("⚠️ Failed to parse metadata: \(error)")
                 }
             }
         }
@@ -1249,7 +1249,7 @@ struct UnifiedRecordingDetailView: View {
                     showSimulation = true
                 }
             } catch {
-                print("⚠️ Failed to load simulation data: \(error)")
+                dlog("⚠️ Failed to load simulation data: \(error)")
             }
         }
     }
@@ -1289,7 +1289,7 @@ struct UnifiedRecordingDetailView: View {
                     decoder.dateDecodingStrategy = .iso8601
                     loadedMetadata = try decoder.decode(RecordingMetadata.self, from: data)
                 } catch {
-                    print("⚠️ Failed to parse metadata: \(error)")
+                    dlog("⚠️ Failed to parse metadata: \(error)")
                 }
             }
         }
@@ -1307,7 +1307,7 @@ struct UnifiedRecordingDetailView: View {
                     showSimulation = true
                 }
             } catch {
-                print("⚠️ Failed to load simulation data: \(error)")
+                dlog("⚠️ Failed to load simulation data: \(error)")
             }
         }
     }

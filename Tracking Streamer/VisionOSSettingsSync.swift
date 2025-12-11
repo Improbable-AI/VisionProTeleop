@@ -84,10 +84,10 @@ class VisionOSSettingsSync: ObservableObject {
                     switch reason {
                     case NSUbiquitousKeyValueStoreServerChange,
                          NSUbiquitousKeyValueStoreInitialSyncChange:
-                        print("☁️ [VisionOSSettingsSync] Received settings update from iOS")
+                        dlog("☁️ [VisionOSSettingsSync] Received settings update from iOS")
                         self.loadFromiCloud()
                     case NSUbiquitousKeyValueStoreAccountChange:
-                        print("ℹ️ [VisionOSSettingsSync] iCloud account changed")
+                        dlog("ℹ️ [VisionOSSettingsSync] iCloud account changed")
                         self.loadFromiCloud()
                     default:
                         break
@@ -101,10 +101,10 @@ class VisionOSSettingsSync: ObservableObject {
     }
     
     private func loadFromiCloud() {
-        print("☁️ [VisionOSSettingsSync] Loading settings from iCloud...")
+        dlog("☁️ [VisionOSSettingsSync] Loading settings from iCloud...")
         
         guard let dataManager = dataManager else {
-            print("⚠️ [VisionOSSettingsSync] DataManager not configured yet")
+            dlog("⚠️ [VisionOSSettingsSync] DataManager not configured yet")
             return
         }
         
@@ -114,65 +114,65 @@ class VisionOSSettingsSync: ObservableObject {
         if let value = store.object(forKey: SettingKey.upperLimbVisible.rawValue) as? Bool {
             dataManager.upperLimbVisible = value
             settingsApplied = true
-            print("☁️ [VisionOSSettingsSync] Applied upperLimbVisible = \(value)")
+            dlog("☁️ [VisionOSSettingsSync] Applied upperLimbVisible = \(value)")
         }
         
         if let value = store.object(forKey: SettingKey.showHeadBeam.rawValue) as? Bool {
             dataManager.showHeadBeam = value
             settingsApplied = true
-            print("☁️ [VisionOSSettingsSync] Applied showHeadBeam = \(value)")
+            dlog("☁️ [VisionOSSettingsSync] Applied showHeadBeam = \(value)")
         }
         
         if let value = store.object(forKey: SettingKey.showHandJoints.rawValue) as? Bool {
             dataManager.showHandJoints = value
             settingsApplied = true
-            print("☁️ [VisionOSSettingsSync] Applied showHandJoints = \(value)")
+            dlog("☁️ [VisionOSSettingsSync] Applied showHandJoints = \(value)")
         }
         
         if let value = store.object(forKey: SettingKey.handJointsOpacity.rawValue) as? Double {
             dataManager.handJointsOpacity = Float(value)
             settingsApplied = true
-            print("☁️ [VisionOSSettingsSync] Applied handJointsOpacity = \(value)")
+            dlog("☁️ [VisionOSSettingsSync] Applied handJointsOpacity = \(value)")
         }
         
         // Video plane settings
         if let value = store.object(forKey: SettingKey.videoPlaneZDistance.rawValue) as? Double {
             dataManager.videoPlaneZDistance = Float(value)
             settingsApplied = true
-            print("☁️ [VisionOSSettingsSync] Applied videoPlaneZDistance = \(value)")
+            dlog("☁️ [VisionOSSettingsSync] Applied videoPlaneZDistance = \(value)")
         }
         
         if let value = store.object(forKey: SettingKey.videoPlaneYPosition.rawValue) as? Double {
             dataManager.videoPlaneYPosition = Float(value)
             settingsApplied = true
-            print("☁️ [VisionOSSettingsSync] Applied videoPlaneYPosition = \(value)")
+            dlog("☁️ [VisionOSSettingsSync] Applied videoPlaneYPosition = \(value)")
         }
         
         // Controller position settings
         if let value = store.object(forKey: SettingKey.statusMinimizedXPosition.rawValue) as? Double {
             dataManager.statusMinimizedXPosition = Float(value)
             settingsApplied = true
-            print("☁️ [VisionOSSettingsSync] Applied statusMinimizedXPosition = \(value)")
+            dlog("☁️ [VisionOSSettingsSync] Applied statusMinimizedXPosition = \(value)")
         }
         
         if let value = store.object(forKey: SettingKey.statusMinimizedYPosition.rawValue) as? Double {
             dataManager.statusMinimizedYPosition = Float(value)
             settingsApplied = true
-            print("☁️ [VisionOSSettingsSync] Applied statusMinimizedYPosition = \(value)")
+            dlog("☁️ [VisionOSSettingsSync] Applied statusMinimizedYPosition = \(value)")
         }
         
         // Recording settings
         if let value = store.object(forKey: SettingKey.autoRecordingEnabled.rawValue) as? Bool {
             recordingManager?.autoRecordingEnabled = value
             settingsApplied = true
-            print("☁️ [VisionOSSettingsSync] Applied autoRecordingEnabled = \(value)")
+            dlog("☁️ [VisionOSSettingsSync] Applied autoRecordingEnabled = \(value)")
         }
         
         // App mode - stored in UserDefaults with @AppStorage
         if let value = store.object(forKey: SettingKey.appMode.rawValue) as? String {
             UserDefaults.standard.set(value, forKey: "appMode")
             settingsApplied = true
-            print("☁️ [VisionOSSettingsSync] Applied appMode = \(value)")
+            dlog("☁️ [VisionOSSettingsSync] Applied appMode = \(value)")
         }
         
         // Update sync status
@@ -183,9 +183,9 @@ class VisionOSSettingsSync: ObservableObject {
         hasRemoteSettings = settingsApplied
         
         if settingsApplied {
-            print("☁️ [VisionOSSettingsSync] ✅ Settings applied from iOS")
+            dlog("☁️ [VisionOSSettingsSync] ✅ Settings applied from iOS")
         } else {
-            print("☁️ [VisionOSSettingsSync] No remote settings found")
+            dlog("☁️ [VisionOSSettingsSync] No remote settings found")
         }
     }
     
@@ -229,6 +229,6 @@ class VisionOSSettingsSync: ObservableObject {
         store.set(Date().timeIntervalSince1970, forKey: SettingKey.lastSyncTime.rawValue)
         
         store.synchronize()
-        print("☁️ [VisionOSSettingsSync] Pushed current settings to iCloud")
+        dlog("☁️ [VisionOSSettingsSync] Pushed current settings to iCloud")
     }
 }

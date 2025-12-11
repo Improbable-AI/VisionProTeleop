@@ -333,7 +333,7 @@ enum iPhoneDisplayDatabase {
             return identifier + String(UnicodeScalar(UInt8(value)))
         }
         
-        print("📱 [CalibrationConfig] Device identifier: \(identifier)")
+        dlog("📱 [CalibrationConfig] Device identifier: \(identifier)")
         return allSpecs[identifier]
     }
     
@@ -358,7 +358,7 @@ enum iPhoneDisplayDatabase {
             }
         }
         
-        print("📱 [CalibrationConfig] Using fallback spec: \(bestMatch.displayName)")
+        dlog("📱 [CalibrationConfig] Using fallback spec: \(bestMatch.displayName)")
         return bestMatch
     }
 }

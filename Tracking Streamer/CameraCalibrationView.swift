@@ -32,9 +32,9 @@ struct CameraCalibrationView: View {
             .navigationTitle("Camera Calibration")
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
-                print("📱 [CalibrationView] View appeared!")
-                print("📱 [CalibrationView] Available devices: \(uvcCameraManager.availableDevices.map { $0.name })")
-                print("📱 [CalibrationView] isCalibrating: \(isCalibrating)")
+                dlog("📱 [CalibrationView] View appeared!")
+                dlog("📱 [CalibrationView] Available devices: \(uvcCameraManager.availableDevices.map { $0.name })")
+                dlog("📱 [CalibrationView] isCalibrating: \(isCalibrating)")
                 setupFrameCallback()
             }
             .onDisappear {
@@ -170,7 +170,7 @@ struct CameraCalibrationView: View {
                 Spacer()
                 
                 Button {
-                    print("🔘 [CalibrationView] Calibrate button tapped for device: \(device.name)")
+                    dlog("🔘 [CalibrationView] Calibrate button tapped for device: \(device.name)")
                     startCalibrationFor(device: device)
                 } label: {
                     Text(hasCalibration ? "Recalibrate" : "Calibrate")
@@ -482,65 +482,65 @@ struct CameraCalibrationView: View {
     // MARK: - Actions
     
     private func setupFrameCallback() {
-        print("🔧 [CalibrationView] Setting up frame callback...")
-        print("🔧 [CalibrationView] uvcCameraManager.isCapturing: \(uvcCameraManager.isCapturing)")
-        print("🔧 [CalibrationView] uvcCameraManager.selectedDevice: \(uvcCameraManager.selectedDevice?.name ?? "nil")")
+        dlog("🔧 [CalibrationView] Setting up frame callback...")
+        dlog("🔧 [CalibrationView] uvcCameraManager.isCapturing: \(uvcCameraManager.isCapturing)")
+        dlog("🔧 [CalibrationView] uvcCameraManager.selectedDevice: \(uvcCameraManager.selectedDevice?.name ?? "nil")")
         
         uvcCameraManager.onPixelBufferReceived = { [weak calibrationManager] pixelBuffer in
-            print("📹 [CalibrationView] Received pixel buffer: \(CVPixelBufferGetWidth(pixelBuffer))x\(CVPixelBufferGetHeight(pixelBuffer))")
+            dlog("📹 [CalibrationView] Received pixel buffer: \(CVPixelBufferGetWidth(pixelBuffer))x\(CVPixelBufferGetHeight(pixelBuffer))")
             
             guard let manager = calibrationManager else {
-                print("❌ [CalibrationView] calibrationManager is nil!")
+                dlog("❌ [CalibrationView] calibrationManager is nil!")
                 return
             }
             
             guard manager.isCalibrating else {
-                print("⏸️ [CalibrationView] Not calibrating, skipping frame")
+                dlog("⏸️ [CalibrationView] Not calibrating, skipping frame")
                 return
             }
             
-            print("🔄 [CalibrationView] Processing frame for calibration (stereo: \(self.isStereoMode))")
+            dlog("🔄 [CalibrationView] Processing frame for calibration (stereo: \(self.isStereoMode))")
             
             Task { @MainActor in
                 // Process frame based on stereo/mono mode
                 if self.isStereoMode {
                     let detection = manager.processStereoFrame(pixelBuffer)
-                    print("🔍 [CalibrationView] Stereo detection: left=\(detection?.foundLeft ?? false), right=\(detection?.foundRight ?? false)")
+                    dlog("🔍 [CalibrationView] Stereo detection: left=\(detection?.foundLeft ?? false), right=\(detection?.foundRight ?? false)")
                 } else {
                     let detection = manager.processMonoFrame(pixelBuffer)
-                    print("🔍 [CalibrationView] Mono detection: found=\(detection?.foundLeft ?? false)")
+                    dlog("🔍 [CalibrationView] Mono detection: found=\(detection?.foundLeft ?? false)")
                 }
             }
         }
         
-        print("✅ [CalibrationView] Frame callback set up")
+        dlog("✅ [CalibrationView] Frame callback set up")
     }
     
     private func startCalibrationFor(device: UVCDevice) {
-        print("🚀 [CalibrationView] ========== START CALIBRATION ==========")
-        print("🚀 [CalibrationView] Device: \(device.name) (id: \(device.id))")
-        print("🚀 [CalibrationView] isStereoMode: \(isStereoMode)")
-        print("🚀 [CalibrationView] Current state - isCapturing: \(uvcCameraManager.isCapturing)")
-        print("🚀 [CalibrationView] Current state - selectedDevice: \(uvcCameraManager.selectedDevice?.name ?? "nil")")
+        dlog("🚀 [CalibrationView] ========== START CALIBRATION ==========")
+        dlog("🚀 [CalibrationView] Device: \(device.name) (id: \(device.id))")
+        dlog("🚀 [CalibrationView] isStereoMode: \(isStereoMode)")
+        dlog("🚀 [CalibrationView] Current state - isCapturing: \(uvcCameraManager.isCapturing)")
+        dlog("🚀 [CalibrationView] Current state - selectedDevice: \(uvcCameraManager.selectedDevice?.name ?? "nil")")
         
         selectedDeviceId = device.id
         
         // Select and start the camera if not already capturing
         if uvcCameraManager.selectedDevice?.id != device.id {
-            print("🔄 [CalibrationView] Selecting device...")
+            dlog("🔄 [CalibrationView] Selecting device...")
             uvcCameraManager.selectDevice(device)
         } else {
-            print("✅ [CalibrationView] Device already selected")
+            dlog("✅ [CalibrationView] Device already selected")
         }
         
         if !uvcCameraManager.isCapturing {
-            print("▶️ [CalibrationView] Starting capture...")
+            dlog("▶️ [CalibrationView] Starting capture...")
             uvcCameraManager.startCapture()
         } else {
-            print("✅ [CalibrationView] Already capturing")
+            dlog("✅ [CalibrationView] Already capturing")
         }
         
-        print("🎯 [CalibrationView] Calling calibrationManager.startCalibration...")
+        dlog("🎯 [CalibrationView] Calling calibrationManager.startCalibration...")
         
         // Start calibration
         calibrationManager.startCalibration(
@@ -549,16 +549,16 @@ struct CameraCalibrationView: View {
             isStereo: isStereoMode
         )
         
-        print("📊 [CalibrationView] After startCalibration - isCalibrating: \(calibrationManager.isCalibrating)")
+        dlog("📊 [CalibrationView] After startCalibration - isCalibrating: \(calibrationManager.isCalibrating)")
         
         isCalibrating = true
-        print("✅ [CalibrationView] Local isCalibrating set to true")
+        dlog("✅ [CalibrationView] Local isCalibrating set to true")
         
         // Re-setup frame callback to ensure it's active
-        print("🔧 [CalibrationView] Re-setting up frame callback...")
+        dlog("🔧 [CalibrationView] Re-setting up frame callback...")
         setupFrameCallback()
         
-        print("🚀 [CalibrationView] ========== START CALIBRATION COMPLETE ==========")
+        dlog("🚀 [CalibrationView] ========== START CALIBRATION COMPLETE ==========")
     }
     
     private func finishCalibration() {
@@ -577,7 +577,7 @@ struct CameraCalibrationView: View {
         
         // If calibration was successful, dismiss the view
         if result != nil {
-            print("✅ [CalibrationView] Calibration complete, dismissing...")
+            dlog("✅ [CalibrationView] Calibration complete, dismissing...")
             onDismiss?()
         }
     }

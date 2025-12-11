@@ -485,8 +485,6 @@ class VisionProStreamer:
         Instantiates background threads immediately: (1) gRPC hand tracking stream and (2) HTTP info server for WebRTC discovery.
         """
 
-        print("NEW ONE")
-
         # Vision Pro IP 
         self.ip = ip
         self.record = record 
@@ -712,25 +710,18 @@ class VisionProStreamer:
             self._log("[WEBRTC] Sim-poses data channel opened", force=True)
             self._webrtc_sim_ready = True
             
-            # Start pose streaming on the event loop (fixes Linux cross-thread issue)
-            import asyncio
+            # Start pose streaming with thread-based approach
+            import threading
             
-            async def start_streaming_on_loop():
-                await asyncio.sleep(0.3)  # Small delay for channel stabilization
+            def start_streaming_delayed():
+                import time
+                time.sleep(0.3)  # Small delay for channel stabilization
                 self._log("[WEBRTC] Starting pose streaming...", force=True)
                 if self._sim_config is not None and self._webrtc_sim_ready:
-                    if not self._pose_stream_running:
-                        self._pose_stream_running = True
-                        self._log("[SIM] Starting pose streaming via WebRTC data channel (async)...", force=True)
-                        # Use create_task since we're already on the event loop
-                        asyncio.create_task(self._pose_streaming_loop_webrtc_async())
-            
-            if self._webrtc_loop is not None:
-                asyncio.run_coroutine_threadsafe(start_streaming_on_loop(), self._webrtc_loop)
-            else:
-                # Fallback: start immediately with thread-based streaming
-                if self._sim_config is not None:
                     self._start_pose_streaming_webrtc()
+            
+            # Start in background thread to not block the event loop
+            threading.Thread(target=start_streaming_delayed, daemon=True).start()
 
         @channel.on("close")
         def _on_close():
@@ -1223,6 +1214,7 @@ class VisionProStreamer:
         relative_to: Optional[List[float]] = None,
         grpc_port: int = 50051,
         force_reload: bool = False,
+        streaming_hz: int = 120,
     ):
         """
         Configure MuJoCo simulation streaming. Call this before serve().
@@ -1239,6 +1231,7 @@ class VisionProStreamer:
                         Or 4-element array [x, y, z, yaw_degrees] for simpler positioning.
             grpc_port: gRPC port for MuJoCo AR communication (default: 50051)
             force_reload: If True, force re-conversion of XML to USDZ even if cached
+            streaming_hz: Rate limit for pose streaming in Hz (default: 120)
         
         Example::
         
@@ -1280,18 +1273,23 @@ class VisionProStreamer:
         self._mujoco_model = model
         self._mujoco_data = data
         
-        # Build body name mapping
+        # Build body name mapping and cache cleaned names for streaming
         self._mujoco_bodies = {}
+        self._mujoco_clean_names = {}  # Cache: body_name -> cleaned name (no string ops per frame)
         for i in range(model.nbody):
             body_name = model.body(i).name
             if body_name:
                 self._mujoco_bodies[body_name] = i
+                # Pre-compute cleaned name to avoid string operations every frame
+                clean_name = body_name.replace('/', '').replace('-', '') if body_name else body_name
+                self._mujoco_clean_names[body_name] = clean_name
         
         self._sim_config = {
             "xml_path": xml_path,
             "attach_to": attach_to,
             "grpc_port": grpc_port,
             "force_reload": force_reload,
+            "streaming_hz": streaming_hz,
         }
         
         # Automatically switch to simulation-relative coordinates
@@ -1309,6 +1307,7 @@ class VisionProStreamer:
         env_indices: Optional[List[int]] = None,
         grpc_port: int = 50051,
         stage = None,  # Optional, derived from scene if not provided
+        streaming_hz: int = 120,
     ):
         """
         Configure Isaac Lab simulation streaming. Call this before start_webrtc().
@@ -1408,6 +1407,7 @@ class VisionProStreamer:
             "type": "isaac",
             "attach_to": attach_to,
             "grpc_port": grpc_port,
+            "streaming_hz": streaming_hz,
         }
         
         # Automatically switch to simulation-relative coordinates
@@ -1792,20 +1792,24 @@ class VisionProStreamer:
             }
     
     def _get_mujoco_poses(self) -> Dict[str, Dict[str, Any]]:
-        """Get current MuJoCo body poses as a dictionary."""
+        """Get current MuJoCo body poses as a dictionary.
+        
+        Returns dict with structure: {clean_body_name: {"xpos": [x,y,z], "xquat": [w,x,y,z]}}
+        """
         body_dict = {}
-        model = self._mujoco_model
         data = self._mujoco_data
+        clean_names = self._mujoco_clean_names  # Use cached clean names
         
         for body_name, body_id in self._mujoco_bodies.items():
             if "world" in body_name.lower():
                 continue  # Skip world body
             
-            xpos = deepcopy(data.body(body_id).xpos.tolist())
-            xquat = deepcopy(data.body(body_id).xquat.tolist())
+            # Get pose data - .tolist() creates a copy (safe for threading)
+            xpos = data.body(body_id).xpos.tolist()
+            xquat = data.body(body_id).xquat.tolist()
             
-            # Clean body name for Swift compatibility
-            clean_name = body_name.replace('/', '').replace('-', '') if body_name else body_name
+            # Use pre-computed clean name (no string ops per frame)
+            clean_name = clean_names.get(body_name, body_name)
             body_dict[clean_name] = {
                 "xpos": xpos,
                 "xquat": xquat,
@@ -2003,8 +2007,7 @@ class VisionProStreamer:
     def _start_pose_streaming_webrtc(self):
         """Start the actual pose streaming loop via WebRTC.
         
-        On Linux, cross-thread sends to aiortc data channels don't work reliably.
-        So we run the streaming loop as an async task on the event loop itself.
+        Uses thread-based approach for reliability.
         """
         if self._pose_stream_running:
             return
@@ -2012,17 +2015,9 @@ class VisionProStreamer:
         self._log("[SIM] Starting pose streaming via WebRTC data channel...", force=True)
         self._pose_stream_running = True
         
-        # Run the streaming loop on the WebRTC event loop (fixes Linux cross-thread issue)
-        if self._webrtc_loop is not None:
-            import asyncio
-            asyncio.run_coroutine_threadsafe(
-                self._pose_streaming_loop_webrtc_async(),
-                self._webrtc_loop
-            )
-        else:
-            # Fallback to thread-based streaming (works on Mac)
-            self._pose_stream_thread = Thread(target=self._pose_streaming_loop_webrtc, daemon=True)
-            self._pose_stream_thread.start()
+        # Thread-based streaming
+        self._pose_stream_thread = Thread(target=self._pose_streaming_loop_webrtc, daemon=True)
+        self._pose_stream_thread.start()
     
     def _stop_pose_streaming(self):
         """Stop pose streaming."""
@@ -2036,8 +2031,22 @@ class VisionProStreamer:
     
     def _pose_streaming_loop_webrtc(self):
         """Background thread to stream poses via WebRTC data channel."""
+        import struct
+        import copy  # Pre-import for speed (was being imported inside loop!)
+        
+        # Pre-create struct objects for faster packing (avoid format string parsing each call)
+        struct_timestamp = struct.Struct('<d')  # 8 bytes
+        struct_body_count = struct.Struct('<H')  # 2 bytes
+        struct_name_len = struct.Struct('<B')  # 1 byte
+        struct_pose = struct.Struct('<7f')  # 28 bytes (x, y, z, qx, qy, qz, qw)
+        struct_array_len = struct.Struct('<H')  # 2 bytes
+        
         self._log("[SIM] Pose streaming via WebRTC started!", force=True)
         frame_count = 0
+        name_bytes_cache = {}  # Cache encoded name bytes
+        
+        # Pre-allocate reusable bytearray (will grow if needed)
+        buffer = bytearray(4096)
         
         try:
             while self._pose_stream_running:
@@ -2045,97 +2054,100 @@ class VisionProStreamer:
                     time.sleep(0.1)
                     continue
                 
+                # CRITICAL: Must hold lock AND deep copy to avoid race with update_sim()
                 with self._pose_stream_lock:
-                    current_data = self._current_poses.copy()
+                    if self._current_poses:
+                        current_data = copy.deepcopy(self._current_poses)
+                    else:
+                        current_data = None
                 
                 if current_data:
                     # Extract data components
-                    # Handle backward compatibility or initialization state
                     if "poses" in current_data and isinstance(current_data["poses"], dict):
                         poses = current_data["poses"]
                         qpos = current_data.get("qpos", [])
                         ctrl = current_data.get("ctrl", [])
                         timestamp = current_data.get("timestamp", time.time())
                     else:
-                        # Fallback if _current_poses is just the poses dict (old format)
                         poses = current_data
                         qpos = []
                         ctrl = []
                         timestamp = time.time()
-
-                    # Build binary message for poses (same format as async loop)
-                    import struct
+                    
+                    # Build binary message using bytearray for efficiency
+                    # Estimate size: 8 + 2 + bodies*(1+20+28) + 2 + qpos*4 + 2 + ctrl*4
+                    body_count = len(poses)
+                    estimated_size = 12 + body_count * 50 + len(qpos) * 4 + len(ctrl) * 4
+                    
+                    # Use list of bytes for simpler code (bytearray extend has overhead)
                     parts = []
+                    parts.append(struct_timestamp.pack(timestamp))
                     
-                    # Timestamp (8 bytes, double)
-                    parts.append(struct.pack('<d', timestamp))
-                    
-                    # Body count (2 bytes)
-                    valid_bodies = [(name, pose) for name, pose in poses.items() if name]
-                    parts.append(struct.pack('<H', len(valid_bodies)))
-                    
-                    # Bodies
-                    for body_name, pose_data in valid_bodies:
+                    # Count valid bodies and pack
+                    valid_count = 0
+                    body_data = []
+                    for body_name, pose_data in poses.items():
+                        if not body_name:
+                            continue
+                        valid_count += 1
+                        
                         xpos = pose_data["xpos"]
-                        xquat = pose_data["xquat"]  # w, x, y, z (MuJoCo format)
+                        xquat = pose_data["xquat"]
                         
-                        # Name (1 byte length + N bytes)
-                        name_bytes = body_name.encode('utf-8')[:255]
-                        parts.append(struct.pack('<B', len(name_bytes)))
-                        parts.append(name_bytes)
+                        # Cache name bytes
+                        if body_name not in name_bytes_cache:
+                            name_bytes_cache[body_name] = body_name.encode('utf-8')[:255]
+                        name_bytes = name_bytes_cache[body_name]
                         
-                        # 7 floats: x, y, z, qx, qy, qz, qw
-                        parts.append(struct.pack('<7f',
-                            float(xpos[0]), float(xpos[1]), float(xpos[2]),
-                            float(xquat[1]), float(xquat[2]), float(xquat[3]), float(xquat[0])
+                        body_data.append(struct_name_len.pack(len(name_bytes)))
+                        body_data.append(name_bytes)
+                        # Convert wxyz to xyzw for Swift
+                        body_data.append(struct_pose.pack(
+                            xpos[0], xpos[1], xpos[2],
+                            xquat[1], xquat[2], xquat[3], xquat[0]
                         ))
                     
-                    # qpos (2 bytes count + N floats)
-                    parts.append(struct.pack('<H', len(qpos)))
-                    if qpos:
-                        parts.append(struct.pack(f'<{len(qpos)}f', *[float(x) for x in qpos]))
+                    parts.append(struct_body_count.pack(valid_count))
+                    parts.extend(body_data)
                     
-                    # ctrl (2 bytes count + N floats)
-                    parts.append(struct.pack('<H', len(ctrl)))
+                    # qpos - pack all at once if present
+                    parts.append(struct_array_len.pack(len(qpos)))
+                    if qpos:
+                        parts.append(struct.pack(f'<{len(qpos)}f', *qpos))
+                    
+                    # ctrl - pack all at once if present
+                    parts.append(struct_array_len.pack(len(ctrl)))
                     if ctrl:
-                        parts.append(struct.pack(f'<{len(ctrl)}f', *[float(x) for x in ctrl]))
+                        parts.append(struct.pack(f'<{len(ctrl)}f', *ctrl))
                     
                     message = b''.join(parts)
                     
                     try:
                         if self._webrtc_loop is not None:
-                            import asyncio
-                            
-                            async def async_send(ch, msg):
-                                ch.send(msg)
-                                await asyncio.sleep(0)
-                            
-                            future = asyncio.run_coroutine_threadsafe(
-                                async_send(self._webrtc_sim_channel, message),
-                                self._webrtc_loop
+                            self._webrtc_loop.call_soon_threadsafe(
+                                self._webrtc_sim_channel.send, message
                             )
-                            try:
-                                future.result(timeout=0.1)
-                            except TimeoutError:
-                                pass
                         else:
                             self._webrtc_sim_channel.send(message)
                         frame_count += 1
                         if frame_count == 1:
-                            self._log(f"[SIM] First sim pose sent ({len(valid_bodies)} bodies, {len(message)} bytes binary)", force=True)
-                        elif frame_count % 500 == 0:
-                            self._log(f"[SIM] Sent {frame_count} sim pose updates")
+                            self._log(f"[SIM] First pose ({valid_count} bodies, {len(message)}B)", force=True)
+                        elif frame_count % 500 == 0:  # Reduced logging frequency
+                            self._log(f"[SIM] Streamed {frame_count} frames")
                     except Exception as e:
-                        self._log(f"[SIM] Warning: Failed to send pose: {e}", force=True)
+                        if frame_count < 5:
+                            self._log(f"[SIM] Send failed: {e}", force=True)
                 
-                time.sleep(0.008)  # ~120 Hz (faster than gRPC was)
+                # Rate limit based on streaming_hz config
+                hz = self._sim_config.get("streaming_hz", 120) if self._sim_config else 120
+                time.sleep(1.0 / hz)
         
         except Exception as e:
             if self._pose_stream_running:
-                self._log(f"[SIM] Error: Pose streaming error: {e}", force=True)
+                self._log(f"[SIM] Streaming error: {e}", force=True)
             self._pose_stream_running = False
         
-        self._log(f"[SIM] Pose streaming stopped (sent {frame_count} updates)")
+        self._log(f"[SIM] Streaming stopped ({frame_count} total)")
     
     async def _pose_streaming_loop_webrtc_async(self):
         """Async version of pose streaming that runs on the event loop.
@@ -2681,8 +2693,8 @@ class VisionProStreamer:
                     # Chunking keeps messages small enough to avoid MTU fragmentation issues on Linux
                     sim_channel = pc.createDataChannel(
                         "sim-poses",
-                        ordered=False,
-                        maxRetransmits=0,
+                        ordered=False,  # Must be ordered to avoid body parts at different timesteps
+                        maxRetransmits=0,  # Still unreliable for low latency
                     )
                     streamer_instance._register_webrtc_sim_channel(sim_channel)
                     streamer_instance._log("[WEBRTC] Created sim-poses data channel")
@@ -3191,4 +3203,4 @@ if __name__ == "__main__":
     while True: 
 
         latest = streamer.get_latest()
-        print(latest)
+        print(latest) 

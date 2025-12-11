@@ -70,7 +70,7 @@ class CloudStorageSettings: ObservableObject {
         NotificationCenter.default.publisher(for: NSNotification.Name("NSApplicationDidBecomeActiveNotification"))
             .sink { [weak self] _ in
                 Task { @MainActor in
-                    print("☁️ [CloudStorageSettings] App became active, refreshing settings...")
+                    dlog("☁️ [CloudStorageSettings] App became active, refreshing settings...")
                     self?.loadSettings()
                 }
             }
@@ -90,8 +90,8 @@ class CloudStorageSettings: ObservableObject {
     
     /// Reload settings from keychain (call when app comes to foreground)
     func loadSettings() {
-        print("☁️ [CloudStorageSettings] ==========================================")
-        print("☁️ [CloudStorageSettings] Loading settings from iCloud Keychain...")
+        dlog("☁️ [CloudStorageSettings] ==========================================")
+        dlog("☁️ [CloudStorageSettings] Loading settings from iCloud Keychain...")
         
         // Debug: Check all keys
         let providerValue = keychain.loadString(forKey: .selectedCloudProvider)
@@ -100,21 +100,21 @@ class CloudStorageSettings: ObservableObject {
         let hasGoogleDriveAccessToken = keychain.exists(key: .googleDriveAccessToken)
         let hasGoogleDriveRefreshToken = keychain.exists(key: .googleDriveRefreshToken)
         
-        print("☁️ [CloudStorageSettings] Raw keychain values:")
-        print("☁️   - selectedCloudProvider: \(providerValue ?? "nil")")
-        print("☁️   - dropboxAccessToken exists: \(hasDropboxAccessToken)")
-        print("☁️   - dropboxRefreshToken exists: \(hasDropboxRefreshToken)")
-        print("☁️   - googleDriveAccessToken exists: \(hasGoogleDriveAccessToken)")
-        print("☁️   - googleDriveRefreshToken exists: \(hasGoogleDriveRefreshToken)")
+        dlog("☁️ [CloudStorageSettings] Raw keychain values:")
+        dlog("☁️   - selectedCloudProvider: \(providerValue ?? "nil")")
+        dlog("☁️   - dropboxAccessToken exists: \(hasDropboxAccessToken)")
+        dlog("☁️   - dropboxRefreshToken exists: \(hasDropboxRefreshToken)")
+        dlog("☁️   - googleDriveAccessToken exists: \(hasGoogleDriveAccessToken)")
+        dlog("☁️   - googleDriveRefreshToken exists: \(hasGoogleDriveRefreshToken)")
         
         // Load selected provider
         if let providerString = providerValue,
            let provider = CloudStorageProvider(rawValue: providerString) {
             selectedProvider = provider
-            print("☁️ [CloudStorageSettings] ✅ Provider from keychain: \(provider.displayName)")
+            dlog("☁️ [CloudStorageSettings] ✅ Provider from keychain: \(provider.displayName)")
         } else {
             selectedProvider = .iCloudDrive
-            print("☁️ [CloudStorageSettings] ⚠️ No provider in keychain, using iCloud Drive")
+            dlog("☁️ [CloudStorageSettings] ⚠️ No provider in keychain, using iCloud Drive")
         }
         
         // Check if Dropbox is configured
@@ -137,8 +137,8 @@ class CloudStorageSettings: ObservableObject {
         Last sync: \(lastSyncTime?.formatted() ?? "never")
         """
         
-        print("☁️ [CloudStorageSettings] ==========================================")
-        print("☁️ [CloudStorageSettings] Final: Provider=\(selectedProvider.displayName), Dropbox=\(isDropboxAvailable), GoogleDrive=\(isGoogleDriveAvailable)")
+        dlog("☁️ [CloudStorageSettings] ==========================================")
+        dlog("☁️ [CloudStorageSettings] Final: Provider=\(selectedProvider.displayName), Dropbox=\(isDropboxAvailable), GoogleDrive=\(isGoogleDriveAvailable)")
         
         // Post notification for RecordingManager
         NotificationCenter.default.post(name: .cloudStorageSettingsDidChange, object: nil)
@@ -147,11 +147,11 @@ class CloudStorageSettings: ObservableObject {
     /// Get the currently configured provider, validating Dropbox/Google Drive availability
     func getActiveProvider() -> CloudStorageProvider {
         if selectedProvider == .dropbox && !isDropboxAvailable {
-            print("⚠️ [CloudStorageSettings] Dropbox selected but not available, falling back to iCloud")
+            dlog("⚠️ [CloudStorageSettings] Dropbox selected but not available, falling back to iCloud")
             return .iCloudDrive
         }
         if selectedProvider == .googleDrive && !isGoogleDriveAvailable {
-            print("⚠️ [CloudStorageSettings] Google Drive selected but not available, falling back to iCloud")
+            dlog("⚠️ [CloudStorageSettings] Google Drive selected but not available, falling back to iCloud")
             return .iCloudDrive
         }
         return selectedProvider
@@ -159,7 +159,7 @@ class CloudStorageSettings: ObservableObject {
     
     /// Force refresh settings (call from UI)
     func forceRefresh() {
-        print("☁️ [CloudStorageSettings] Force refresh requested")
+        dlog("☁️ [CloudStorageSettings] Force refresh requested")
         loadSettings()
     }
 }

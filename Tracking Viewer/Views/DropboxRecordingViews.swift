@@ -739,43 +739,43 @@ struct DropboxRecordingDetailView: View {
         isLoading = true
         loadError = nil
         
-        print("📦 Dropbox: Loading recording: \(recording.name)")
-        print("📦 hasVideo: \(recording.hasVideo), hasTracking: \(recording.hasTracking)")
+        dlog("📦 Dropbox: Loading recording: \(recording.name)")
+        dlog("📦 hasVideo: \(recording.hasVideo), hasTracking: \(recording.hasTracking)")
         
         // Download and load video
         if recording.hasVideo {
-            print("📦 Downloading video...")
+            dlog("📦 Downloading video...")
             if let url = await RecordingsManager.shared.downloadDropboxVideo(for: recording) {
-                print("✅ Video downloaded to: \(url)")
+                dlog("✅ Video downloaded to: \(url)")
                 localVideoURL = url
                 await playbackController.setupPlayer(with: url, loop: true)
             } else {
-                print("❌ Failed to download video")
+                dlog("❌ Failed to download video")
             }
         }
         
         // Download and load tracking data
         if recording.hasTracking {
-            print("📦 Downloading tracking data...")
+            dlog("📦 Downloading tracking data...")
             if let url = await RecordingsManager.shared.downloadDropboxTrackingData(for: recording) {
-                print("✅ Tracking data downloaded to: \(url)")
+                dlog("✅ Tracking data downloaded to: \(url)")
                 localTrackingURL = url
                 do {
                     let frames = try await TrackingDataLoader.loadTrackingData(from: url)
-                    print("✅ Loaded \(frames.count) frames")
+                    dlog("✅ Loaded \(frames.count) frames")
                     await playbackController.setTrackingData(frames)
                 } catch {
-                    print("❌ Failed to parse tracking data: \(error)")
+                    dlog("❌ Failed to parse tracking data: \(error)")
                     loadError = "Failed to load tracking data: \(error.localizedDescription)"
                 }
             } else {
-                print("❌ Failed to download tracking data")
+                dlog("❌ Failed to download tracking data")
                 loadError = "Failed to download tracking data"
             }
         }
         
         isLoading = false
-        print("📦 Loading complete. totalFrames: \(playbackController.totalFrames)")
+        dlog("📦 Loading complete. totalFrames: \(playbackController.totalFrames)")
         
         // Auto-play after everything is loaded
         if localVideoURL != nil || playbackController.totalFrames > 0 {
@@ -801,12 +801,12 @@ struct DropboxRecordingDetailView: View {
             let success = await cloudKitManager.makeRecordingPrivate(recordingId: recording.id)
             if success {
                 isPublic = false
-                print("✅ Recording made private")
+                dlog("✅ Recording made private")
             }
         } else {
             // Make public - need to create shared link first
             guard let sharedURL = await DropboxManager.shared.createSharedLink(path: recording.path) else {
-                print("❌ Failed to create shared link")
+                dlog("❌ Failed to create shared link")
                 return
             }
             
@@ -821,7 +821,7 @@ struct DropboxRecordingDetailView: View {
             
             if success {
                 isPublic = true
-                print("✅ Recording made public")
+                dlog("✅ Recording made public")
             }
         }
     }

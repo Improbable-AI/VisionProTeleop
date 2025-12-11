@@ -2107,7 +2107,7 @@ struct RecordingsView: View {
                             recordingsManager.dropboxRecordings.removeAll { $0.id == id }
                         }
                     } catch {
-                        print("❌ Failed to delete Dropbox recording: \(error)")
+                        dlog("❌ Failed to delete Dropbox recording: \(error)")
                     }
                 }
             case .googleDrive:
@@ -2118,7 +2118,7 @@ struct RecordingsView: View {
                             recordingsManager.googleDriveRecordings.removeAll { $0.id == id }
                         }
                     } catch {
-                        print("❌ Failed to delete Google Drive recording: \(error)")
+                        dlog("❌ Failed to delete Google Drive recording: \(error)")
                     }
                 }
             default:

@@ -52,7 +52,7 @@ struct MuJoCoStreamingView: View {
                 
                 if let entity = entity {
                     content.add(entity)
-                    print("✅ Added initial entity to RealityView: \(entity.name)")
+                    dlog("✅ Added initial entity to RealityView: \(entity.name)")
                 }
             } update: { updateContent, updatedAttachments in
                 if let newEntity = entity {
@@ -66,14 +66,14 @@ struct MuJoCoStreamingView: View {
                             }
                         }
                         updateContent.add(newEntity)
-                        print("✅ [RealityView.update] Added new entity: \(newEntity.name)")
+                        dlog("✅ [RealityView.update] Added new entity: \(newEntity.name)")
                     }
                 }
                 
                 if !finalTransforms.isEmpty {
-                    print("🔄 [RealityView.update] Applying \(finalTransforms.count) final transforms")
+                    dlog("🔄 [RealityView.update] Applying \(finalTransforms.count) final transforms")
                     applyFinalTransforms(finalTransforms)
-                    print("✅ [RealityView.update] Applied transforms successfully")
+                    dlog("✅ [RealityView.update] Applied transforms successfully")
                 }
             } attachments: {
                 Attachment(id: "status") {
@@ -89,7 +89,7 @@ struct MuJoCoStreamingView: View {
             }
         }
         .task {
-            print("🚀 [MuJoCoStreamingView] Starting initialization...")
+            dlog("🚀 [MuJoCoStreamingView] Starting initialization...")
             networkManager.updateNetworkInfo()
             appModel.run()
         }
@@ -318,27 +318,27 @@ struct MuJoCoStreamingView: View {
     
     // MARK: - Server Control
     private func startServer() async {
-        print("🚀 [startServer] Starting MuJoCo gRPC server on port \(networkManager.grpcPort)...")
+        dlog("🚀 [startServer] Starting MuJoCo gRPC server on port \(networkManager.grpcPort)...")
         networkManager.updateConnectionStatus("Starting Server...")
         networkManager.isServerRunning = true
         await grpcManager.startServer(streamingView: self, port: networkManager.grpcPort)
         networkManager.updateConnectionStatus("Server Running")
-        print("✅ [startServer] MuJoCo gRPC server started successfully")
+        dlog("✅ [startServer] MuJoCo gRPC server started successfully")
     }
     
     private func stopServer() async {
-        print("🛑 [stopServer] Stopping MuJoCo gRPC server...")
+        dlog("🛑 [stopServer] Stopping MuJoCo gRPC server...")
         networkManager.updateConnectionStatus("Stopping Server...")
         await grpcManager.stopServer()
         networkManager.updateConnectionStatus("Server Stopped")
         networkManager.isServerRunning = false
-        print("✅ [stopServer] MuJoCo gRPC server stopped successfully")
+        dlog("✅ [stopServer] MuJoCo gRPC server stopped successfully")
     }
     
     // MARK: - Status Display
     private func createStatusDisplay(content: RealityViewContent, attachments: RealityViewAttachments) {
         guard let statusAttachment = attachments.entity(for: "status") else {
-            print("❌ Could not find status attachment")
+            dlog("❌ Could not find status attachment")
             return
         }
         
@@ -357,7 +357,7 @@ struct MuJoCoStreamingView: View {
         statusContainerEntity = statusContainer
         updateStatusContainerPosition(animated: false)
         
-        print("✅ Created head-following status display")
+        dlog("✅ Created head-following status display")
     }
     
     @MainActor
@@ -377,12 +377,12 @@ struct MuJoCoStreamingView: View {
     // MARK: - USDZ Model Loading
     private func loadUsdzModel(from url: URL) async {
         do {
-            print("♻️ Resetting previous model and cached data...")
+            dlog("♻️ Resetting previous model and cached data...")
             
             await MainActor.run {
                 if let oldEntity = entity, let content = realityContent {
                     content.remove(oldEntity)
-                    print("🧹 Removed previous entity from RealityView")
+                    dlog("🧹 Removed previous entity from RealityView")
                 }
             }
             
@@ -394,7 +394,7 @@ struct MuJoCoStreamingView: View {
             pythonToSwiftTargets.removeAll()
             entityPathByObjectID.removeAll()
             
-            print("📦 Loading USDZ from \(url.absoluteString)")
+            dlog("📦 Loading USDZ from \(url.absoluteString)")
             let loadedEntity = try await spatialGen.loadEntity(from: url)
             
             let newEntity: ModelEntity
@@ -409,16 +409,16 @@ struct MuJoCoStreamingView: View {
             await MainActor.run {
                 if let content = realityContent {
                     content.add(newEntity)
-                    print("✅ Added new entity to RealityView: \(newEntity.name)")
+                    dlog("✅ Added new entity to RealityView: \(newEntity.name)")
                 }
                 entity = newEntity
             }
             
             indexBodyEntities(newEntity)
-            print("✅ Model loaded and indexed successfully")
+            dlog("✅ Model loaded and indexed successfully")
             
         } catch {
-            print("❌ Failed to load USDZ: \(error)")
+            dlog("❌ Failed to load USDZ: \(error)")
         }
     }
     
@@ -427,7 +427,7 @@ struct MuJoCoStreamingView: View {
         bodyEntities.removeAll()
         initialLocalTransforms.removeAll()
         entityPathByObjectID.removeAll()
-        print("🔍 [indexBodyEntities] Starting recursive indexing...")
+        dlog("🔍 [indexBodyEntities] Starting recursive indexing...")
         
         func indexRec(_ entity: Entity, parentPath: String) {
             if entity.name.isEmpty {
@@ -443,7 +443,7 @@ struct MuJoCoStreamingView: View {
                 initialLocalTransforms[pathKey] = modelEntity.transform
                 entityPathByObjectID[ObjectIdentifier(modelEntity)] = pathKey
                 
-                print("✅ Added ModelEntity: '\(modelEntity.name)'")
+                dlog("✅ Added ModelEntity: '\(modelEntity.name)'")
                 
                 for child in modelEntity.children {
                     indexRec(child, parentPath: pathKey)
@@ -468,7 +468,7 @@ struct MuJoCoStreamingView: View {
                 initialLocalTransforms[pathKey] = wrapper.transform
                 entityPathByObjectID[ObjectIdentifier(wrapper)] = pathKey
                 
-                print("✅ Added wrapper: '\(wrapper.name)'")
+                dlog("✅ Added wrapper: '\(wrapper.name)'")
                 
                 for child in originalChildren {
                     indexRec(child, parentPath: pathKey)
@@ -477,7 +477,7 @@ struct MuJoCoStreamingView: View {
         }
         
         indexRec(rootEntity, parentPath: "")
-        print("📝 Indexed \(bodyEntities.count) entities with cached local transforms")
+        dlog("📝 Indexed \(bodyEntities.count) entities with cached local transforms")
     }
     
     // MARK: - Pose Transform Application
@@ -518,13 +518,13 @@ struct MuJoCoStreamingView: View {
     
     // MARK: - Public API for gRPC Service
     func updateUsdzURL(_ url: String, attachToPosition: SIMD3<Float>? = nil, attachToRotation: simd_quatf? = nil) {
-        print("🔄 [updateUsdzURL] Called with URL: \(url)")
+        dlog("🔄 [updateUsdzURL] Called with URL: \(url)")
         
         self.attachToPosition = attachToPosition
         self.attachToRotation = attachToRotation
         
         if let position = attachToPosition, let rotation = attachToRotation {
-            print("📍 [updateUsdzURL] Attach to position: \(position), rotation: \(rotation)")
+            dlog("📍 [updateUsdzURL] Attach to position: \(position), rotation: \(rotation)")
         }
         
         networkManager.updateConnectionStatus("Client Connected - USDZ Received")
@@ -555,7 +555,7 @@ struct MuJoCoStreamingView: View {
     }
     
     func updatePosesWithTransforms(_ transforms: [String: simd_float4x4]) {
-        print("🔄 [updatePosesWithTransforms] Called with \(transforms.count) final transforms")
+        dlog("🔄 [updatePosesWithTransforms] Called with \(transforms.count) final transforms")
         networkManager.updateConnectionStatus("Streaming Poses - \(transforms.count) Bodies")
         finalTransforms = transforms
         poseUpdateTrigger = UUID()
@@ -563,7 +563,7 @@ struct MuJoCoStreamingView: View {
     
     func computeFinalTransforms(_ poses: [String: MujocoAr_BodyPose]) -> [String: simd_float4x4] {
         guard !bodyEntities.isEmpty, !initialLocalTransforms.isEmpty else {
-            print("⏳ Entities not fully indexed yet; deferring pose application")
+            dlog("⏳ Entities not fully indexed yet; deferring pose application")
             return [:]
         }
         
@@ -636,7 +636,7 @@ struct MuJoCoStreamingView: View {
         }
         
         pythonToSwiftNameMap = newMap
-        print("🔤 Built name mapping (Python → Swift): \(newMap.count) entries")
+        dlog("🔤 Built name mapping (Python → Swift): \(newMap.count) entries")
     }
     
     private func sanitizeName(_ s: String) -> String {

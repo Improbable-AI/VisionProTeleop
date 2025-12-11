@@ -93,13 +93,13 @@ class FeedPlayerManager: ObservableObject {
         // For now, the View will observe `currentPlayingID` and trigger the actual player setup
         // This manager acts as the coordinator
         
-        print("▶️ FeedPlayerManager: Switched to \(id)")
+        dlog("▶️ FeedPlayerManager: Switched to \(id)")
     }
     
     /// Stop all playback
     func stopPlayback() {
         if let current = currentPlayingID {
-            print("⏹️ FeedPlayerManager: Stopping \(current)")
+            dlog("⏹️ FeedPlayerManager: Stopping \(current)")
         }
         currentPlayingID = nil
         player?.pause()

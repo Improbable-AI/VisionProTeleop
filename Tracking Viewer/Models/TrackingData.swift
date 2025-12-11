@@ -315,7 +315,7 @@ class TrackingDataLoader {
                     let frame = try decoder.decode(RecordedFrame.self, from: lineData)
                     frames.append(frame)
                 } catch {
-                    print("⚠️ Failed to decode frame: \(error)")
+                    dlog("⚠️ Failed to decode frame: \(error)")
                 }
             }
         }
@@ -347,7 +347,7 @@ class SimulationDataLoader {
                     let frame = try decoder.decode(SimulationFrame.self, from: lineData)
                     frames.append(frame)
                 } catch {
-                    print("⚠️ Failed to decode simulation frame: \(error)")
+                    dlog("⚠️ Failed to decode simulation frame: \(error)")
                 }
             }
         }

@@ -11,6 +11,8 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
     private var audioTrack: LKRTCAudioTrack?
     private var handDataChannel: LKRTCDataChannel?
     private var simPosesDataChannel: LKRTCDataChannel?  // WebRTC data channel for sim pose streaming
+    private var simPosesMessageCount: Int = 0  // Counter for debugging message flow
+    private var lastProcessedPoseTimestamp: Double = 0  // For dropping stale frames
     private var handStreamTask: Task<Void, Never>?
     private let handStreamIntervalNanoseconds: UInt64 = 2_000_000
     
@@ -362,7 +364,7 @@ extension WebRTCClient {
     }
     
     func peerConnection(_ peerConnection: LKRTCPeerConnection, didOpen dataChannel: LKRTCDataChannel) {
-        print("DEBUG: Data channel opened (label=\(dataChannel.label), state=\(dataChannel.readyState.rawValue))")
+        print("🔔 [WebRTC] Data channel opened (label=\(dataChannel.label), state=\(dataChannel.readyState.rawValue))")
         
         if dataChannel.label == "hand-tracking" {
             handDataChannel = dataChannel
@@ -374,7 +376,8 @@ extension WebRTCClient {
         } else if dataChannel.label == "sim-poses" {
             simPosesDataChannel = dataChannel
             dataChannel.delegate = self
-            print("DEBUG: Sim-poses data channel connected for MuJoCo simulation streaming")
+            let hasCallback = onSimPosesReceived != nil
+            print("🔔 [WebRTC] Sim-poses data channel connected! hasCallback=\(hasCallback)")
             Task { @MainActor in
                 DataManager.shared.connectionStatus = "Sim-poses data channel open"
             }
@@ -386,7 +389,10 @@ extension WebRTCClient {
 
 extension WebRTCClient: LKRTCDataChannelDelegate {
     func dataChannelDidChangeState(_ dataChannel: LKRTCDataChannel) {
-        print("DEBUG: Data channel '\(dataChannel.label)' state changed to: \(dataChannel.readyState.rawValue)")
+        let stateNames = ["connecting", "open", "closing", "closed"]
+        let stateName = dataChannel.readyState.rawValue < stateNames.count ? stateNames[Int(dataChannel.readyState.rawValue)] : "unknown"
+        print("🔄 [WebRTC] Data channel '\(dataChannel.label)' state → \(stateName) (\(dataChannel.readyState.rawValue))")
+        
         if dataChannel.readyState == .closed || dataChannel.readyState == .closing {
             if dataChannel == handDataChannel {
                 stopHandTrackingStream()
@@ -394,6 +400,7 @@ extension WebRTCClient: LKRTCDataChannelDelegate {
                     DataManager.shared.connectionStatus = "Hand data channel closed"
                 }
             } else if dataChannel == simPosesDataChannel {
+                print("⚠️ [WebRTC] sim-poses channel is closing/closed! Total messages received: \(simPosesMessageCount)")
                 simPosesDataChannel = nil
                 Task { @MainActor in
                     DataManager.shared.connectionStatus = "Sim-poses data channel closed"
@@ -403,77 +410,145 @@ extension WebRTCClient: LKRTCDataChannelDelegate {
     }
 
     func dataChannel(_ dataChannel: LKRTCDataChannel, didReceiveMessageWith buffer: LKRTCDataBuffer) {
-        // Debug: log EVERY data channel message at start
-        print("📥 [WebRTC] didReceiveMessageWith called: channel='\(dataChannel.label)', bytes=\(buffer.data.count)")
-        
         if dataChannel.label == "sim-poses" {
-            // Debug: log raw data reception
-            let dataSize = buffer.data.count
+            simPosesMessageCount += 1
             
-            // Parse JSON pose data: {"t": timestamp, "p": {"body_name": [x,y,z,qx,qy,qz,qw], ...}, "b": {...}}
-            guard let jsonString = String(data: buffer.data, encoding: .utf8),
-                  let jsonData = jsonString.data(using: .utf8),
-                  let parsed = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-                  let poses = parsed["p"] as? [String: [NSNumber]] else {
-                print("⚠️ [WebRTC sim-poses] Failed to parse \(dataSize) bytes")
+            // Log only first message and every 100th for debugging
+            if simPosesMessageCount == 1 || simPosesMessageCount % 100 == 0 {
+                print("📥 [WebRTC sim-poses] Message #\(simPosesMessageCount), bytes=\(buffer.data.count)")
+            }
+            
+            // Parse binary pose data
+            // Format:
+            //   [timestamp: 8 bytes double]
+            //   [body_count: 2 bytes uint16]
+            //   For each body:
+            //     [name_len: 1 byte uint8]
+            //     [name: N bytes UTF-8]
+            //     [x, y, z, qx, qy, qz, qw: 7 × 4 bytes float32]
+            //   [qpos_count: 2 bytes uint16]
+            //   [qpos values: N × 4 bytes float32]
+            //   [ctrl_count: 2 bytes uint16]
+            //   [ctrl values: N × 4 bytes float32]
+            
+            let data = buffer.data
+            var offset = 0
+            
+            // Need at least timestamp (8) + body_count (2) = 10 bytes
+            guard data.count >= 10 else {
+                print("⚠️ [WebRTC sim-poses] Message too small: \(data.count) bytes")
                 return
             }
             
-            // Debug: log first frame
-            if poses.count > 0 {
-                // Only log occasionally to avoid spam
-                let shouldLog = Int.random(in: 0..<100) == 0
-                if shouldLog {
-                    print("📦 [WebRTC sim-poses] Received \(poses.count) body poses, \(dataSize) bytes")
-                }
+            // Read timestamp (8 bytes, little-endian double)
+            let timestamp: Double = data.withUnsafeBytes { ptr in
+                ptr.loadUnaligned(fromByteOffset: offset, as: Double.self)
             }
+            offset += 8
             
-            // Check for benchmark data and echo back
-            if let benchmarkData = parsed["b"] as? [String: Any],
-               let sequenceId = benchmarkData["s"] as? Int,
-               let sentTimestamp = benchmarkData["t"] as? Int {
-                // Echo benchmark data back to Python for round-trip measurement
-                let nowNanoseconds = DispatchTime.now().uptimeNanoseconds
-                let detectedMs = Int(nowNanoseconds / 1_000_000) % Int(Int32.max)  // Relative timestamp
-                
-                let echoData: [String: Any] = [
-                    "b": [
-                        "s": sequenceId,
-                        "t": sentTimestamp,
-                        "d": detectedMs  // Swift detection time
-                    ]
-                ]
-                
-                if let echoJson = try? JSONSerialization.data(withJSONObject: echoData),
-                   let echoString = String(data: echoJson, encoding: .utf8) {
-                    let rtcBuffer = LKRTCDataBuffer(data: echoString.data(using: .utf8)!, isBinary: false)
-                    dataChannel.sendData(rtcBuffer)
-                }
+            // Read body count (2 bytes, little-endian uint16)
+            let bodyCount: UInt16 = data.withUnsafeBytes { ptr in
+                ptr.loadUnaligned(fromByteOffset: offset, as: UInt16.self)
             }
+            offset += 2
             
-            // Extract additional data
-            let timestamp = parsed["t"] as? Double ?? Date().timeIntervalSince1970
-            let qpos = (parsed["q"] as? [NSNumber])?.map { $0.floatValue }
-            let ctrl = (parsed["c"] as? [NSNumber])?.map { $0.floatValue }
-            
-            // Convert to [String: [Float]]
             var floatPoses: [String: [Float]] = [:]
-            for (bodyName, values) in poses {
-                floatPoses[bodyName] = values.map { $0.floatValue }
+            
+            // Read each body
+            for _ in 0..<bodyCount {
+                // Check bounds
+                guard offset + 1 <= data.count else { break }
+                
+                // Read name length (1 byte)
+                let nameLen = Int(data[offset])
+                offset += 1
+                
+                guard offset + nameLen + 28 <= data.count else { break }
+                
+                // Read name (N bytes UTF-8)
+                let nameData = data.subdata(in: offset..<(offset + nameLen))
+                let bodyName = String(data: nameData, encoding: .utf8) ?? ""
+                offset += nameLen
+                
+                // Read 7 floats (28 bytes)
+                var values: [Float] = []
+                for _ in 0..<7 {
+                    let value: Float = data.withUnsafeBytes { ptr in
+                        ptr.loadUnaligned(fromByteOffset: offset, as: Float.self)
+                    }
+                    values.append(value)
+                    offset += 4
+                }
+                
+                floatPoses[bodyName] = values
+            }
+            
+            // Read qpos
+            var qpos: [Float]? = nil
+            if offset + 2 <= data.count {
+                let qposCount: UInt16 = data.withUnsafeBytes { ptr in
+                    ptr.loadUnaligned(fromByteOffset: offset, as: UInt16.self)
+                }
+                offset += 2
+                
+                if qposCount > 0 && offset + Int(qposCount) * 4 <= data.count {
+                    var qposValues: [Float] = []
+                    for _ in 0..<qposCount {
+                        let value: Float = data.withUnsafeBytes { ptr in
+                            ptr.loadUnaligned(fromByteOffset: offset, as: Float.self)
+                        }
+                        qposValues.append(value)
+                        offset += 4
+                    }
+                    qpos = qposValues
+                }
+            }
+            
+            // Read ctrl
+            var ctrl: [Float]? = nil
+            if offset + 2 <= data.count {
+                let ctrlCount: UInt16 = data.withUnsafeBytes { ptr in
+                    ptr.loadUnaligned(fromByteOffset: offset, as: UInt16.self)
+                }
+                offset += 2
+                
+                if ctrlCount > 0 && offset + Int(ctrlCount) * 4 <= data.count {
+                    var ctrlValues: [Float] = []
+                    for _ in 0..<ctrlCount {
+                        let value: Float = data.withUnsafeBytes { ptr in
+                            ptr.loadUnaligned(fromByteOffset: offset, as: Float.self)
+                        }
+                        ctrlValues.append(value)
+                        offset += 4
+                    }
+                    ctrl = ctrlValues
+                }
             }
             
             // Call callback on main thread
             if let callback = onSimPosesReceived {
+                // Debug: log timestamp, body count, and first two body positions every 100th message
+                if simPosesMessageCount % 100 == 0 {
+                    let sortedBodies = floatPoses.keys.sorted()
+                    if sortedBodies.count >= 2 {
+                        let body0 = sortedBodies[0]
+                        let body1 = sortedBodies[1]
+                        let pos0 = floatPoses[body0]!
+                        let pos1 = floatPoses[body1]!
+                        print("🔍 [DEBUG] msg#\(simPosesMessageCount) ts=\(String(format: "%.3f", timestamp)) bodies=\(floatPoses.count)")
+                        print("   body0='\(body0)' pos=[\(String(format: "%.3f", pos0[0])),\(String(format: "%.3f", pos0[1])),\(String(format: "%.3f", pos0[2]))]")
+                        print("   body1='\(body1)' pos=[\(String(format: "%.3f", pos1[0])),\(String(format: "%.3f", pos1[1])),\(String(format: "%.3f", pos1[2]))]")
+                    }
+                }
+                
                 DispatchQueue.main.async {
                     callback(timestamp, floatPoses, qpos, ctrl)
                 }
             } else {
-                // Debug: callback not set
                 print("⚠️ [WebRTC sim-poses] Callback not set, dropping \(floatPoses.count) poses")
             }
-        } else {
-            print("DEBUG: Received \(buffer.data.count) bytes on data channel '\(dataChannel.label)' (ignored)")
         }
+        // Other data channels silently ignored
     }
 }
 

@@ -33,7 +33,7 @@ struct ExtrinsicCalibrationView: View {
             .navigationTitle("Extrinsic Calibration")
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
-                print("📐 [ExtrinsicCalibrationView] View appeared!")
+                dlog("📐 [ExtrinsicCalibrationView] View appeared!")
                 setupFrameCallback()
             }
             .onDisappear {
@@ -783,7 +783,7 @@ struct ExtrinsicCalibrationView: View {
     // MARK: - Frame Processing
     
     private func setupFrameCallback() {
-        print("📐 [ExtrinsicCalibrationView] Setting up frame callback...")
+        dlog("📐 [ExtrinsicCalibrationView] Setting up frame callback...")
         
         uvcCameraManager.onPixelBufferReceived = { [self] pixelBuffer in
             guard calibrationManager.isCalibrating else { return }
@@ -809,9 +809,9 @@ struct ExtrinsicCalibrationView: View {
     // MARK: - Calibration Actions
     
     private func startCalibration(for device: UVCDevice) {
-        print("📐 [ExtrinsicCalibrationView] ========== START CALIBRATION ==========")
-        print("📐 [ExtrinsicCalibrationView] Device: \(device.name)")
-        print("📐 [ExtrinsicCalibrationView] Stereo mode: \(isStereoMode)")
+        dlog("📐 [ExtrinsicCalibrationView] ========== START CALIBRATION ==========")
+        dlog("📐 [ExtrinsicCalibrationView] Device: \(device.name)")
+        dlog("📐 [ExtrinsicCalibrationView] Stereo mode: \(isStereoMode)")
         
         // Select device and start capture if needed
         if uvcCameraManager.selectedDevice?.id != device.id {
@@ -834,7 +834,7 @@ struct ExtrinsicCalibrationView: View {
         isCalibrating = true
         setupFrameCallback()
         
-        print("📐 [ExtrinsicCalibrationView] ========== CALIBRATION STARTED ==========")
+        dlog("📐 [ExtrinsicCalibrationView] ========== CALIBRATION STARTED ==========")
     }
     
     private func finishCalibration() {
@@ -852,7 +852,7 @@ struct ExtrinsicCalibrationView: View {
         isCalibrating = false
         
         if result != nil {
-            print("✅ [ExtrinsicCalibrationView] Calibration complete, dismissing...")
+            dlog("✅ [ExtrinsicCalibrationView] Calibration complete, dismissing...")
             onDismiss?()
         }
     }
@@ -878,7 +878,7 @@ struct ExtrinsicCalibrationView: View {
         isCalibrating = false
         
         if result != nil {
-            print("✅ [ExtrinsicCalibrationView] Auto-finish complete, dismissing...")
+            dlog("✅ [ExtrinsicCalibrationView] Auto-finish complete, dismissing...")
             // Dismiss after showing success briefly
             try? await Task.sleep(nanoseconds: 500_000_000)
             onDismiss?()

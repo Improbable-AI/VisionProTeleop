@@ -1008,7 +1008,7 @@ struct CameraCalibrationWizardView: View {
     }
     
     private func setupIntrinsicFrameCallback() {
-        print("🔧 [CalibrationWizard] Setting up INTRINSIC frame callback...")
+        dlog("🔧 [CalibrationWizard] Setting up INTRINSIC frame callback...")
         
         uvcManager.onPixelBufferReceived = { [weak calibrationManager] pixelBuffer in
             guard let manager = calibrationManager else { return }
@@ -1024,15 +1024,15 @@ struct CameraCalibrationWizardView: View {
             }
         }
         
-        print("✅ [CalibrationWizard] INTRINSIC frame callback set up")
+        dlog("✅ [CalibrationWizard] INTRINSIC frame callback set up")
     }
     
     private func setupExtrinsicFrameCallback() {
-        print("🔧 [CalibrationWizard] Setting up EXTRINSIC frame callback...")
+        dlog("🔧 [CalibrationWizard] Setting up EXTRINSIC frame callback...")
         
         guard let device = uvcManager.selectedDevice,
               let intrinsicData = calibrationManager.allCalibrations[device.id] else {
-            print("❌ [CalibrationWizard] No intrinsic calibration available for extrinsic!")
+            dlog("❌ [CalibrationWizard] No intrinsic calibration available for extrinsic!")
             return
         }
         
@@ -1047,7 +1047,7 @@ struct CameraCalibrationWizardView: View {
             )
         }
         
-        print("✅ [CalibrationWizard] EXTRINSIC frame callback set up")
+        dlog("✅ [CalibrationWizard] EXTRINSIC frame callback set up")
     }
     
     private func startIntrinsicCalibration() {

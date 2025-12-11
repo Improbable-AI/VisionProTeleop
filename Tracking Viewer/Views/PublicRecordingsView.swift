@@ -678,18 +678,18 @@ struct PublicRecordingDetailView: View {
             let trackingURLString = baseURL + "/tracking.jsonl"
             
             if let videoURL = URL(string: videoURLString) {
-                print("🎬 Playing from Dropbox direct link: \(videoURL)")
+                dlog("🎬 Playing from Dropbox direct link: \(videoURL)")
                 await playbackController.setupPlayer(with: videoURL, loop: true)
                 playbackController.play()
                 
                 // Try to load tracking data
                 if let trackingURL = URL(string: trackingURLString) {
-                    print("📊 Loading tracking data from: \(trackingURL)")
+                    dlog("📊 Loading tracking data from: \(trackingURL)")
                     do {
                         let frames = try await TrackingDataLoader.loadTrackingData(from: trackingURL)
                         await playbackController.setTrackingData(frames)
                     } catch {
-                        print("⚠️ Failed to load tracking data: \(error)")
+                        dlog("⚠️ Failed to load tracking data: \(error)")
                         // Don't show error to user if video works, just log it
                     }
                 }
@@ -700,7 +700,7 @@ struct PublicRecordingDetailView: View {
         } else if recording.provider == .googleDrive {
             // 2. Google Drive Handling
             if GoogleDriveManager.shared.isAuthenticated {
-                print("🎬 Authenticated with Google Drive, attempting download...")
+                dlog("🎬 Authenticated with Google Drive, attempting download...")
                 
                 // recording.recordingId is the FOLDER ID
                 let (videoId, trackingId, _, _) = await GoogleDriveManager.shared.getRecordingFileIds(folderId: recording.recordingId)
@@ -725,7 +725,7 @@ struct PublicRecordingDetailView: View {
                 )
                 
                 if let url = await RecordingsManager.shared.downloadGoogleDriveVideo(for: tempInfo) {
-                    print("✅ Downloaded Google Drive video to: \(url)")
+                    dlog("✅ Downloaded Google Drive video to: \(url)")
                     localVideoURL = url
                     await playbackController.setupPlayer(with: url, loop: true)
                     playbackController.play()
@@ -739,7 +739,7 @@ struct PublicRecordingDetailView: View {
                                 let frames = try await TrackingDataLoader.loadTrackingData(from: trackingUrl)
                                 await playbackController.setTrackingData(frames)
                             } catch {
-                                print("⚠️ Failed to load tracking data: \(error)")
+                                dlog("⚠️ Failed to load tracking data: \(error)")
                             }
                         }
                     }

@@ -15,7 +15,7 @@ struct 🌐RealityView: View {
     
     var body: some View {
         RealityView { content, attachments in
-            print("🟢 [🌐RealityView] RealityView content block called")
+            dlog("🟢 [🌐RealityView] RealityView content block called")
             
             let resultLabelEntity = attachments.entity(for: Self.resultLabelID)!
             resultLabelEntity.components.set(🧑HeadTrackingComponent())
@@ -36,10 +36,10 @@ struct 🌐RealityView: View {
             
             // Attach the status UI to the container
             if let statusAttachment = attachments.entity(for: Self.statusAttachmentID) {
-                print("🟢 [🌐RealityView] Status attachment found and attached")
+                dlog("🟢 [🌐RealityView] Status attachment found and attached")
                 statusAttachment.setParent(statusContainer)
             } else {
-                print("🔴 [🌐RealityView] Status attachment NOT found!")
+                dlog("🔴 [🌐RealityView] Status attachment NOT found!")
             }
             
             // Create preview status container entity (initially hidden)
@@ -56,7 +56,7 @@ struct 🌐RealityView: View {
             
             // Attach the status preview UI to the preview container
             if let statusPreviewAttachment = attachments.entity(for: "statusPreview") {
-                print("🟢 [🌐RealityView] Status preview attachment found and attached")
+                dlog("🟢 [🌐RealityView] Status preview attachment found and attached")
                 statusPreviewAttachment.setParent(statusPreviewContainer)
                 statusPreviewContainer.isEnabled = false
             }
@@ -112,7 +112,7 @@ struct 🌐RealityView: View {
             Attachment(id: Self.resultLabelID) {
             }
             Attachment(id: Self.statusAttachmentID) {
-                print("🟡 [🌐RealityView] Status attachment builder called")
+                dlog("🟡 [🌐RealityView] Status attachment builder called")
                 return StatusOverlay(
                     showVideoStatus: false, 
                     isMinimized: $isMinimized,

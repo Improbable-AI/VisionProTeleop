@@ -41,7 +41,7 @@ class UVCCameraManager: NSObject, ObservableObject {
         if let deviceID = selectedDevice?.id {
             let key = Self.stereoPreferenceKeyPrefix + deviceID
             UserDefaults.standard.set(isStereo, forKey: key)
-            print("📷 [UVCCameraManager] Saved stereo preference for camera \(selectedDevice?.name ?? "unknown"): \(isStereo)")
+            dlog("📷 [UVCCameraManager] Saved stereo preference for camera \(selectedDevice?.name ?? "unknown"): \(isStereo)")
         }
     }
     
@@ -50,7 +50,7 @@ class UVCCameraManager: NSObject, ObservableObject {
         let key = Self.stereoPreferenceKeyPrefix + device.id
         let savedValue = UserDefaults.standard.object(forKey: key) as? Bool ?? false
         stereoEnabled = savedValue
-        print("📷 [UVCCameraManager] Loaded stereo preference for \(device.name): \(savedValue)")
+        dlog("📷 [UVCCameraManager] Loaded stereo preference for \(device.name): \(savedValue)")
     }
     
     // MARK: - Private Properties
@@ -79,7 +79,7 @@ class UVCCameraManager: NSObject, ObservableObject {
     
     private override init() {
         super.init()
-        print("📷 [UVCCameraManager] Initializing...")
+        dlog("📷 [UVCCameraManager] Initializing...")
         setupSession()
         checkAuthorizationStatus()
         observeDeviceConnectionStates()
@@ -91,7 +91,7 @@ class UVCCameraManager: NSObject, ObservableObject {
             // If we found devices on init and we're authorized, auto-start
             if !self.availableDevices.isEmpty && self.authorizationStatus == .authorized {
                 if let device = self.selectedDevice, !self.isCapturing {
-                    print("📷 [UVCCameraManager] Camera already connected at launch, auto-starting capture")
+                    dlog("📷 [UVCCameraManager] Camera already connected at launch, auto-starting capture")
                     // Short delay for session setup
                     try? await Task.sleep(nanoseconds: 500_000_000) // 500ms
                     self.startCapture()
@@ -104,7 +104,7 @@ class UVCCameraManager: NSObject, ObservableObject {
     
     private func checkAuthorizationStatus() {
         authorizationStatus = AVCaptureDevice.authorizationStatus(for: .video)
-        print("📷 [UVCCameraManager] Authorization status: \(authorizationStatus.rawValue)")
+        dlog("📷 [UVCCameraManager] Authorization status: \(authorizationStatus.rawValue)")
     }
     
     func requestCameraAccess() async -> Bool {
@@ -133,9 +133,9 @@ class UVCCameraManager: NSObject, ObservableObject {
             UVCDevice(id: $0.uniqueID, name: $0.localizedName)
         }
         
-        print("📷 [UVCCameraManager] Found \(devices.count) UVC device(s)")
+        dlog("📷 [UVCCameraManager] Found \(devices.count) UVC device(s)")
         for device in devices {
-            print("   - \(device.name) (ID: \(device.id))")
+            dlog("   - \(device.name) (ID: \(device.id))")
         }
         
         availableDevices = devices
@@ -143,7 +143,7 @@ class UVCCameraManager: NSObject, ObservableObject {
         // Auto-select first device if none selected
         if selectedDevice == nil && !devices.isEmpty {
             let firstDevice = devices.first!
-            print("📷 [UVCCameraManager] Auto-selected: \(firstDevice.name)")
+            dlog("📷 [UVCCameraManager] Auto-selected: \(firstDevice.name)")
             
             // Auto-start capture when a new device is connected
             selectDevice(firstDevice)
@@ -156,7 +156,7 @@ class UVCCameraManager: NSObject, ObservableObject {
                     try? await Task.sleep(nanoseconds: 300_000_000) // 300ms for device setup
                     await MainActor.run {
                         if !self.isCapturing && self.selectedDevice != nil {
-                            print("📷 [UVCCameraManager] Auto-starting capture for newly connected device")
+                            dlog("📷 [UVCCameraManager] Auto-starting capture for newly connected device")
                             self.startCapture()
                         }
                     }
@@ -166,7 +166,7 @@ class UVCCameraManager: NSObject, ObservableObject {
         
         // Clear selection if selected device was disconnected
         if let selected = selectedDevice, !devices.contains(where: { $0.id == selected.id }) {
-            print("📷 [UVCCameraManager] Selected device disconnected")
+            dlog("📷 [UVCCameraManager] Selected device disconnected")
             selectedDevice = nil
             stopCapture()
             
@@ -180,14 +180,14 @@ class UVCCameraManager: NSObject, ObservableObject {
     private func observeDeviceConnectionStates() {
         Task {
             for await _ in NotificationCenter.default.notifications(named: AVCaptureDevice.wasConnectedNotification) {
-                print("📷 [UVCCameraManager] Device connected notification")
+                dlog("📷 [UVCCameraManager] Device connected notification")
                 await MainActor.run { updateDeviceList() }
             }
         }
         
         Task {
             for await _ in NotificationCenter.default.notifications(named: AVCaptureDevice.wasDisconnectedNotification) {
-                print("📷 [UVCCameraManager] Device disconnected notification")
+                dlog("📷 [UVCCameraManager] Device disconnected notification")
                 await MainActor.run { updateDeviceList() }
             }
         }
@@ -211,9 +211,9 @@ class UVCCameraManager: NSObject, ObservableObject {
             
             if self.captureSession.canAddOutput(self.videoDataOutput) {
                 self.captureSession.addOutput(self.videoDataOutput)
-                print("📷 [UVCCameraManager] Added video data output")
+                dlog("📷 [UVCCameraManager] Added video data output")
             } else {
-                print("❌ [UVCCameraManager] Unable to add video data output")
+                dlog("❌ [UVCCameraManager] Unable to add video data output")
             }
         }
     }
@@ -221,7 +221,7 @@ class UVCCameraManager: NSObject, ObservableObject {
     // MARK: - Device Selection and Capture Control
     
     func selectDevice(_ device: UVCDevice?) {
-        print("📷 [UVCCameraManager] Selecting device: \(device?.name ?? "none")")
+        dlog("📷 [UVCCameraManager] Selecting device: \(device?.name ?? "none")")
         
         sessionQueue.async { [weak self] in
             guard let self = self else { return }
@@ -252,7 +252,7 @@ class UVCCameraManager: NSObject, ObservableObject {
             
             // Check authorization
             guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized else {
-                print("❌ [UVCCameraManager] Camera access not authorized")
+                dlog("❌ [UVCCameraManager] Camera access not authorized")
                 return
             }
             
@@ -261,29 +261,29 @@ class UVCCameraManager: NSObject, ObservableObject {
                 
                 if self.captureSession.canAddInput(input) {
                     self.captureSession.addInput(input)
-                    print("📷 [UVCCameraManager] Added input for \(device.name)")
+                    dlog("📷 [UVCCameraManager] Added input for \(device.name)")
                     
                     Task { @MainActor in
                         self.selectedDevice = device
                         self.loadStereoPreference(for: device)
                     }
                 } else {
-                    print("❌ [UVCCameraManager] Unable to add input for \(device.name)")
+                    dlog("❌ [UVCCameraManager] Unable to add input for \(device.name)")
                 }
             } catch {
-                print("❌ [UVCCameraManager] Failed to create input: \(error)")
+                dlog("❌ [UVCCameraManager] Failed to create input: \(error)")
             }
         }
     }
     
     func startCapture() {
         guard selectedDevice != nil else {
-            print("📷 [UVCCameraManager] No device selected, cannot start capture")
+            dlog("📷 [UVCCameraManager] No device selected, cannot start capture")
             return
         }
         
         guard authorizationStatus == .authorized else {
-            print("📷 [UVCCameraManager] Camera not authorized, cannot start capture")
+            dlog("📷 [UVCCameraManager] Camera not authorized, cannot start capture")
             Task {
                 let granted = await requestCameraAccess()
                 if granted {
@@ -298,7 +298,7 @@ class UVCCameraManager: NSObject, ObservableObject {
             
             if !self.captureSession.isRunning {
                 self.captureSession.startRunning()
-                print("📷 [UVCCameraManager] Capture session started")
+                dlog("📷 [UVCCameraManager] Capture session started")
                 
                 Task { @MainActor in
                     self.isCapturing = true
@@ -307,7 +307,7 @@ class UVCCameraManager: NSObject, ObservableObject {
                     
                     // Automatically switch video source to UVC camera when capture starts
                     if DataManager.shared.videoSource != .uvcCamera {
-                        print("📷 [UVCCameraManager] Auto-switching video source to USB Camera")
+                        dlog("📷 [UVCCameraManager] Auto-switching video source to USB Camera")
                         DataManager.shared.videoSource = .uvcCamera
                     }
                 }
@@ -321,7 +321,7 @@ class UVCCameraManager: NSObject, ObservableObject {
             
             if self.captureSession.isRunning {
                 self.captureSession.stopRunning()
-                print("📷 [UVCCameraManager] Capture session stopped")
+                dlog("📷 [UVCCameraManager] Capture session stopped")
                 
                 Task { @MainActor in
                     self.isCapturing = false

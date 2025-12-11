@@ -14,42 +14,42 @@ final class MuJoCoGRPCServerManager: ObservableObject {
     
     func startServer(streamingView: MuJoCoStreamingView, port: Int = 50051) async {
         self.currentPort = port
-        print("🚀 Starting MuJoCo gRPC server...")
+        dlog("🚀 Starting MuJoCo gRPC server...")
         do {
             let mujocoService = MuJoCoARServiceImpl(streamingView: streamingView)
-            print("✅ Created MuJoCoARServiceImpl")
+            dlog("✅ Created MuJoCoARServiceImpl")
             
             let transport = HTTP2ServerTransport.Posix(
                 address: .ipv4(host: "0.0.0.0", port: currentPort),
                 transportSecurity: .plaintext
             )
-            print("✅ Created HTTP2ServerTransport on port \(currentPort)")
+            dlog("✅ Created HTTP2ServerTransport on port \(currentPort)")
             
             let server = GRPCServer(
                 transport: transport,
                 services: [mujocoService]
             )
-            print("✅ Created GRPCServer with MuJoCo AR service")
+            dlog("✅ Created GRPCServer with MuJoCo AR service")
             
             self.grpcServer = server
             
-            print("🎯 Starting server.serve()...")
+            dlog("🎯 Starting server.serve()...")
             try await server.serve()
-            print("🚀 MuJoCo gRPC server started successfully on port \(currentPort)")
+            dlog("🚀 MuJoCo gRPC server started successfully on port \(currentPort)")
             
         } catch {
-            print("❌ Failed to start MuJoCo gRPC server: \(error)")
-            print("🔍 Error details: \(error.localizedDescription)")
+            dlog("❌ Failed to start MuJoCo gRPC server: \(error)")
+            dlog("🔍 Error details: \(error.localizedDescription)")
         }
     }
     
     func stopServer() async {
         if let server = self.grpcServer {
             server.beginGracefulShutdown()
-            print("🛑 MuJoCo gRPC server stopped")
+            dlog("🛑 MuJoCo gRPC server stopped")
             self.grpcServer = nil
         } else {
-            print("ℹ️ MuJoCo gRPC server was not running")
+            dlog("ℹ️ MuJoCo gRPC server was not running")
         }
     }
 }
@@ -64,14 +64,14 @@ struct MuJoCoARServiceImpl: MujocoAr_MuJoCoARService.SimpleServiceProtocol {
     
     init(streamingView: MuJoCoStreamingView) {
         self.streamingView = streamingView
-        print("🎯 MuJoCoARServiceImpl initialized")
-        print("📋 Available methods:")
-        print("   - sendUsdzUrl")
-        print("   - sendUsdzData")
-        print("   - sendUsdzDataChunked")
-        print("   - updatePoses")
-        print("   - streamPoses")
-        print("   - streamHandTracking")
+        dlog("🎯 MuJoCoARServiceImpl initialized")
+        dlog("📋 Available methods:")
+        dlog("   - sendUsdzUrl")
+        dlog("   - sendUsdzData")
+        dlog("   - sendUsdzDataChunked")
+        dlog("   - updatePoses")
+        dlog("   - streamPoses")
+        dlog("   - streamHandTracking")
     }
     
     // MARK: - SendUsdzUrl
@@ -79,20 +79,20 @@ struct MuJoCoARServiceImpl: MujocoAr_MuJoCoARService.SimpleServiceProtocol {
         request: MujocoAr_UsdzUrlRequest,
         context: ServerContext
     ) async throws -> MujocoAr_UsdzUrlResponse {
-        print("📨 [sendUsdzUrl] Received request")
-        print("📨 [sendUsdzUrl] USDZ URL: \(request.usdzURL)")
-        print("📨 [sendUsdzUrl] Session ID: \(request.sessionID)")
+        dlog("📨 [sendUsdzUrl] Received request")
+        dlog("📨 [sendUsdzUrl] USDZ URL: \(request.usdzURL)")
+        dlog("📨 [sendUsdzUrl] Session ID: \(request.sessionID)")
         
         await MainActor.run {
-            print("📨 [sendUsdzUrl] Updating streaming view...")
+            dlog("📨 [sendUsdzUrl] Updating streaming view...")
             streamingView?.updateUsdzURL(request.usdzURL)
-            print("📨 [sendUsdzUrl] Streaming view updated")
+            dlog("📨 [sendUsdzUrl] Streaming view updated")
         }
         
         var response = MujocoAr_UsdzUrlResponse()
         response.success = true
         response.message = "USDZ URL received successfully"
-        print("📨 [sendUsdzUrl] Sending success response")
+        dlog("📨 [sendUsdzUrl] Sending success response")
         return response
     }
     
@@ -101,10 +101,10 @@ struct MuJoCoARServiceImpl: MujocoAr_MuJoCoARService.SimpleServiceProtocol {
         request: MujocoAr_UsdzDataRequest,
         context: ServerContext
     ) async throws -> MujocoAr_UsdzDataResponse {
-        print("📨 [sendUsdzData] *** METHOD CALLED ***")
-        print("📨 [sendUsdzData] Received USDZ data: \(request.usdzData.count) bytes")
-        print("📨 [sendUsdzData] Filename: \(request.filename)")
-        print("📨 [sendUsdzData] Session ID: \(request.sessionID)")
+        dlog("📨 [sendUsdzData] *** METHOD CALLED ***")
+        dlog("📨 [sendUsdzData] Received USDZ data: \(request.usdzData.count) bytes")
+        dlog("📨 [sendUsdzData] Filename: \(request.filename)")
+        dlog("📨 [sendUsdzData] Session ID: \(request.sessionID)")
         
         var attachToPosition: SIMD3<Float>? = nil
         var attachToRotation: simd_quatf? = nil
@@ -112,41 +112,41 @@ struct MuJoCoARServiceImpl: MujocoAr_MuJoCoARService.SimpleServiceProtocol {
         if request.hasAttachToPosition && request.hasAttachToRotation {
             attachToPosition = SIMD3<Float>(request.attachToPosition.x, request.attachToPosition.y, request.attachToPosition.z)
             attachToRotation = simd_quatf(ix: request.attachToRotation.x, iy: request.attachToRotation.y, iz: request.attachToRotation.z, r: request.attachToRotation.w)
-            print("📨 [sendUsdzData] Attach to position: \(attachToPosition!), rotation: \(attachToRotation!)")
+            dlog("📨 [sendUsdzData] Attach to position: \(attachToPosition!), rotation: \(attachToRotation!)")
         }
         
         var response = MujocoAr_UsdzDataResponse()
         
         do {
-            print("📨 [sendUsdzData] Creating temporary file...")
+            dlog("📨 [sendUsdzData] Creating temporary file...")
             let tempDir = FileManager.default.temporaryDirectory
             let fileName = request.filename.isEmpty ? "\(UUID().uuidString).usdz" : request.filename
             let localURL = tempDir.appendingPathComponent(fileName)
             
-            print("📨 [sendUsdzData] Writing to: \(localURL.path)")
+            dlog("📨 [sendUsdzData] Writing to: \(localURL.path)")
             try request.usdzData.write(to: localURL)
             
-            print("💾 [sendUsdzData] Saved USDZ data to: \(localURL.path)")
+            dlog("💾 [sendUsdzData] Saved USDZ data to: \(localURL.path)")
             
             await MainActor.run {
-                print("📨 [sendUsdzData] Updating streaming view with local file...")
+                dlog("📨 [sendUsdzData] Updating streaming view with local file...")
                 streamingView?.updateUsdzURL(localURL.absoluteString, attachToPosition: attachToPosition, attachToRotation: attachToRotation)
-                print("📨 [sendUsdzData] Streaming view updated")
+                dlog("📨 [sendUsdzData] Streaming view updated")
             }
             
             response.success = true
             response.message = "USDZ data received and saved successfully"
             response.localFilePath = localURL.path
-            print("📨 [sendUsdzData] Sending success response")
+            dlog("📨 [sendUsdzData] Sending success response")
             
         } catch {
-            print("❌ [sendUsdzData] Failed to save USDZ data: \(error)")
-            print("❌ [sendUsdzData] Error details: \(error.localizedDescription)")
+            dlog("❌ [sendUsdzData] Failed to save USDZ data: \(error)")
+            dlog("❌ [sendUsdzData] Error details: \(error.localizedDescription)")
             response.success = false
             response.message = "Failed to save USDZ data: \(error.localizedDescription)"
         }
         
-        print("📨 [sendUsdzData] Returning response (success: \(response.success))")
+        dlog("📨 [sendUsdzData] Returning response (success: \(response.success))")
         return response
     }
     
@@ -155,7 +155,7 @@ struct MuJoCoARServiceImpl: MujocoAr_MuJoCoARService.SimpleServiceProtocol {
         request: RPCAsyncSequence<MujocoAr_UsdzChunkRequest, any Error>,
         context: ServerContext
     ) async throws -> MujocoAr_UsdzDataResponse {
-        print("📦 [sendUsdzDataChunked] *** CHUNKED TRANSFER STARTED ***")
+        dlog("📦 [sendUsdzDataChunked] *** CHUNKED TRANSFER STARTED ***")
         
         var response = MujocoAr_UsdzDataResponse()
         var chunkData = Data()
@@ -169,8 +169,8 @@ struct MuJoCoARServiceImpl: MujocoAr_MuJoCoARService.SimpleServiceProtocol {
         
         do {
             for try await chunkRequest in request {
-                print("📦 [sendUsdzDataChunked] Received chunk \(chunkRequest.chunkIndex + 1)/\(chunkRequest.totalChunks)")
-                print("📦 [sendUsdzDataChunked] Chunk size: \(chunkRequest.chunkData.count) bytes")
+                dlog("📦 [sendUsdzDataChunked] Received chunk \(chunkRequest.chunkIndex + 1)/\(chunkRequest.totalChunks)")
+                dlog("📦 [sendUsdzDataChunked] Chunk size: \(chunkRequest.chunkData.count) bytes")
                 
                 if receivedChunks == 0 {
                     fileName = chunkRequest.filename
@@ -181,53 +181,53 @@ struct MuJoCoARServiceImpl: MujocoAr_MuJoCoARService.SimpleServiceProtocol {
                     if chunkRequest.hasAttachToPosition && chunkRequest.hasAttachToRotation {
                         attachToPosition = SIMD3<Float>(chunkRequest.attachToPosition.x, chunkRequest.attachToPosition.y, chunkRequest.attachToPosition.z)
                         attachToRotation = simd_quatf(ix: chunkRequest.attachToRotation.x, iy: chunkRequest.attachToRotation.y, iz: chunkRequest.attachToRotation.z, r: chunkRequest.attachToRotation.w)
-                        print("📦 [sendUsdzDataChunked] Attach to position: \(attachToPosition!), rotation: \(attachToRotation!)")
+                        dlog("📦 [sendUsdzDataChunked] Attach to position: \(attachToPosition!), rotation: \(attachToRotation!)")
                     }
                     
-                    print("📦 [sendUsdzDataChunked] Filename: \(fileName)")
-                    print("📦 [sendUsdzDataChunked] Total expected size: \(totalExpectedSize) bytes")
-                    print("📦 [sendUsdzDataChunked] Total chunks: \(totalChunks)")
+                    dlog("📦 [sendUsdzDataChunked] Filename: \(fileName)")
+                    dlog("📦 [sendUsdzDataChunked] Total expected size: \(totalExpectedSize) bytes")
+                    dlog("📦 [sendUsdzDataChunked] Total chunks: \(totalChunks)")
                 }
                 
                 chunkData.append(chunkRequest.chunkData)
                 receivedChunks += 1
                 
-                print("📦 [sendUsdzDataChunked] Progress: \(chunkData.count)/\(totalExpectedSize) bytes")
+                dlog("📦 [sendUsdzDataChunked] Progress: \(chunkData.count)/\(totalExpectedSize) bytes")
                 
                 if chunkRequest.isLastChunk {
-                    print("📦 [sendUsdzDataChunked] Received last chunk!")
+                    dlog("📦 [sendUsdzDataChunked] Received last chunk!")
                     break
                 }
             }
             
             if chunkData.count != totalExpectedSize {
-                print("⚠️ [sendUsdzDataChunked] Warning: Received \(chunkData.count) bytes, expected \(totalExpectedSize)")
+                dlog("⚠️ [sendUsdzDataChunked] Warning: Received \(chunkData.count) bytes, expected \(totalExpectedSize)")
             }
             
-            print("📦 [sendUsdzDataChunked] All chunks received, assembling file...")
+            dlog("📦 [sendUsdzDataChunked] All chunks received, assembling file...")
             
             let tempDir = FileManager.default.temporaryDirectory
             let finalFileName = fileName.isEmpty ? "\(UUID().uuidString).usdz" : fileName
             let localURL = tempDir.appendingPathComponent(finalFileName)
             
-            print("📦 [sendUsdzDataChunked] Writing assembled file to: \(localURL.path)")
+            dlog("📦 [sendUsdzDataChunked] Writing assembled file to: \(localURL.path)")
             try chunkData.write(to: localURL)
             
-            print("💾 [sendUsdzDataChunked] Successfully saved complete USDZ file (\(chunkData.count) bytes)")
+            dlog("💾 [sendUsdzDataChunked] Successfully saved complete USDZ file (\(chunkData.count) bytes)")
             
             await MainActor.run {
-                print("📦 [sendUsdzDataChunked] Updating streaming view with assembled file...")
+                dlog("📦 [sendUsdzDataChunked] Updating streaming view with assembled file...")
                 streamingView?.updateUsdzURL(localURL.absoluteString, attachToPosition: attachToPosition, attachToRotation: attachToRotation)
-                print("📦 [sendUsdzDataChunked] Streaming view updated")
+                dlog("📦 [sendUsdzDataChunked] Streaming view updated")
             }
             
             response.success = true
             response.message = "Chunked USDZ data received and assembled successfully (\(receivedChunks) chunks, \(chunkData.count) bytes)"
             response.localFilePath = localURL.path
-            print("📦 [sendUsdzDataChunked] Sending success response")
+            dlog("📦 [sendUsdzDataChunked] Sending success response")
             
         } catch {
-            print("❌ [sendUsdzDataChunked] Failed to process chunked data: \(error)")
+            dlog("❌ [sendUsdzDataChunked] Failed to process chunked data: \(error)")
             response.success = false
             response.message = "Failed to process chunked data: \(error.localizedDescription)"
         }
@@ -240,7 +240,7 @@ struct MuJoCoARServiceImpl: MujocoAr_MuJoCoARService.SimpleServiceProtocol {
         request: MujocoAr_PoseUpdateRequest,
         context: ServerContext
     ) async throws -> MujocoAr_PoseUpdateResponse {
-        print("📨 [updatePoses] Received pose update with \(request.bodyPoses.count) bodies")
+        dlog("📨 [updatePoses] Received pose update with \(request.bodyPoses.count) bodies")
         
         var posesMutable: [String: MujocoAr_BodyPose] = [:]
         for bodyPose in request.bodyPoses {
@@ -277,7 +277,7 @@ struct MuJoCoARServiceImpl: MujocoAr_MuJoCoARService.SimpleServiceProtocol {
         response: RPCWriter<MujocoAr_PoseUpdateResponse>,
         context: ServerContext
     ) async throws {
-        print("🔄 [streamPoses] Starting pose streaming...")
+        dlog("🔄 [streamPoses] Starting pose streaming...")
         
         do {
             for try await poseRequest in request {
@@ -311,11 +311,11 @@ struct MuJoCoARServiceImpl: MujocoAr_MuJoCoARService.SimpleServiceProtocol {
                 try await response.write(responseMsg)
             }
         } catch {
-            print("❌ Error in pose streaming: \(error)")
+            dlog("❌ Error in pose streaming: \(error)")
             throw error
         }
         
-        print("🔄 [streamPoses] Pose streaming ended")
+        dlog("🔄 [streamPoses] Pose streaming ended")
     }
     
     // MARK: - StreamHandTracking
@@ -324,8 +324,8 @@ struct MuJoCoARServiceImpl: MujocoAr_MuJoCoARService.SimpleServiceProtocol {
         response: RPCWriter<MujocoAr_HandTrackingUpdate>,
         context: ServerContext
     ) async throws {
-        print("🖐️ [streamHandTracking] Client connected for hand tracking stream")
-        print("🖐️ [streamHandTracking] Session ID: \(request.sessionID)")
+        dlog("🖐️ [streamHandTracking] Client connected for hand tracking stream")
+        dlog("🖐️ [streamHandTracking] Session ID: \(request.sessionID)")
         
         do {
             while !Task.isCancelled {
@@ -338,11 +338,11 @@ struct MuJoCoARServiceImpl: MujocoAr_MuJoCoARService.SimpleServiceProtocol {
                 try await Task.sleep(nanoseconds: 10_000_000) // ~100 Hz
             }
         } catch {
-            print("❌ [streamHandTracking] Error in hand tracking streaming: \(error)")
+            dlog("❌ [streamHandTracking] Error in hand tracking streaming: \(error)")
             throw error
         }
         
-        print("🖐️ [streamHandTracking] Client disconnected from hand tracking stream")
+        dlog("🖐️ [streamHandTracking] Client disconnected from hand tracking stream")
     }
 }
 
