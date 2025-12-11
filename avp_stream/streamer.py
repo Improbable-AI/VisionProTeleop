@@ -1308,6 +1308,7 @@ class VisionProStreamer:
         grpc_port: int = 50051,
         stage = None,  # Optional, derived from scene if not provided
         streaming_hz: int = 120,
+        force_reload: bool = False,
     ):
         """
         Configure Isaac Lab simulation streaming. Call this before start_webrtc().
@@ -1326,6 +1327,7 @@ class VisionProStreamer:
                         e.g., [0, 1, 2] will include env_0, env_1, env_2
             grpc_port: gRPC port for USDZ transfer (default: 50051)
             stage: (Deprecated) USD stage, automatically derived from scene.
+            force_reload: If True, force re-export of USDZ even if cached (default: False)
         
         Example::
         
@@ -1400,6 +1402,7 @@ class VisionProStreamer:
             "env_indices": env_indices,
             "attach_to": attach_to,
             "grpc_port": grpc_port,
+            "force_reload": force_reload,
         }
         
         # Also set _sim_config so the streaming infrastructure knows sim is enabled
@@ -2279,8 +2282,57 @@ class VisionProStreamer:
             # MuJoCo: convert XML to USDZ
             return self._load_and_send_mujoco_scene(attach_to, grpc_port)
     
+    def _compute_isaac_cache_key(self) -> str:
+        """Compute a hash key for the current Isaac configuration for USDZ caching.
+        
+        Hashes the InteractiveSceneCfg dataclass to detect any structural scene changes.
+        This includes robot types, asset paths, sensor configs, etc.
+        """
+        import hashlib
+        import json
+        
+        cache_data = {
+            "include_ground": self._isaac_config.get("include_ground", False),
+            "env_indices": self._isaac_config.get("env_indices"),
+        }
+        
+        # Try to hash the InteractiveSceneCfg for comprehensive change detection
+        if self._isaac_scene is not None:
+            try:
+                import dataclasses
+                if hasattr(self._isaac_scene, 'cfg') and dataclasses.is_dataclass(self._isaac_scene.cfg):
+                    # Convert dataclass to dict for hashing
+                    cfg_dict = dataclasses.asdict(self._isaac_scene.cfg)
+                    cache_data["scene_cfg"] = cfg_dict
+                    self._log("[ISAAC] Using InteractiveSceneCfg for cache key")
+                else:
+                    # Fallback: use scene class name and detected bodies/articulations
+                    cache_data["scene_class"] = self._isaac_scene.__class__.__name__
+                    cache_data["bodies"] = sorted(list(self._isaac_bodies.keys()))
+                    cache_data["articulations"] = sorted(list(self._isaac_articulations.keys()))
+                    self._log("[ISAAC] Using fallback (bodies/articulations) for cache key")
+            except Exception as e:
+                # Fallback if dataclasses.asdict fails (e.g., non-serializable fields)
+                cache_data["scene_class"] = self._isaac_scene.__class__.__name__
+                cache_data["bodies"] = sorted(list(self._isaac_bodies.keys()))
+                cache_data["articulations"] = sorted(list(self._isaac_articulations.keys()))
+                self._log(f"[ISAAC] Fallback cache key due to: {e}")
+        
+        # Create stable hash from dict
+        def json_default(obj):
+            """Handle non-serializable objects in dataclass."""
+            if hasattr(obj, '__dict__'):
+                return str(obj.__class__.__name__)
+            return str(obj)
+        
+        cache_str = json.dumps(cache_data, sort_keys=True, default=json_default)
+        return hashlib.sha256(cache_str.encode()).hexdigest()[:16]
+    
     def _load_and_send_isaac_scene(self, attach_to, grpc_port) -> bool:
-        """Export Isaac Lab stage to USDZ and send to VisionPro."""
+        """Export Isaac Lab stage to USDZ and send to VisionPro.
+        
+        Uses caching to skip export if InteractiveSceneCfg hasn't changed.
+        """
         import tempfile
         
         if self._isaac_stage is None or self._isaac_config is None:
@@ -2289,10 +2341,22 @@ class VisionProStreamer:
         
         include_ground = self._isaac_config.get("include_ground", False)
         env_indices = self._isaac_config.get("env_indices")
+        force_reload = self._isaac_config.get("force_reload", False)
         
-        # Create temp directory for USDZ export
-        tmp_dir = tempfile.mkdtemp(prefix="isaac_usdz_")
-        usdz_path = os.path.join(tmp_dir, "isaac_scene.usdz")  # isaac_ prefix tells VisionOS this is Isaac Lab
+        # Check cache for existing USDZ (unless force_reload)
+        cache_key = self._compute_isaac_cache_key()
+        cache_dir = os.path.join(tempfile.gettempdir(), "isaac_usdz_cache")
+        os.makedirs(cache_dir, exist_ok=True)
+        cached_usdz_path = os.path.join(cache_dir, f"isaac_scene_{cache_key}.usdz")
+        
+        if not force_reload and os.path.exists(cached_usdz_path):
+            self._log(f"[ISAAC] Cache hit! Using cached USDZ (key={cache_key[:8]}...)", force=True)
+            return self._send_usdz_data(cached_usdz_path, attach_to, grpc_port)
+        
+        if force_reload:
+            self._log(f"[ISAAC] Force reload requested, exporting new USDZ...", force=True)
+        else:
+            self._log(f"[ISAAC] Cache miss (key={cache_key[:8]}...), exporting new USDZ...", force=True)
         
         try:
             # Use our Isaac USDZ export utility
@@ -2301,11 +2365,11 @@ class VisionProStreamer:
             self._log(f"[ISAAC] Exporting stage to USDZ...")
             usdz_path = export_stage_to_usdz(
                 stage=self._isaac_stage,
-                output_path=usdz_path,
+                output_path=cached_usdz_path,
                 include_ground=include_ground,
                 env_indices=env_indices,
             )
-            self._log(f"[ISAAC] USDZ exported: {usdz_path}")
+            self._log(f"[ISAAC] USDZ exported and cached: {usdz_path}")
             
         except Exception as e:
             self._log(f"[ISAAC] Error: Failed to export USDZ: {e}", force=True)
@@ -2315,37 +2379,72 @@ class VisionProStreamer:
             return False
         
         # Send USDZ to VisionPro
-        return self._send_usdz_data(usdz_path, attach_to, grpc_port)
+        return self._send_usdz_data(cached_usdz_path, attach_to, grpc_port)
     
     def _load_and_send_mujoco_scene(self, attach_to, grpc_port) -> bool:
-        """Convert MuJoCo XML to USDZ and send to VisionPro."""
+        """Convert MuJoCo XML to USDZ and send to VisionPro.
+        
+        Uses content-based caching to skip conversion if XML hasn't changed.
+        """
+        import tempfile
+        import hashlib
+        
         xml_path = self._sim_config["xml_path"]
         force_reload = self._sim_config.get("force_reload", False)
         
-        # Check if USDZ already exists
-        usdz_path = xml_path.replace('.xml', '.usdz')
-        if not os.path.exists(usdz_path) or force_reload:
+        # Compute hash of XML content for cache key
+        try:
+            with open(xml_path, 'rb') as f:
+                xml_content = f.read()
+            xml_hash = hashlib.sha256(xml_content).hexdigest()[:16]
+        except Exception as e:
+            self._log(f"[USDZ] Warning: Could not read XML for hashing: {e}")
+            xml_hash = None
+        
+        # Check cache for existing USDZ
+        if xml_hash and not force_reload:
+            cache_dir = os.path.join(tempfile.gettempdir(), "mujoco_usdz_cache")
+            os.makedirs(cache_dir, exist_ok=True)
+            cached_usdz_path = os.path.join(cache_dir, f"mujoco_scene_{xml_hash}.usdz")
+            
+            if os.path.exists(cached_usdz_path):
+                self._log(f"[USDZ] Cache hit! Using cached USDZ (key={xml_hash[:8]}...)", force=True)
+                return self._send_usdz_data(cached_usdz_path, attach_to, grpc_port)
+            
+            self._log(f"[USDZ] Cache miss (key={xml_hash[:8]}...), converting...", force=True)
+            usdz_path = cached_usdz_path
+        else:
+            # Fallback to old behavior if hashing failed or force_reload
+            usdz_path = xml_path.replace('.xml', '.usdz')
+        
+        # Convert XML to USDZ
+        try:
+            usdz_path = self._convert_to_usdz(xml_path, output_path=usdz_path)
+            self._log(f"[USDZ] Converted and cached: {usdz_path}")
+        except Exception as e:
+            self._log(f"[USDZ] Warning: Local conversion failed: {e}")
+            # Try external converter
             try:
-                usdz_path = self._convert_to_usdz(xml_path)
-            except Exception as e:
-                self._log(f"[USDZ] Warning: Local conversion failed: {e}")
-                # Try external converter
-                try:
-                    from avp_stream.mujoco_msg.upload_xml import convert_and_download
-                    usdz_path = convert_and_download(
-                        server="http://mujoco-usd-convert.xyz",
-                        scene_xml=Path(xml_path),
-                        out_dir=Path(xml_path).parent
-                    )
-                except Exception as e2:
-                    self._log(f"[USDZ] Error: External conversion also failed: {e2}", force=True)
-                    return False
+                from avp_stream.mujoco_msg.upload_xml import convert_and_download
+                usdz_path = convert_and_download(
+                    server="http://mujoco-usd-convert.xyz",
+                    scene_xml=Path(xml_path),
+                    out_dir=Path(xml_path).parent
+                )
+            except Exception as e2:
+                self._log(f"[USDZ] Error: External conversion also failed: {e2}", force=True)
+                return False
         
         # Send USDZ to VisionPro
         return self._send_usdz_data(usdz_path, attach_to, grpc_port)
     
-    def _convert_to_usdz(self, xml_path: str) -> str:
-        """Convert MuJoCo XML to USDZ file (requires mujoco_usd_converter)."""
+    def _convert_to_usdz(self, xml_path: str, output_path: Optional[str] = None) -> str:
+        """Convert MuJoCo XML to USDZ file (requires mujoco_usd_converter).
+        
+        Args:
+            xml_path: Path to the MuJoCo XML file
+            output_path: Optional path for USDZ output. If None, saves next to XML.
+        """
         try:
             import mujoco_usd_converter
             import usdex.core
@@ -2355,7 +2454,7 @@ class VisionProStreamer:
         
         converter = mujoco_usd_converter.Converter()
         usd_output_path = xml_path.replace('.xml', '_usd')
-        usdz_output_path = xml_path.replace('.xml', '.usdz')
+        usdz_output_path = output_path if output_path else xml_path.replace('.xml', '.usdz')
         
         asset = converter.convert(xml_path, usd_output_path)
         stage = Usd.Stage.Open(asset.path)
