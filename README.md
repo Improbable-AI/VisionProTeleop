@@ -323,7 +323,10 @@ We provide CAD models for camera mounting brackets you can 3D print in [`assets/
 
 📺 **Video Tutorial**: Watch our [camera attachment tutorial](https://youtu.be/vGd3XjLV0kw) for step-by-step assembly instructions.
 
-[![Camera Attachment Tutorial](https://img.youtube.com/vi/vGd3XjLV0kw/0.jpg)](https://www.youtube.com/watch?v=vGd3XjLV0kw)
+
+https://github.com/user-attachments/assets/e923eb07-7944-4a80-8e9b-b0029fd0579d
+
+
 
 ### Camera Calibration
 
