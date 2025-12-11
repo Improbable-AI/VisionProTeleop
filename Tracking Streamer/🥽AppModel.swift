@@ -57,7 +57,7 @@ final class BenchmarkEventDispatcher: @unchecked Sendable {
         lock.lock()
         guard responseWriter != nil else {
             lock.unlock()
-            print("⚠️ [Benchmark] No active gRPC stream; dropping detection for seq=\(sequenceID)")
+            dlog("⚠️ [Benchmark] No active gRPC stream; dropping detection for seq=\(sequenceID)")
             return
         }
 
@@ -88,7 +88,7 @@ final class BenchmarkEventDispatcher: @unchecked Sendable {
                     try await writer.write(message)
                 }
             } catch {
-                print("⚠️ [Benchmark] Failed to send detection event: \(error)")
+                dlog("⚠️ [Benchmark] Failed to send detection event: \(error)")
             }
         }
     }
@@ -241,6 +241,23 @@ class DataManager: ObservableObject {
         }
     }
     
+    // Video plane scale factor (persistent via UserDefaults)
+    @Published var videoPlaneScale: Float {
+        didSet {
+            UserDefaults.standard.set(videoPlaneScale, forKey: "videoPlaneScale")
+            syncSettingToiCloud("visionos.videoPlaneScale", value: Double(videoPlaneScale))
+        }
+    }
+    
+    // Stereo baseline offset for IPD adjustment (persistent via UserDefaults)
+    // Negative = narrower baseline (crop outer sides), Positive = wider baseline (crop inner sides)
+    @Published var stereoBaselineOffset: Float {
+        didSet {
+            UserDefaults.standard.set(stereoBaselineOffset, forKey: "stereoBaselineOffset")
+            syncSettingToiCloud("visionos.stereoBaselineOffset", value: Double(stereoBaselineOffset))
+        }
+    }
+    
     @Published var showExitConfirmation: Bool = false
     
     // MARK: - iCloud Sync Helper
@@ -293,6 +310,10 @@ class DataManager: ObservableObject {
         
         // Load saved hand joints opacity or default to 0.9 (90%)
         self.handJointsOpacity = UserDefaults.standard.object(forKey: "handJointsOpacity") as? Float ?? 0.9
+        // Load saved video plane scale or default to 1.0 (100%)
+        self.videoPlaneScale = UserDefaults.standard.object(forKey: "videoPlaneScale") as? Float ?? 1.0
+        // Load saved stereo baseline offset or default to 0.0 (no adjustment)
+        self.stereoBaselineOffset = UserDefaults.standard.object(forKey: "stereoBaselineOffset") as? Float ?? 0.0
     }
 }
 
@@ -306,14 +327,23 @@ class 🥽AppModel: ObservableObject {
     private let handTracking = HandTrackingProvider()
     private let worldTracking = WorldTrackingProvider()
     private let sceneReconstruction = SceneReconstructionProvider()
-
+    
+    // Pre-computed joint types array (static to avoid recreation on each update)
+    private static let jointTypes: [HandSkeleton.JointName] = [
+        .forearmArm, .forearmWrist, .wrist,
+        .thumbKnuckle, .thumbIntermediateBase, .thumbIntermediateTip, .thumbTip,
+        .indexFingerMetacarpal, .indexFingerKnuckle, .indexFingerIntermediateBase, .indexFingerIntermediateTip, .indexFingerTip,
+        .middleFingerMetacarpal, .middleFingerKnuckle, .middleFingerIntermediateBase, .middleFingerIntermediateTip, .middleFingerTip,
+        .ringFingerMetacarpal, .ringFingerKnuckle, .ringFingerIntermediateBase, .ringFingerIntermediateTip, .ringFingerTip,
+        .littleFingerMetacarpal, .littleFingerKnuckle, .littleFingerIntermediateBase, .littleFingerIntermediateTip, .littleFingerTip,
+    ]
 }
 
 extension 🥽AppModel {
     
     func run() {
 #if targetEnvironment(simulator)
-        print("Not support handTracking in simulator.")
+        dlog("Not support handTracking in simulator.")
 #else
         
         Task {
@@ -329,7 +359,7 @@ extension 🥽AppModel {
     }
 
     func startserver() {
-        print("🚀 [DEBUG] startserver() called - initiating gRPC server...")
+        dlog("🚀 [DEBUG] startserver() called - initiating gRPC server...")
         Task { startServer() }
     }
     
@@ -365,10 +395,10 @@ extension 🥽AppModel {
     
     func processReconstructionUpdates() async {
         for await update in sceneReconstruction.anchorUpdates {
-            // print("reconstruction update")
+            // dlog("reconstruction update")
             let meshAnchor = update.anchor
             let mesh_description = meshAnchor.geometry.description
-            // print(mesh_description)
+            // dlog(mesh_description)
         }
     }
 
@@ -379,8 +409,8 @@ extension 🥽AppModel {
         guard worldTracking.state == .running else { return }
         
         let deviceAnchor = worldTracking.queryDeviceAnchor(atTimestamp: CACurrentMediaTime())
-        // print(" *** device tracking running ")
-//        print(deviceAnchor?.originFromAnchorTransform)
+        // dlog(" *** device tracking running ")
+//        dlog(deviceAnchor?.originFromAnchorTransform)
         guard let deviceAnchor else { return }
         DataManager.shared.latestHandTrackingData.Head = deviceAnchor.originFromAnchorTransform
             }
@@ -388,64 +418,36 @@ extension 🥽AppModel {
     private func processHandUpdates() async {
         for await update in self.handTracking.anchorUpdates {
             let handAnchor = update.anchor
-            // print("processHandUpates is running.")
+            
+            // Use pre-computed static joint types array for better performance
+            let jointTypes = Self.jointTypes
+            
             switch handAnchor.chirality {
             case .left:
                 if handAnchor.isTracked {
                     DataManager.shared.latestHandTrackingData.leftWrist = handAnchor.originFromAnchorTransform
                 }
-                // print(handAnchor.originFromAnchorTransform)
                 
-
-                let jointTypes: [HandSkeleton.JointName] = [
-                    .forearmArm, .forearmWrist, .wrist,
-                    .thumbKnuckle, .thumbIntermediateBase, .thumbIntermediateTip, .thumbTip,
-                    .indexFingerMetacarpal, .indexFingerKnuckle, .indexFingerIntermediateBase, .indexFingerIntermediateTip, .indexFingerTip,
-                    .middleFingerMetacarpal, .middleFingerKnuckle, .middleFingerIntermediateBase, .middleFingerIntermediateTip, .middleFingerTip,
-                    .ringFingerMetacarpal, .ringFingerKnuckle, .ringFingerIntermediateBase, .ringFingerIntermediateTip, .ringFingerTip,
-                    .littleFingerMetacarpal, .littleFingerKnuckle, .littleFingerIntermediateBase, .littleFingerIntermediateTip, .littleFingerTip,
-                ]
-                
-                for (index, jointType) in jointTypes.enumerated() {
-                    guard let joint = handAnchor.handSkeleton?.joint(jointType) else {
-                        continue
+                if let skeleton = handAnchor.handSkeleton {
+                    for (index, jointType) in jointTypes.enumerated() {
+                        let joint = skeleton.joint(jointType)
+                        DataManager.shared.latestHandTrackingData.leftSkeleton.joints[index] = joint.anchorFromJointTransform
                     }
-                    DataManager.shared.latestHandTrackingData.leftSkeleton.joints[index] = joint.anchorFromJointTransform
                 }
-                
-                // print("Updated left hand skeleton")
-                // Repeat for right hand and other fingers as needed
 
             case .right:
-            
                 if handAnchor.isTracked {
                     DataManager.shared.latestHandTrackingData.rightWrist = handAnchor.originFromAnchorTransform
                 }
-                // print(handAnchor.originFromAnchorTransform)
                 
-                let jointTypes: [HandSkeleton.JointName] = [
-                    .forearmArm, .forearmWrist, .wrist,
-                    .thumbKnuckle, .thumbIntermediateBase, .thumbIntermediateTip, .thumbTip,
-                    .indexFingerMetacarpal, .indexFingerKnuckle, .indexFingerIntermediateBase, .indexFingerIntermediateTip, .indexFingerTip,
-                    .middleFingerMetacarpal, .middleFingerKnuckle, .middleFingerIntermediateBase, .middleFingerIntermediateTip, .middleFingerTip,
-                    .ringFingerMetacarpal, .ringFingerKnuckle, .ringFingerIntermediateBase, .ringFingerIntermediateTip, .ringFingerTip,
-                    .littleFingerMetacarpal, .littleFingerKnuckle, .littleFingerIntermediateBase, .littleFingerIntermediateTip, .littleFingerTip,
-                ]
-
-                for (index, jointType) in jointTypes.enumerated() {
-                    guard let joint = handAnchor.handSkeleton?.joint(jointType) else {
-                        continue
+                if let skeleton = handAnchor.handSkeleton {
+                    for (index, jointType) in jointTypes.enumerated() {
+                        let joint = skeleton.joint(jointType)
+                        DataManager.shared.latestHandTrackingData.rightSkeleton.joints[index] = joint.anchorFromJointTransform
                     }
-                    // print(index)
-                    DataManager.shared.latestHandTrackingData.rightSkeleton.joints[index] = joint.anchorFromJointTransform
                 }
-                
-                // print("Updated right hand skeleton")
             }
-            
         }
-        
-        
     }
 }
 
@@ -459,7 +461,7 @@ extension GRPCCore.RPCWriter: RPCWriterProtocol {}
 /// Starts the gRPC server using grpc-swift-2
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 func startServer() {
-    print("📡 [DEBUG] startServer() - Starting gRPC server setup (grpc-swift-2)...")
+    dlog("📡 [DEBUG] startServer() - Starting gRPC server setup (grpc-swift-2)...")
     
     Task {
         let serverManager = GRPCServerManager()
@@ -469,7 +471,7 @@ func startServer() {
 
 /// Legacy startServer function for backwards compatibility with older iOS versions
 func startServerLegacy() {
-    print("⚠️ [DEBUG] Legacy startServer called - grpc-swift-2 requires iOS 18.0+/visionOS 2.0+")
+    dlog("⚠️ [DEBUG] Legacy startServer called - grpc-swift-2 requires iOS 18.0+/visionOS 2.0+")
 }
 
 func fill_handUpdate() -> Handtracking_HandUpdate {

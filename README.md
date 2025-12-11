@@ -2,10 +2,6 @@
 VisionProTeleop
 ===========
 
-
-> **🎉 V2 UPDATE: Low-Latency Video/Audio/Simulation Streaming!** Now stream video, audio, and MuJoCo simulations back to Vision Pro via WebRTC — alongside the original hand tracking stream, from any machine on the network. Update the app, `pip install --upgrade avp_stream`, and you're ready!
-
-
 <div align="center">
   <img width="340" src="assets/vptv2.png">
 </div>
@@ -21,232 +17,250 @@ VisionProTeleop
   </a>
 </p>
 
+A complete ecosystem for using Apple Vision Pro in robotics research — from **real-world teleoperation** to **simulation teleoperation** to **egocentric dataset recording**. Stream hand/head tracking from Vision Pro, send video/audio/simulation back, and record everything to the cloud.
 
+> **For a more detailed explanation, check out this short [paper](./assets/short_paper_new.pdf).**
 
-This VisionOS app and python library allows anyone to get Head + Wrist + Hand Tracking from Vision Pro, and **stream back stereo video / audio feeds from your robot to Vision Pro.** 
+> The recently updated App Store version of Tracking Streamer requires python library `avp_stream` over 2.50.0. It will show a warning message on the VisionOS side if the python library is outdated. You can upgrade the library by running `pip install --upgrade avp_stream`. 
 
-> **For a more detailed explanation, check out this short [paper](./assets/short_paper_new.pdf).*
 
 <!-- omit in toc -->
 ## Table of Contents
 
-- [Key Features](#key-features)
-- [Egocentric Video Dataset Recording](#egocentric-video-dataset-recording)
-  - [What Gets Recorded](#what-gets-recorded)
-  - [Why We Built This](#why-we-built-this)
-  - [Hardware Requirements](#hardware-requirements)
-  - [Camera Mounting](#camera-mounting)
+- [Overview](#overview)
+- [Installations](#installations)
+- [Use Case 1: Real-World Teleoperation](#use-case-1-real-world-teleoperation)
+  - [Video \& Audio Streaming](#video--audio-streaming)
+  - [Video Configuration Examples](#video-configuration-examples)
+  - [Audio Configuration Examples](#audio-configuration-examples)
+- [Use Case 2: Simulation Teleoperation](#use-case-2-simulation-teleoperation)
+  - [MuJoCo Streaming](#mujoco-streaming)
+  - [Isaac Lab Streaming](#isaac-lab-streaming)
+  - [Positioning Your Simulation in AR](#positioning-your-simulation-in-ar)
+  - [Hand Tracking Coordinate Frame](#hand-tracking-coordinate-frame)
+- [Use Case 3: Egocentric Video Dataset Recording](#use-case-3-egocentric-video-dataset-recording)
+  - [USB Camera Mounting on AVP](#usb-camera-mounting-on-avp)
   - [Camera Calibration](#camera-calibration)
-- [Examples](#examples)
-- [Getting Started](#getting-started)
-  - [Installation](#installation)
-  - [Basic Usage](#basic-usage)
-- [Streaming Guide](#streaming-guide)
-  - [Video Streaming](#video-streaming)
-  - [Audio Streaming](#audio-streaming)
-  - [MuJoCo Simulation Streaming](#mujoco-simulation-streaming)
-    - [Positioning Your Simulation in AR (`relative_to`)](#positioning-your-simulation-in-ar-relative_to)
-    - [Hand Tracking Coordinate Frame (`origin`)](#hand-tracking-coordinate-frame-origin)
-  - [Configuration Reference](#configuration-reference)
+- [Recording \& Cloud Storage](#recording--cloud-storage)
+  - [Automatic Cloud Sync](#automatic-cloud-sync)
+  - [Companion iOS App: Tracking Manager](#companion-ios-app-tracking-manager)
+  - [Public Dataset Sharing](#public-dataset-sharing)
+- [App Settings \& Customization](#app-settings--customization)
 - [API Reference](#api-reference)
   - [Available Data](#available-data)
+  - [Configuration Reference](#configuration-reference)
   - [Axis Convention](#axis-convention)
   - [Hand Skeleton](#hand-skeleton)
 - [Performance](#performance)
-  - [Latency Benchmark Results](#latency-benchmark-results)
+- [Examples](#examples)
 - [Appendix](#appendix)
   - [Citation](#citation)
   - [Acknowledgements](#acknowledgements)
 
 
+## Overview
 
-## Key Features 
+This project provides:
 
-1. **Bilateral Data Streams**: 
-    - AVP → Python:  Wrist, Fingers and Head Tracking
-    - Python → AVP:  Low-Latency Streaming of Video, Audio,  MuJoCo environments presented in AR with RealityKit
-2. **Direct UVC Camera Connection**: It supports directly connecting a UVC camera to Vision Pro using its Developer Strap, which can be useful for: 
-    - extremely low latency video streaming experience  
-    - record **human manipulation videos with egocentric RGB video with accurate hand/head tracking data**, bypassing the limited access to RGB camera feeds on AVP.
-3. **Recording to iCloud Drive**: The app can record the incoming/outgoing data streams (video + hand tracking) to personal iCloud Drive for easy data syncing and sharing. 
-4. **Wired Network Connection** : It also supports wired network connection with a computer that's running our Python client via Developer Strap for low latency communication. 
+1. **Tracking Streamer**: A **VisionOS** app that 
+    - streams hand/head tracking data *to* Python client
+    - receive stereo/mono video/audio streams *from* Python client
+    - present simulation scenes (MuJoCo and Isaac Lab) and its updates with native AR rendering using RealityKit
+    - record egocentric video with hand tracking with arbitrary UVC camera connected to Vision Pro
+    - (optionally) record every sessions to user's personal cloud storage 
+2. **avp_stream**: A **Python** library for 
+    - receiving tracking data from Vision Pro
+    - streaming video/audio/simulation back to Vision Pro
+3. **Tracking Manager**: A companion **iOS** app for 
+    - managing and viewing recordings on their personal cloud storage
+    - configuring app settings for VisionOS app
+    - calibrating camera mounted on Vision Pro
+    - sharing recorded datasets with others
+    - viewing publicly shared datasets
 
-## Egocentric Video Dataset Recording
+Together, they enable three major workflows for robotics research:
 
-One unique capability of this system is recording **egocentric human manipulation video datasets** with synchronized hand and head tracking data. This is particularly valuable for imitation learning, human behavior analysis, and robotics research.
+<table>
+  <tr>
+    <th colspan="2">Use Case</th>
+    <th>Description</th>
+    <th>Primary Tools</th>
+  </tr>
+  <tr>
+    <td colspan="2"><a href="#use-case-1-real-world-teleoperation"><b>Real-World Teleoperation</b></a></td>
+    <td>Control physical robots with hand tracking while viewing robot camera feeds</td>
+    <td><code>avp_stream</code> + WebRTC streaming <code>configure_video()</code> (or direct USB connection) of Physical Camera</td>
+  </tr>
+  <tr>
+    <td rowspan="2"><a href="#use-case-2-simulation-teleoperation"><b>Simulation Teleoperation</b></a></td>
+    <td><i>2D Renderings</i></td>
+    <td>Control simulated robots with hand tracking while viewing 2D renderings from simulation</td>
+    <td><code>avp_stream</code> + WebRTC streaming of 2D simulation rendering <code>configure_video()</code> </td>
+  </tr>
+  <tr>
+    <td><i>AR</i></td>
+    <td>Control simulated robots with MuJoCo/Isaac Lab with scenes directly presented in AR</td>
+    <td><code>avp_stream</code> + MuJoCo/Isaac Lab streaming <code>configure_mujoco()</code> <code>configure_isaac()</code></td>
+  </tr>
+  <tr>
+    <td colspan="2"><a href="#use-case-3-egocentric-video-dataset-recording"><b>Egocentric Human Video Recording</b></a></td>
+    <td>Record first-person manipulation videos with synchronized tracking</td>
+    <td>UVC camera + Developer Strap</td>
+  </tr>
+</table>
 
-### What Gets Recorded
 
-When recording in egocentric video mode, the system captures:
-- **Video frames** from a connected UVC camera (egocentric RGB view)
-- **Hand tracking data** — full 25-joint hand skeleton for both hands
-- **Head tracking data** — 6-DoF head pose in world coordinates
-- **Wrist tracking data** — wrist poses and roll angles
-- **Timestamps** — for accurate synchronization between all modalities
 
-All data can be recorded directly to **iCloud Drive** for easy syncing and sharing.
+---
+## Installations
 
-### Why We Built This
-
-Although Vision Pro has multiple high-quality RGB cameras built-in, **Apple does not grant individual developers access to these camera feeds**. Access requires an Apple Enterprise account with a complicated approval process, making it impractical for most researchers and developers.
-
-Similarly, **Meta's Project Aria glasses** offer egocentric recording capabilities, but they also require going through a complex approval process that's difficult to obtain unless you're officially affiliated with Meta.
-
-**Our solution bypasses these limitations** by using an external UVC camera connected via the Developer Strap. This approach offers several advantages:
-- **No approval process** — works with any standard UVC camera
-- **Camera flexibility** — use any camera that fits your research needs (wide-angle, high-resolution, stereo, etc.)
-- **Full control** — direct access to raw video frames for custom processing
-- **Synchronized data** — video frames are perfectly synced with Vision Pro's precise hand/head tracking
-
-### Hardware Requirements
-
-To record egocentric video datasets, you'll need three components:
-
-| Component | Description | 
+Installing is easy: install it from the App Store and PyPI. 
+| Component | Installation |
 |-----------|-------------|
-| **1. UVC Camera** | Any USB Video Class compatible camera. We recommend compact cameras with wide field-of-view for capturing hand manipulation. |
-| **2. Developer Strap** | Apple's [Vision Pro Developer Strap](https://www.apple.com/shop/product/MW3N3LL/A/apple-vision-pro-developer-strap) provides the USB-C port needed to connect the camera. |
-| **3. 3D Printed Brackets** | Custom mounting brackets to attach the camera to the Developer Strap securely. |
+| **Tracking Streamer** (VisionOS) | Install from [App Store](https://apps.apple.com/us/app/tracking-streamer/id6478969032) |
+| **Tracking Manager** (iOS) | Install from [App Store](https://apps.apple.com/app/tracking-manager) |
+| **avp_stream** (Python) | `pip install --upgrade avp_stream` |
 
-### Camera Mounting
+No other network configurations are required. Everything should work out of the box after installation. An easy way to get onboarded is to go through the [examples](examples/) folder. All examples should work out of the box without any extra configurations required. 
 
-We provide CAD models for 3D printing camera mounting brackets in the [`assets/adapters/`](assets/adapters/) folder:
+**Note**: Some examples demonstrate teleoperating things within IsaacLab world; since IsaacLab is an extremely heavy dependency, I did not include that as a dependency for `avp_stream`. If you're trying to run examples including IsaacLab as a simulation backend, you should install things according to their official installation guide. 
 
-| File | Description |
-|------|-------------|
-| `attachment_left.step` | Left-side camera mount bracket |
-| `attachment_right.step` | Right-side camera mount bracket |
-| `camera_head.step` | Camera head adapter |
+---
 
-📺 **Video Tutorial**: Watch our [camera attachment tutorial on YouTube](https://youtu.be/vGd3XjLV0kw) for step-by-step assembly instructions.
+## Use Case 1: Real-World Teleoperation
 
-### Camera Calibration
+Stream your robot's camera feed to Vision Pro while receiving hand/head tracking data for control. Perfect for teleoperating physical robots with visual feedback.
 
-After mounting the camera, you'll need to calibrate it to accurately align the video frames with the tracking data. The calibration process includes:
-
-1. **Intrinsic Calibration** — Determines the camera's internal parameters (focal length, distortion coefficients)
-2. **Extrinsic Calibration** — Determines the camera's position and orientation relative to the Vision Pro head frame
-
-Both calibrations can be performed using the companion **iOS app (Tracking Manager)** or directly on the Vision Pro app. For detailed instructions, see the [Camera Calibration Guide](docs/camera_calibration.md).
-
-## Examples
-
-The best way to learn about this app is to go through the [examples](examples/) folder. It contains 13 examples covering hand tracking, video/audio streaming, and sample teleoperation script using AR simulation streaming feature. 
- 
-
-## Getting Started
-
-### Installation
-
-**Step 1. Install the app on Vision Pro**
-
-This app is officially on VisionOS App Store! You can search for **[Tracking Streamer](https://apps.apple.com/us/app/tracking-streamer/id6478969032)** from the App Store and install the app. 
-
-> If you want to play around with the app, you can build/install the app yourself too. To learn how to do that, take a look at this [documentation](/how_to_install.md). This requires (a) Apple Developer Account, (b) Vision Pro Developer Strap, and (c) a Mac with Xcode installed. 
-
-After installation, click and open the app on Vision Pro. It should show something like this. Click **START with Video Streaming** if you want to stream back videos from your robot over webRTC. Otherwise, click the left button. That's it!  
-
-
-**Step 2. Install Python Library**
-
-The following python package allows you to receive the data stream from any device that's connected to the same WiFi network. Install the package: 
-
-```
-pip install --upgrade avp_stream 
-```
-
-### Basic Usage
-
-Add this code snippet to any of your projects: 
+### Video & Audio Streaming
 
 ```python
 from avp_stream import VisionProStreamer
-avp_ip = "10.31.181.201"   # example IP 
-s = VisionProStreamer(ip = avp_ip)
 
-while True:
-    r = s.latest
-    dlog(r['head'], r['right_wrist'], r['right_fingers'])
-```
+avp_ip = "10.31.181.201"  # Vision Pro IP (shown in the app)
+s = VisionProStreamer(ip=avp_ip)
 
-
-## Streaming Guide
-
-Stream your robot's video feed, audio, and even MuJoCo simulations back to Vision Pro via WebRTC. Make sure you upgrade both the python library and the VisionOS app.
-
-### Video Streaming
-
-```python
-from avp_stream import VisionProStreamer
-avp_ip = "10.31.181.201"   # Vision Pro IP (shown in the app)
-s = VisionProStreamer(ip = avp_ip)
-
-# Configure and start video streaming
-s.configure_video(device="/dev/video0", format="v4l2", size="640x480", fps=30)
-s.start_webrtc()  # Start streaming to Vision Pro
+# Configure video streaming from robot camera
+s.configure_video(device="/dev/video0", format="v4l2", size="1280x720", fps=30)
+s.start_webrtc()
 
 while True:
     r = s.get_latest()
-    dlog(r['head'], r['right_wrist'], r['right_fingers'])
+    # Use tracking data to control your robot
+    head_pose = r['head']
+    right_wrist = r['right_wrist']
+    right_fingers = r['right_fingers']
 ```
 
-**Example 1: Camera with custom processing:**
+### Video Configuration Examples
+
+**Camera with overlay processing:**
 ```python
+def add_overlay(frame):
+    return cv2.putText(frame, "Robot View", (50, 50), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
 s = VisionProStreamer(ip=avp_ip)
-s.register_frame_callback(my_image_processor)  # Your processing function
+s.register_frame_callback(add_overlay)
 s.configure_video(device="/dev/video0", format="v4l2", size="640x480", fps=30)
 s.start_webrtc()
 ```
 
-**Example 2: Stereo camera (side-by-side):**
+**Stereo camera (side-by-side 3D):**
 ```python
 s = VisionProStreamer(ip=avp_ip)
 s.configure_video(device="/dev/video0", format="v4l2", size="1920x1080", fps=30, stereo=True)
 s.start_webrtc()
 ```
 
-**Example 3: Synthetic video:**
+**Synthetic video (generated frames):**
 ```python
 s = VisionProStreamer(ip=avp_ip)
-s.register_frame_callback(render_simulation_frame)  # Generate frames programmatically
+s.register_frame_callback(render_visualization)  # Your rendering function
 s.configure_video(size="1280x720", fps=60)  # No device = synthetic mode
 s.start_webrtc()
 ```
 
-### Audio Streaming
+### Audio Configuration Examples
 
+**With microphone input:**
 ```python
 s = VisionProStreamer(ip=avp_ip)
-s.register_frame_callback(visualizer)
-s.register_audio_callback(audio_generator)  # Generate or process audio
+s.configure_video(device="/dev/video0", format="v4l2", size="1280x720", fps=30)
+s.configure_audio(device=":0", stereo=True)  # Default mic
+s.start_webrtc()
+```
+
+**With synthetic audio (feedback sounds):**
+```python
+def beep_on_pinch(audio_frame):
+    # Generate audio based on hand tracking state
+    return audio_frame
+
+s = VisionProStreamer(ip=avp_ip)
+s.register_audio_callback(beep_on_pinch)
 s.configure_video(size="1280x720", fps=60)
 s.configure_audio(sample_rate=48000, stereo=True)
 s.start_webrtc()
 ```
 
-### MuJoCo Simulation Streaming
 
-Stream your MuJoCo physics simulations directly into AR! The simulation scene is converted to USD and rendered natively on Vision Pro using RealityKit, with real-time pose updates streamed via webRTC.
+---
+
+## Use Case 2: Simulation Teleoperation
+
+Render MuJoCo/Isaac Lab physics simulations directly in AR on Vision Pro. Consider it as a **3D Lifted** version of your simulation renderings; rather than rendering your simulation environments on a 2D flat screen (either mono/stereo), you can view them in a 3D space in AR with super realistic rendering provided by Apple RealityKit. 
+
+The simulation environment (both for MuJoCo/Isaac Lab) is automatically converted to USD and rendered natively using RealityKit, with real-time pose updates streamed via WebRTC. Note that pose updates are way more compact than the full rendered frames in terms of network communication, enabling low-latency and reliable teleoperation experience. 
+
+Control simulated robots with your hands in a mixed-reality environment.
 
 ![](assets/diagram-mjar3.png)
 
 https://github.com/user-attachments/assets/7e6a3b6a-34f8-472a-ac6f-0f032fc0eae5
 
+### MuJoCo Streaming
+
 ```python
 import mujoco
+from avp_stream import VisionProStreamer
+
 model = mujoco.MjModel.from_xml_path("robot.xml")
 data = mujoco.MjData(model)
 
 s = VisionProStreamer(ip=avp_ip)
-s.configure_sim("robot.xml", model, data, relative_to=[0, 1, 0.5, -90])
+s.configure_mujoco("robot.xml", model, data, relative_to=[0, 0, 0.8, 90])
 s.start_webrtc()
 
 while True:
+    # Your control logic using hand tracking
+    r = s.get_latest()
+    # ... update robot based on hand positions ...
+    
     mujoco.mj_step(model, data)
     s.update_sim()  # Stream updated poses to Vision Pro
 ```
 
-#### Positioning Your Simulation in AR (`relative_to`)
+### Isaac Lab Streaming
+
+```python
+from avp_stream import VisionProStreamer
+
+# After creating your Isaac Lab environment...
+streamer = VisionProStreamer(ip=avp_ip)
+streamer.configure_isaac(
+    scene=env.scene,
+    relative_to=[0, 0, 0.8, 90],
+    include_ground=False,
+    env_indices=[0],  # Stream only first environment
+)
+streamer.start_webrtc()
+
+while simulation_app.is_running():
+    env.step(action)
+    streamer.update_sim()  # Stream updated poses to Vision Pro
+```
+
+### Positioning Your Simulation in AR
 
 Since AR blends your simulation with the real world, you need to decide where the simulation's `world` frame should be placed in your physical space. Use `relative_to` parameter:
 
@@ -255,108 +269,197 @@ Since AR blends your simulation with the real world, you need to decide where th
 
 ```python
 # Place world frame 0.8m above ground, rotated 90° around z-axis
-s.configure_sim("robot.xml", model, data, relative_to=[0, 0, 0.8, 90])
+s.configure_mujoco("robot.xml", model, data, relative_to=[0, 0, 0.8, 90])
 ```
 
 **Default Behavior**: VisionOS automatically detects the physical ground and places the origin there (below your feet if standing, below your chair if sitting).
 
-| Examples from [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) | [Unitree G1 XML](https://github.com/google-deepmind/mujoco_menagerie/tree/main/unitree_g1/scene.xml) | [Google Robot XML](https://github.com/google-deepmind/mujoco_menagerie/tree/main/google_robot/scene.xml) | [ALOHA 2 XML](https://github.com/google-deepmind/mujoco_menagerie/blob/main/aloha/scene.xml) |
+| Examples from [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) | [Unitree G1](https://github.com/google-deepmind/mujoco_menagerie/tree/main/unitree_g1/scene.xml) | [Google Robot](https://github.com/google-deepmind/mujoco_menagerie/tree/main/google_robot/scene.xml) | [ALOHA 2](https://github.com/google-deepmind/mujoco_menagerie/blob/main/aloha/scene.xml) |
 |-------|---------|----------|----------|
-| Visualization of `world` frame | ![](assets/unitree_g1.png)  | ![](assets/google_robot.png)     | ![](assets/aloha2.png)     |
-|  | `world` frame is attached on a "ground".     | `world` frame is attached on a "ground".     | `world` frame is attached on a "table".     |
-| Recommended `attach_to` | Default Setting    | Default Setting     | Offset in `z-axis`, that can bring up the table surface to reasonable height in your real world.    |
+| Visualization of `world` frame | ![](assets/unitree_g1.png) | ![](assets/google_robot.png) | ![](assets/aloha2.png) |
+| | `world` frame on ground | `world` frame on ground | `world` frame on table |
+| Recommended `relative_to` | Default | Default | Offset in z-axis |
 
-#### Hand Tracking Coordinate Frame (`origin`)
+### Hand Tracking Coordinate Frame
 
-When using MuJoCo simulation streaming, you often want hand tracking data in the simulation's coordinate frame (not Vision Pro's native frame). By default, calling `configure_sim()` automatically sets `origin="sim"`, so hand positions are relative to your scene's `world` frame.
+When using simulation streaming, you often want hand tracking data in the simulation's coordinate frame (not Vision Pro's native frame). By default, calling `configure_mujoco()` or `configure_isaac()` automatically sets `origin="sim"`.
 
 ```python
 s = VisionProStreamer(ip=avp_ip)
-s.configure_sim("robot.xml", model, data, relative_to=[0, 0, 0.8, 90])
+s.configure_mujoco("robot.xml", model, data, relative_to=[0, 0, 0.8, 90])
 # origin is now "sim" — hand tracking is in simulation coordinates
 
-# You can also switch manually:
+# You can switch manually:
 s.set_origin("avp")  # Vision Pro's native coordinate frame
-s.set_origin("sim")  # Simulation's coordinate frame (relative to attach_to)
+s.set_origin("sim")  # Simulation's coordinate frame
 ```
 
 | Origin | Hand Tracking Frame | Use Case |
 |--------|---------------------|----------|
-| `"avp"` | Vision Pro ground frame | Default, general hand tracking |
-| `"sim"` | Simulation world frame | Teleoperation, robot control in sim |
+| `"avp"` | Vision Pro ground frame | General hand tracking |
+| `"sim"` | Simulation world frame | Teleoperation, robot control |
 
 
+---
 
-### Configuration Reference
+## Use Case 3: Egocentric Video Dataset Recording
 
-**Video Configuration** (`configure_video`):
-| Parameter | Description | Example |
-|-----------|-------------|---------|
-| `device` | Camera device. `None` for synthetic frames | `"/dev/video0"`, `"0:none"` (macOS), `None` |
-| `format` | Video format | `"v4l2"` (Linux), `"avfoundation"` (macOS) |
-| `size` | Resolution as "WxH" | `"640x480"`, `"1280x720"`, `"1920x1080"` |
-| `fps` | Frame rate | `30`, `60` |
-| `stereo` | Side-by-side stereo video | `True`, `False` |
+Record **egocentric human manipulation video datasets** with synchronized hand and head tracking data. This is invaluable for learning from video, human behavior anaylsis, etc. 
 
-**Audio Configuration** (`configure_audio`):
-| Parameter | Description | Example |
-|-----------|-------------|---------|
-| `device` | Audio device. `None` for synthetic audio | `":0"` (default mic on macOS), `None` |
-| `sample_rate` | Sample rate in Hz | `48000` |
-| `stereo` | Stereo or mono audio | `True`, `False` |
 
-**Simulation Configuration** (`configure_sim`):
-| Parameter | Description | Example |
-|-----------|-------------|---------|
-| `xml_path` | Path to MuJoCo XML scene | `"scene.xml"` |
-| `model` | MuJoCo model object | `mujoco.MjModel` |
-| `data` | MuJoCo data object | `mujoco.MjData` |
-| `relative_to` | Scene placement [x, y, z, yaw°] or [x, y, z, qw, qx, qy, qz] | `[0, 1, 0.5, -90]` |
+> **Why we built this**: Vision Pro has multiple high-quality RGB cameras, but **Apple doesn't let individual developers access them**; you need an Enterprise account and a complicated approval process. Meta's Project Aria glasses have similar restrictions, unless you're officially affiliated with Meta. Other solutions does not provide accurate enough hand tracking data / global SLAM capabilities for accurate localization.  
+So we built a workaround: **connect any standard UVC camera via the Developer Strap**. This gives you full control over your camera choice (wide-angle, high-res, stereo, whatever your research needs), direct access to raw frames, and precise synchronization with Vision Pro's hand/head tracking. No approval process required.
 
-**Note:** Finding the right combination of `device`, `format`, `size`, and `fps` can be tricky since cameras only support certain combinations. Use this script to find valid configurations:
 
-```bash
-python test_video_devices.py --live
-``` 
+### USB Camera Mounting on AVP
 
+We provide CAD models for camera mounting brackets you can 3D print in [`assets/adapters/`](assets/adapters/). It is designed to easily detach/attach the camera mount whenever you want.  
+
+| File | Description |
+|------|-------------|
+| `attachment_left.step` | Left-side bracket |
+| `attachment_right.step` | Right-side bracket |
+| `camera_head.step` | Camera head adapter |
+
+📺 **Video Tutorial**: Watch our [camera attachment tutorial](https://youtu.be/vGd3XjLV0kw) for step-by-step assembly instructions.
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/vGd3XjLV0kw?si=ScaL19nu62lFbntl" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin"allowfullscreen></iframe>
+
+### Camera Calibration
+
+After mounting the camera, you need to calibrate it to align video frames with tracking data:
+
+1. **Intrinsic Calibration**: Determines camera's internal parameters (focal length, distortion)
+2. **Extrinsic Calibration**: Determines camera's position/orientation relative to Vision Pro
+
+Both calibrations can be performed using **Tracking Manager**, our iOS companion app.  For detailed instructions and math behind these calibrations, see the [Camera Calibration Guide](docs/camera_calibration.md).
+
+
+---
+
+## Recording & Cloud Storage
+
+Any session (whether real-world teleoperation, simulation teleoperation, or egocentric recording) can be saved to cloud storage for easy access and sharing.
+
+### Automatic Cloud Sync
+
+Configure cloud storage in the Tracking Streamer app settings, or our companion iOS app. It supports setting up your personal:
+
+- iCloud Drive
+- Google Drive
+- Dropbox
+
+Recordings basically include all incoming data streams (videos, audios, simulation data streams, simulation scenes, etc.) and outgoing data streams (hand/head tracking).
+- Video file (H.264/H.265 encoded)
+- Tracking data (JSON format with all hand/head poses)
+- Metadata (timestamps, calibration info, session details)
+- Simulation data (if using MuJoCo/IsaacLab streaming)
+
+
+**Important Note:** We never have access to your data; everything will be logged to your personal drive (which also means that it's gonna occupy your personal drive storage), which you can definitely opt out. But you can also optionally choose to share your recordings to the public community through our iOS companion app. See more in the companion app section below. 
+
+
+### Companion iOS App: Tracking Manager
+
+The **Tracking Manager** iOS app provides a complete interface for managing your recordings:
+
+| Feature | Description |
+|---------|-------------|
+| **Manage Personal Recordings** | Browse and manage your recordings from cloud storage |
+| **Playback & Inspection** | View synchronized video + 3D skeleton visualization |
+| **Calibration** | Perform camera calibration with visual guidance |
+| **Vision Pro Settings** | Configure Tracking Streamer settings remotely |
+| **Public Sharing** | Share recordings with the research community |
+
+### Public Dataset Sharing
+
+Want to contribute to the research community? The Tracking Manager app allows you to:
+
+1. Select recordings to share publicly
+2. Add metadata (task description, environment info) if you want.
+3. Upload to a shared CloudKit database
+4. Browse and download others' public recordings
+
+This creates a growing community dataset of egocentric manipulation videos with tracking data. 
+
+**IMPORTANT NOTE:** The data always belongs to you; making your recordings public doesn't *copy* your dataset into some other data storage. It just makes your recording on your personal cloud to be *shareable with anyone **with a link***, and CloudKit logs that link and shares with anyone who joins the app. If you want to make your recordings to be *private* again, you can simply make the google drive / dropbox dataset folder to be "private" again, or toggle it through our iOS companion app. You can always delete the recordings on your personal cloud storage as well. 
+
+
+---
+
+## App Settings & Customization
+
+The **Tracking Streamer** VisionOS app includes a settings panel (tap the gear icon) with various customization options:
+
+| Setting | Description |
+|---------|-------------|
+| **Video Source** | Switcvh between network stream (from Python), UVC camera (Developer Strap), or no video |
+| **Video Plane Position** | Adjust size, distance (2-20m), and height of the video display in AR |
+| **Lock to World** | When enabled, video stays fixed in world space; when disabled, it follows your head |
+| **Stereo Baseline** | Fine-tune stereo separation for side-by-side 3D video to match your IPD |
+| **Visualizations** | Toggle hand skeleton overlay, head gaze ray, and hands-over-AR rendering |
+| **Recording** | Configure storage location (local/iCloud/Google Drive/Dropbox) and start/stop recording |
+| **Camera Calibration** | Run intrinsic and extrinsic calibration for mounted UVC cameras (EgoRecord mode) |
+| **Controller Position** | Adjust where the floating status panel appears in your view |
+
+These settings persist across sessions and can also be configured remotely via the **Tracking Manager** iOS companion app.
+
+---
 
 ## API Reference
 
 ### Available Data
 
 ```python
-r = s.latest
+r = s.get_latest()
 ```
 
-`r` is a dictionary containing the following data streamed from AVP: 
+| Key | Type | Description |
+|-----|------|-------------|
+| `head` | `(1,4,4) ndarray` | Head pose matrix (Z-up frame) |
+| `left_wrist` / `right_wrist` | `(1,4,4) ndarray` | Wrist pose matrices |
+| `left_fingers` / `right_fingers` | `(25,4,4) ndarray` | Finger joints in wrist frame |
+| `left_arm` / `right_arm` | `(27,4,4) ndarray` | Full skeleton (includes forearm) |
+| `left_pinch_distance` / `right_pinch_distance` | `float` | Thumb-index pinch distance (m) |
+| `left_wrist_roll` / `right_wrist_roll` | `float` | Axial wrist rotation (rad) |
 
-```python
-r['head']: np.ndarray  
-  # shape (1,4,4) / measured from ground frame
-r['right_wrist']: np.ndarray 
-  # shape (1,4,4) / measured from ground frame
-r['left_wrist']: np.ndarray 
-  # shape (1,4,4) / measured from ground frame
-r['right_fingers']: np.ndarray 
-  # shape (25,4,4) / measured from right wrist frame 
-r['left_fingers']: np.ndarray 
-  # shape (25,4,4) / measured from left wrist frame 
-r['right_pinch_distance']: float  
-  # distance between right index tip and thumb tip 
-r['left_pinch_distance']: float  
-  # distance between left index tip and thumb tip 
-r['right_wrist_roll']: float 
-  # rotation angle of your right wrist around your arm axis
-r['left_wrist_roll']: float 
- # rotation angle of your left wrist around your arm axis
-```
+### Configuration Reference
 
+**Video** (`configure_video`):
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `device` | Camera device (`None` for synthetic) | `"/dev/video0"`, `"0:none"` (macOS) |
+| `format` | Video format | `"v4l2"` (Linux), `"avfoundation"` (macOS) |
+| `size` | Resolution | `"640x480"`, `"1280x720"`, `"1920x1080"` |
+| `fps` | Frame rate | `30`, `60` |
+| `stereo` | Side-by-side stereo | `True`, `False` |
 
+**Audio** (`configure_audio`):
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `device` | Audio device (`None` for synthetic) | `":0"` (default mic on macOS) |
+| `sample_rate` | Sample rate (Hz) | `48000` |
+| `stereo` | Stereo or mono | `True`, `False` |
 
+**MuJoCo Simulation** (`configure_mujoco`):
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `xml_path` | MuJoCo XML path | `"scene.xml"` |
+| `model` | MuJoCo model | `mujoco.MjModel` |
+| `data` | MuJoCo data | `mujoco.MjData` |
+| `relative_to` | Scene placement | `[0, 0, 0.8, 90]` |
+| `force_reload` | Force re-export of USDZ | `True`, `False` |
+
+**Isaac Lab Simulation** (`configure_isaac`):
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `scene` | Isaac Lab [InteractiveScene](https://isaac-sim.github.io/IsaacLab/main/source/api/lab/isaaclab.scene.html#isaaclab.scene.InteractiveScene) object | `env.scene` |
+| `relative_to` | Scene placement | `[0, 0, 0.8, 90]` |
+| `include_ground` | Include ground plane | `True`, `False` |
+| `env_indices` | Which envs to stream | `[0]`, `[0, 1, 2]` |
+| `force_reload` | Force re-export of USDZ | `True`, `False` |
 
 ### Axis Convention
-
-Refer to the image below to see how the axis are defined for your head, wrist, and fingers. 
 
 ![](assets/axis_convention.png)
 
@@ -364,42 +467,70 @@ Refer to the image below to see how the axis are defined for your head, wrist, a
 
 ![](assets/hand_skeleton_convention.png)
 
-Refer to the image above to see what order the joints are represented in each hand's skeleton. 
+The 27-joint skeleton order (with forearm tracking):
+- `[0]` forearmArm, `[1]` forearmWrist, `[2]` wrist
+- `[3-6]` thumb (knuckle, intermediateBase, intermediateTip, tip)
+- `[7-11]` index, `[12-16]` middle, `[17-21]` ring, `[22-26]` little
 
+
+---
 
 ## Performance
 
-### Latency Benchmark Results
+We performed comprehensive round-trip latency measurements. The system consistently achieves:
 
-We performed comprehensive round-trip latency measurements to benchmark our video streaming system. The measurement captures the full cycle: 
-1. Python encodes a timestamp into a video frame as a marker
-2. WebRTC transmission happens over the network
-3. Vision Pro decodes the image, and reads the marker ID 
-4. sends the marker ID back to Python.
-5. Python calculates latency. 
+| Configuration | Latency |
+|---------------|---------|
+| Wireless, resolution ≤720p | < 100ms |
+| Wired, stereo 4K | ~50ms stable |
 
-This provides a conservative upper bound on user-experienced latency. According to our own testing, the system can consistently hit under 100ms both in wired mode and wireless mode for resolution under 720p. When wired up (requires developer strap), you can get stable 50ms latency even for **stereo 4K streaming**. 
-
-For detailed methodology, test configurations, and complete results, see the **[Benchmark Documentation](docs/benchmark.md)**.
+For detailed methodology and results, see [Benchmark Documentation](docs/benchmark.md).
 
 ![](comparison.png)
 
+
+---
+
+## Examples
+
+The [examples/](examples/) folder contains 13 examples:
+
+| # | Example | Use Case |
+|---|---------|----------|
+| 00 | `hand_streaming.py` | Basic hand tracking |
+| 01 | `visualize_hand_callback.py` | Synthetic video with hand viz |
+| 02 | `visualize_hand_direct.py` | Direct frame generation |
+| 03 | `visualize_hand_with_audio_callback.py` | Audio feedback on pinch |
+| 04 | `stereo_depth_visualization.py` | Stereo depth demo |
+| 05 | `text_scroller_callback.py` | Text overlay example |
+| 06 | `stream_from_camera.py` | Camera streaming |
+| 07 | `process_frames.py` | Frame processing |
+| 08 | `stream_audio_file.py` | Audio file streaming |
+| 09 | `mujoco_streaming.py` | MuJoCo AR simulation |
+| 10 | `teleop_osc_franka.py` | Franka teleoperation |
+| 11 | `diffik_aloha.py` | ALOHA diff IK control |
+| 12 | `diffik_shadow_hand.py` | Shadow hand control |
+
+
+---
 
 ## Appendix
 
 ### Citation
 
-If you use this repository in your work, consider citing:
+If you use this project in your research:
 
-    @software{park2024avp,
-        title={Using Apple Vision Pro to Train and Control Robots},
-        author={Park, Younghyo and Agrawal, Pulkit},
-        year={2024},
-        url = {https://github.com/Improbable-AI/VisionProTeleop},
-    }
+```bibtex
+@software{park2024avp,
+    title={Using Apple Vision Pro to Train and Control Robots},
+    author={Park, Younghyo and Agrawal, Pulkit},
+    year={2024},
+    url={https://github.com/Improbable-AI/VisionProTeleop},
+}
+```
 
-### Acknowledgements 
+### Acknowledgements
 
-We acknowledge support from Hyundai Motor Company and ARO MURI grant number W911NF-23-1-0277. 
+We acknowledge support from Hyundai Motor Company and ARO MURI grant number W911NF-23-1-0277.
 
 [![Star History Chart](https://api.star-history.com/svg?repos=improbable-ai/visionproteleop&type=date&legend=top-left)](https://www.star-history.com/#improbable-ai/visionproteleop&type=date&legend=top-left)

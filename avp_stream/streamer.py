@@ -962,7 +962,7 @@ class VisionProStreamer:
         Example::
         
             streamer = VisionProStreamer(ip=avp_ip)
-            streamer.configure_sim("scene.xml", model, data, relative_to=[0, 0, 0.8, 90])
+            streamer.configure_mujoco("scene.xml", model, data, relative_to=[0, 0, 0.8, 90])
             streamer.set_origin("sim")  # Now hand tracking is in simulation frame
             streamer.start_webrtc()
         """
@@ -1206,7 +1206,7 @@ class VisionProStreamer:
         
         self._log(f"[CONFIG] Audio configured: {effective_sample_rate}Hz (device={device}, stereo={stereo})")
     
-    def configure_sim(
+    def configure_mujoco(
         self,
         xml_path: str,
         model,
@@ -1239,7 +1239,7 @@ class VisionProStreamer:
             model = mujoco.MjModel.from_xml_path("scene.xml")
             data = mujoco.MjData(model)
             
-            streamer.configure_sim("scene.xml", model, data, relative_to=[0, 0, 1, 1, 0, 0, 0])
+            streamer.configure_mujoco("scene.xml", model, data, relative_to=[0, 0, 1, 1, 0, 0, 0])
             streamer.start_webrtc()
             
             while True:
@@ -1299,6 +1299,9 @@ class VisionProStreamer:
         if attach_to:
             self._log(f"  Position: [{attach_to[0]:.2f}, {attach_to[1]:.2f}, {attach_to[2]:.2f}]")
     
+    # Backward compatibility alias
+    configure_sim = configure_mujoco
+    
     def configure_isaac(
         self,
         scene,
@@ -1356,7 +1359,7 @@ class VisionProStreamer:
             except Exception as e:
                 raise ValueError(f"Could not get USD stage: {e}. Make sure Isaac Sim is initialized.")
         
-        # Process relative_to parameter (same logic as configure_sim)
+        # Process relative_to parameter (same logic as configure_mujoco)
         attach_to = None
         if relative_to is not None:
             if len(relative_to) == 4:
@@ -1747,7 +1750,7 @@ class VisionProStreamer:
         Sync current simulation state to the VisionPro.
         
         Call this after each simulation step to update the 3D visualization.
-        Works with both MuJoCo (configure_sim) and Isaac Lab (configure_isaac).
+        Works with both MuJoCo (configure_mujoco) and Isaac Lab (configure_isaac).
         
         Example (MuJoCo)::
         
@@ -1766,7 +1769,7 @@ class VisionProStreamer:
         is_mujoco = self._mujoco_model is not None and self._mujoco_data is not None
         
         if not is_isaac and not is_mujoco:
-            self._log("[SIM] Warning: No simulation configured. Call configure_sim() or configure_isaac() first.", force=True)
+            self._log("[SIM] Warning: No simulation configured. Call configure_mujoco() or configure_isaac() first.", force=True)
             return
         
         if not self._pose_stream_running:
@@ -2597,7 +2600,7 @@ class VisionProStreamer:
         Start the WebRTC streaming server using configured video/audio/simulation.
         
         This is the core method that starts the WebRTC server. It uses the
-        configuration set by configure_video(), configure_audio(), and configure_sim().
+        configuration set by configure_video(), configure_audio(), and configure_mujoco().
         
         Note: Consider using start_webrtc() instead for clarity.
         
@@ -2611,13 +2614,13 @@ class VisionProStreamer:
         
         Example (simulation only)::
         
-            streamer.configure_sim("scene.xml", model, data)
+            streamer.configure_mujoco("scene.xml", model, data)
             streamer.start_webrtc()
         
         Example (video + simulation)::
         
             streamer.configure_video(device=None, size="1280x720")
-            streamer.configure_sim("scene.xml", model, data)
+            streamer.configure_mujoco("scene.xml", model, data)
             streamer.start_webrtc()
         """
         self._webrtc_port = port
@@ -2920,7 +2923,7 @@ class VisionProStreamer:
         Start WebRTC streaming to Vision Pro.
         
         This starts the outbound media streaming (video/audio/simulation) to Vision Pro
-        using the configuration set by configure_video(), configure_audio(), and configure_sim().
+        using the configuration set by configure_video(), configure_audio(), and configure_mujoco().
         
         Note: Hand tracking data flows automatically via gRPC when VisionProStreamer is
         instantiated. This method starts the *outbound* streaming for visual/audio feedback.
@@ -2966,7 +2969,7 @@ class VisionProStreamer:
         
         Example::
         
-            streamer.configure_sim("scene.xml", model, data)
+            streamer.configure_mujoco("scene.xml", model, data)
             streamer.start_webrtc()
             if streamer.wait_for_sim_channel():
                 # Channel is ready, start simulation

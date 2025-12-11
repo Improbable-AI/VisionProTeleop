@@ -15,7 +15,7 @@ if __name__ == "__main__":
     
     try:
         while True:
-            print(streamer.latest)
+            print(streamer.get_latest())
             time.sleep(1/60.)
     except KeyboardInterrupt:
         print("\nStopping...")

@@ -24,7 +24,7 @@ def main(args):
     # attach_to format: [x, y, z, yaw_degrees]
     attach_to = [0.2, 1.0, 0.7, -90]
 
-    streamer.configure_sim(
+    streamer.configure_mujoco(
         xml_path=xml_path,
         model=model,
         data=data,

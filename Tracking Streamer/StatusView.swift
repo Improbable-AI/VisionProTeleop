@@ -26,7 +26,7 @@ class NetworkInfoManager: ObservableObject {
     @Published var webrtcServerInfo: (host: String, port: Int)? = nil
     
     init() {
-        print("🔵 [StatusView] NetworkInfoManager init called")
+        dlog("🔵 [StatusView] NetworkInfoManager init called")
         updateNetworkInfo()
         
         // Periodically update status
@@ -45,6 +45,7 @@ class NetworkInfoManager: ObservableObject {
 /// Enum to track which settings panel is currently expanded
 enum ExpandedPanel: Equatable {
     case none
+    case settings  // Shows the settings menu (Layer 2)
     case videoSource
     case viewControls
     case recording
@@ -54,6 +55,7 @@ enum ExpandedPanel: Equatable {
     case visualizations  // Hand/head visualization toggles
     case positionLayout  // Combined video view + controller position
     case personaCapture  // Spatial Persona front camera preview
+    case stereoBaseline  // Stereo IPD/baseline adjustment
 }
 
 /// App mode: Teleop (network-based teleoperation) vs Egorecord (local UVC recording)
@@ -121,7 +123,7 @@ struct StatusOverlay: View {
         self._previewStatusPosition = previewStatusPosition
         self._previewStatusActive = previewStatusActive
         self.mujocoManager = mujocoManager
-//        print("🟢 [StatusView] StatusOverlay init called, hasFrames: \(hasFrames.wrappedValue), showVideoStatus: \(showVideoStatus), mujocoEnabled: \(mujocoManager != nil)")
+//        dlog("🟢 [StatusView] StatusOverlay init called, hasFrames: \(hasFrames.wrappedValue), showVideoStatus: \(showVideoStatus), mujocoEnabled: \(mujocoManager != nil)")
     }
     
     var body: some View {
@@ -169,9 +171,9 @@ struct StatusOverlay: View {
             }
         }
         .onAppear {
-            print("🔴 [StatusView] StatusOverlay onAppear called")
+            dlog("🔴 [StatusView] StatusOverlay onAppear called")
             ipAddresses = getIPAddresses()
-            print("🔴 [StatusView] IP Addresses: \(ipAddresses)")
+            dlog("🔴 [StatusView] IP Addresses: \(ipAddresses)")
             
             // Flashing animation for warnings (gentle pulse 1.5s cycle)
             Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { _ in
@@ -202,12 +204,12 @@ struct StatusOverlay: View {
                 // But don't maximize if we're currently uploading to cloud - wait for upload to complete
                 if (wasPythonConnected && !pythonConnected) || (wasWebrtcConnected && !webrtcConnected) {
                     if recordingManager.isUploadingToCloud {
-                        print("🔌 [StatusView] Connection lost but upload in progress - staying minimized")
+                        dlog("🔌 [StatusView] Connection lost but upload in progress - staying minimized")
                         // Just reset flags, don't maximize yet
                         userInteracted = false
                         hasFrames = false
                     } else {
-                        print("🔌 [StatusView] Connection lost - maximizing status view")
+                        dlog("🔌 [StatusView] Connection lost - maximizing status view")
                         withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
                             isMinimized = false
                             userInteracted = false  // Reset so it can auto-minimize again on next connection
@@ -221,7 +223,7 @@ struct StatusOverlay: View {
                      // Only minimize on Python connection if NOT in video mode (hand tracking only)
                      // In video mode, we wait for frames to arrive (handled in ImmersiveView)
                      if !showVideoStatus {
-                         print("🔌 [StatusView] Connection established - minimizing status view")
+                         dlog("🔌 [StatusView] Connection established - minimizing status view")
                          if !userInteracted {
                              withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
                                  isMinimized = true
@@ -237,7 +239,7 @@ struct StatusOverlay: View {
                     // This is triggered periodically, so we need to detect the transition
                     // We rely on the fact that hasFrames was set to false when connection was lost
                     if !hasFrames {
-                        print("☁️ [StatusView] Upload completed and no connection - maximizing status view")
+                        dlog("☁️ [StatusView] Upload completed and no connection - maximizing status view")
                         withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
                             isMinimized = false
                         }
@@ -365,7 +367,7 @@ struct StatusOverlay: View {
                     }
                     
                     Button {
-                        print("❌ [StatusView] Exiting app now")
+                        dlog("❌ [StatusView] Exiting app now")
                         exit(0)
                     } label: {
                         ZStack {
@@ -479,7 +481,7 @@ struct StatusOverlay: View {
                     
                     // Exit button
                     Button {
-                        print("🔴 [StatusView] Exit button tapped (minimized)")
+                        dlog("🔴 [StatusView] Exit button tapped (minimized)")
                         withAnimation {
                             showLocalExitConfirmation = true
                         }
@@ -550,7 +552,7 @@ struct StatusOverlay: View {
                 Spacer()
                 
                 Button {
-                    print("🔴 [StatusView] Exit button tapped (expanded)")
+                    dlog("🔴 [StatusView] Exit button tapped (expanded)")
                     withAnimation {
                         showLocalExitConfirmation = true
                     }
@@ -1030,12 +1032,12 @@ struct StatusOverlay: View {
 
     private var expandedView: some View {
         HStack(alignment: .center, spacing: 0) {
-            // Left column - Main status panel
+            // Panel 1 (Left) - Main status panel
             leftColumnView
             
-            // Right column - Expanded settings panel (if any)
+            // Panel 2 (Right) - Settings panel (switches between menu and content)
             if expandedPanel != .none {
-                rightColumnView
+                settingsPanelView
             }
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: expandedPanel)
@@ -1089,7 +1091,7 @@ struct StatusOverlay: View {
                                 .buttonStyle(.plain)
                                 
                                 Button {
-                                    print("❌ [StatusView] Exiting app now")
+                                    dlog("❌ [StatusView] Exiting app now")
                                     exit(0)
                                 } label: {
                                     Text(recordingManager.isUploadingToCloud ? "Exit Anyway" : "Exit")
@@ -1173,115 +1175,35 @@ struct StatusOverlay: View {
                 }
             }
             
-            // Menu items section
-            if showVideoStatus {
-                Divider()
-                    .background(Color.white.opacity(0.3))
-                
-                // Video Source menu item
-                menuItem(
-                    icon: dataManager.videoSource.icon,
-                    title: "Video Source",
-                    subtitle: dataManager.videoSource.rawValue,
-                    isExpanded: expandedPanel == .videoSource,
-                    accentColor: .blue
-                ) {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                        expandedPanel = expandedPanel == .videoSource ? .none : .videoSource
-                    }
-                }
-                
-                // Position & Layout menu item (combined video view + controller position)
-                menuItem(
-                    icon: "square.resize",
-                    title: "Position & Layout",
-                    subtitle: nil,
-                    isExpanded: expandedPanel == .positionLayout,
-                    accentColor: .green
-                ) {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                        if expandedPanel == .positionLayout {
-                            expandedPanel = .none
-                            previewZDistance = nil
-                            previewActive = false
-                            previewStatusPosition = nil
-                            previewStatusActive = false
-                            hidePreviewTask?.cancel()
-                        } else {
-                            expandedPanel = .positionLayout
-                        }
-                    }
-                }
-            }
-            
+            // Settings button - opens Layer 2 settings menu
             Divider()
                 .background(Color.white.opacity(0.3))
             
-            // Recording menu item
-            menuItem(
-                icon: recordingManager.isRecording ? "record.circle.fill" : "record.circle",
-                title: "Recording",
-                subtitle: recordingManager.isRecording 
-                    ? recordingManager.formatDuration(recordingManager.recordingDuration) 
-                    : (recordingManager.storageLocation == .cloud 
-                        ? recordingManager.cloudProvider.displayName 
-                        : "Local"),
-                isExpanded: expandedPanel == .recording,
-                accentColor: .red,
-                iconColor: recordingManager.isRecording ? .red : nil
-            ) {
+            Button {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                    expandedPanel = expandedPanel == .recording ? .none : .recording
+                    expandedPanel = expandedPanel == .none ? .settings : .none
                 }
-            }
-            
-            // Camera Calibration menu item:
-            // - Teleop mode: hidden
-            // - Egorecord mode: always shown, flashes if not calibrated
-            if appMode == .egorecord {
-                let hasIntrinsic = uvcCameraManager.selectedDevice.map { calibrationManager.hasCalibration(for: $0.id) } ?? false
-                let hasExtrinsic = uvcCameraManager.selectedDevice.map { extrinsicCalibrationManager.hasCalibration(for: $0.id) } ?? false
-                let isCalibrated = hasIntrinsic && hasExtrinsic
-                
-                cameraCalibrationMenuItem
-                    .opacity(isCalibrated ? 1.0 : flashingOpacity)
-            }
-            
-            // Visualizations menu - only show in teleop mode
-            if appMode == .teleop {
-                Divider()
-                    .background(Color.white.opacity(0.3))
-                
-                // Count active visualizations for subtitle
-                let activeCount = [dataManager.upperLimbVisible, dataManager.showHeadBeam, dataManager.showHandJoints].filter { $0 }.count
-                
-                menuItem(
-                    icon: "eye.fill",
-                    title: "Debugging Visualizations",
-                    subtitle: "\(activeCount)/3 active",
-                    isExpanded: expandedPanel == .visualizations,
-                    accentColor: .cyan
-                ) {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                        expandedPanel = expandedPanel == .visualizations ? .none : .visualizations
-                    }
+            } label: {
+                HStack {
+                    Image(systemName: "gearshape.fill")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundColor(expandedPanel != .none ? .blue : .white.opacity(0.9))
+                        .frame(width: 24)
+                    Text("Settings")
+                        .font(.body)
+                        .fontWeight(.medium)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(expandedPanel != .none ? .blue : .white.opacity(0.5))
                 }
-                
-                // Persona Preview menu item
-                let personaController = PersonaCaptureController.shared
-                menuItem(
-                    icon: personaController.isRunning ? "person.crop.circle.fill" : "person.crop.circle",
-                    title: "Persona Preview",
-                    subtitle: personaController.isRunning ? "Live" : "Off",
-                    isExpanded: expandedPanel == .personaCapture,
-                    accentColor: .purple,
-                    iconColor: personaController.isRunning ? .green : nil
-                ) {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                        expandedPanel = expandedPanel == .personaCapture ? .none : .personaCapture
-                    }
-                }
+                .foregroundColor(expandedPanel != .none ? .blue : .white.opacity(0.9))
+                .padding(.vertical, 12)
+                .padding(.horizontal, 4)
+                .background(expandedPanel != .none ? Color.blue.opacity(0.15) : Color.clear)
+                .cornerRadius(8)
             }
+            .buttonStyle(.plain)
             
             // Egorecord mode: Start Recording button with requirement checks
             if appMode == .egorecord {
@@ -1419,7 +1341,7 @@ struct StatusOverlay: View {
 
         }
         .padding(24)
-        .frame(width: 352)
+        .frame(width: 350)
         .background(Color.black.opacity(0.7))
         .cornerRadius(16)
     }
@@ -1453,15 +1375,43 @@ struct StatusOverlay: View {
         .buttonStyle(.plain)
     }
     
-    private var rightColumnView: some View {
+    // MARK: - Settings Panel View (combines menu and content in one panel)
+    
+    private var settingsPanelView: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Panel header
             HStack {
+                // Back button (only shown when viewing specific settings)
+                if expandedPanel != .settings {
+                    Button {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            expandedPanel = .settings
+                            previewZDistance = nil
+                            previewActive = false
+                            previewStatusPosition = nil
+                            previewStatusActive = false
+                            hidePreviewTask?.cancel()
+                        }
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(Color.white.opacity(0.2))
+                                .frame(width: 44, height: 44)
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(.white)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+                
                 Text(panelTitle)
                     .font(.body)
                     .fontWeight(.semibold)
                     .foregroundColor(.white)
                 Spacer()
+                
+                // Close button
                 Button {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                         expandedPanel = .none
@@ -1476,8 +1426,8 @@ struct StatusOverlay: View {
                         Circle()
                             .fill(Color.white.opacity(0.2))
                             .frame(width: 44, height: 44)
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 18, weight: .bold))
+                        Image(systemName: "xmark")
+                            .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.white)
                     }
                 }
@@ -1487,7 +1437,156 @@ struct StatusOverlay: View {
             Divider()
                 .background(Color.white.opacity(0.3))
             
-            // Panel content
+            // Panel content - either menu or specific settings
+            if expandedPanel == .settings {
+                settingsMenuContent
+            } else {
+                settingsDetailContent
+            }
+        }
+        .padding(24)
+        .frame(width: 340)
+        .background(Color.black.opacity(0.7))
+        .cornerRadius(16)
+        .padding(.leading, 8)
+    }
+    
+    // MARK: - Settings Menu Content
+    
+    private var settingsMenuContent: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Video Source menu item (only in video mode)
+            if showVideoStatus {
+                menuItem(
+                    icon: dataManager.videoSource.icon,
+                    title: "Video Source",
+                    subtitle: dataManager.videoSource.rawValue,
+                    isExpanded: false,
+                    accentColor: .blue
+                ) {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        expandedPanel = .videoSource
+                    }
+                }
+                
+                // Video Plane menu item
+                menuItem(
+                    icon: "rectangle.on.rectangle",
+                    title: "Video Plane",
+                    subtitle: String(format: "%.1fm, %d%%", -dataManager.videoPlaneZDistance, Int(dataManager.videoPlaneScale * 100)),
+                    isExpanded: expandedPanel == .viewControls,
+                    accentColor: .blue
+                ) {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        expandedPanel = expandedPanel == .viewControls ? .settings : .viewControls
+                    }
+                }
+                
+                // Controller Position menu item
+                menuItem(
+                    icon: "arrow.up.and.down.and.arrow.left.and.right",
+                    title: "Controller Position",
+                    subtitle: nil,
+                    isExpanded: expandedPanel == .statusPosition,
+                    accentColor: .purple
+                ) {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        expandedPanel = expandedPanel == .statusPosition ? .settings : .statusPosition
+                    }
+                }
+            }
+            
+            Divider()
+                .background(Color.white.opacity(0.2))
+            
+            // Recording menu item
+            menuItem(
+                icon: recordingManager.isRecording ? "record.circle.fill" : "record.circle",
+                title: "Recording",
+                subtitle: recordingManager.isRecording 
+                    ? recordingManager.formatDuration(recordingManager.recordingDuration) 
+                    : (recordingManager.storageLocation == .cloud 
+                        ? recordingManager.cloudProvider.displayName 
+                        : "Local"),
+                isExpanded: false,
+                accentColor: .red,
+                iconColor: recordingManager.isRecording ? .red : nil
+            ) {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    expandedPanel = .recording
+                }
+            }
+            
+            // Camera Calibration menu item (Egorecord mode only)
+            if appMode == .egorecord {
+                let hasIntrinsic = uvcCameraManager.selectedDevice.map { calibrationManager.hasCalibration(for: $0.id) } ?? false
+                let hasExtrinsic = uvcCameraManager.selectedDevice.map { extrinsicCalibrationManager.hasCalibration(for: $0.id) } ?? false
+                let isCalibrated = hasIntrinsic && hasExtrinsic
+                
+                cameraCalibrationMenuItem
+                    .opacity(isCalibrated ? 1.0 : flashingOpacity)
+            }
+            
+            // Teleop-only menu items
+            if appMode == .teleop {
+                Divider()
+                    .background(Color.white.opacity(0.2))
+                
+                // Visualizations
+                let activeCount = [dataManager.upperLimbVisible, dataManager.showHeadBeam, dataManager.showHandJoints].filter { $0 }.count
+                
+                menuItem(
+                    icon: "eye.fill",
+                    title: "Visualizations",
+                    subtitle: "\(activeCount)/3 active",
+                    isExpanded: false,
+                    accentColor: .cyan
+                ) {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        expandedPanel = .visualizations
+                    }
+                }
+                
+                // Persona Preview
+                let personaController = PersonaCaptureController.shared
+                menuItem(
+                    icon: personaController.isRunning ? "person.crop.circle.fill" : "person.crop.circle",
+                    title: "Persona Preview",
+                    subtitle: personaController.isRunning ? "Live" : "Off",
+                    isExpanded: false,
+                    accentColor: .purple,
+                    iconColor: personaController.isRunning ? .green : nil
+                ) {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        expandedPanel = .personaCapture
+                    }
+                }
+            }
+            
+            Divider()
+                .background(Color.white.opacity(0.2))
+            
+            let offsetPercent = dataManager.stereoBaselineOffset * 100
+            let offsetLabel = abs(offsetPercent) < 0.05 ? "Default" : String(format: "%+.1f%%", offsetPercent)
+            
+            menuItem(
+                icon: "eyes",
+                title: "Stereo Baseline",
+                subtitle: offsetLabel,
+                isExpanded: false,
+                accentColor: .indigo
+            ) {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    expandedPanel = .stereoBaseline
+                }
+            }
+        }
+    }
+    
+    // MARK: - Settings Detail Content
+    
+    private var settingsDetailContent: some View {
+        Group {
             switch expandedPanel {
             case .videoSource:
                 videoSourcePanelContent
@@ -1507,21 +1606,19 @@ struct StatusOverlay: View {
                 visualizationsPanelContent
             case .personaCapture:
                 personaCapturePanelContent
-            case .none:
+            case .stereoBaseline:
+                stereoBaselinePanelContent
+            case .settings, .none:
                 EmptyView()
             }
         }
-        .padding(24)
-        .frame(width: 300)
-        .background(Color.black.opacity(0.7))
-        .cornerRadius(16)
-        .padding(.leading, 8)
     }
     
     private var panelTitle: String {
         switch expandedPanel {
+        case .settings: return "Settings"
         case .videoSource: return "Video Source"
-        case .viewControls: return "Video View"
+        case .viewControls: return "Video Plane"
         case .recording: return "Recording"
         case .statusPosition: return "Controller Position"
         case .positionLayout: return "Position & Layout"
@@ -1529,6 +1626,7 @@ struct StatusOverlay: View {
         case .cloudStorageDebug: return "Cloud Storage Debug"
         case .visualizations: return "Visualizations"
         case .personaCapture: return "Persona Preview"
+        case .stereoBaseline: return "Stereo Baseline"
         case .none: return ""
         }
     }
@@ -1721,6 +1819,34 @@ struct StatusOverlay: View {
     
     private var viewControlsPanelContent: some View {
         VStack(alignment: .leading, spacing: 10) {
+            // Size control
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("Size")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.7))
+                    Spacer()
+                    Text("\(Int(dataManager.videoPlaneScale * 100))%")
+                        .font(.caption)
+                        .foregroundColor(.white)
+                        .monospacedDigit()
+                }
+                
+                Slider(value: Binding(
+                    get: { dataManager.videoPlaneScale },
+                    set: { newValue in
+                        dataManager.videoPlaneScale = newValue
+                        previewActive = true
+                        hidePreviewTask?.cancel()
+                        hidePreviewTask = Task { @MainActor in
+                            try? await Task.sleep(nanoseconds: 3_000_000_000)
+                            if !Task.isCancelled { previewActive = false }
+                        }
+                    }
+                ), in: 0.5...2.0, step: 0.1)
+                .tint(.purple)
+            }
+            
             // Distance control
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
@@ -1809,6 +1935,7 @@ struct StatusOverlay: View {
                 .buttonStyle(.plain)
                 
                 Button {
+                    dataManager.videoPlaneScale = 1.0
                     dataManager.videoPlaneZDistance = -10.0
                     dataManager.videoPlaneYPosition = 0.0
                     dataManager.videoPlaneAutoPerpendicular = false
@@ -2357,6 +2484,34 @@ struct StatusOverlay: View {
                         .foregroundColor(.white)
                 }
                 
+                // Size control
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Size")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.7))
+                        Spacer()
+                        Text("\(Int(dataManager.videoPlaneScale * 100))%")
+                            .font(.caption)
+                            .foregroundColor(.white)
+                            .monospacedDigit()
+                    }
+                    
+                    Slider(value: Binding(
+                        get: { dataManager.videoPlaneScale },
+                        set: { newValue in
+                            dataManager.videoPlaneScale = newValue
+                            previewActive = true
+                            hidePreviewTask?.cancel()
+                            hidePreviewTask = Task { @MainActor in
+                                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                                if !Task.isCancelled { previewActive = false }
+                            }
+                        }
+                    ), in: 0.5...2.0, step: 0.1)
+                    .tint(.purple)
+                }
+                
                 // Distance control
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
@@ -2718,6 +2873,86 @@ struct StatusOverlay: View {
         }
     }
     
+    // MARK: - Stereo Baseline Panel
+    
+    private var stereoBaselinePanelContent: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Description
+            Text("Adjust stereo baseline to match your IPD. This works by asymmetrically cropping the left and right views.")
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.6))
+                .fixedSize(horizontal: false, vertical: true)
+            
+            Divider()
+                .background(Color.white.opacity(0.2))
+            
+            // Baseline offset slider
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Baseline Adjustment")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                    Spacer()
+                    let offsetPercent = dataManager.stereoBaselineOffset * 100
+                    Text(abs(offsetPercent) < 0.05 ? "Default" : String(format: "%+.1f%%", offsetPercent))
+                        .font(.caption)
+                        .foregroundColor(.white)
+                        .monospacedDigit()
+                }
+                
+                Slider(value: $dataManager.stereoBaselineOffset, in: -0.20...0.20, step: 0.001)
+                    .tint(.indigo)
+                
+                // Explanation
+                HStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("← Narrower")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundColor(.orange)
+                        Text("For wider IPD")
+                            .font(.caption2)
+                            .foregroundColor(.white.opacity(0.5))
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("Wider →")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundColor(.cyan)
+                        Text("For narrower IPD")
+                            .font(.caption2)
+                            .foregroundColor(.white.opacity(0.5))
+                    }
+                }
+            }
+            
+            // Reset button
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    dataManager.stereoBaselineOffset = 0.0
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 12, weight: .bold))
+                    Text("Reset to Default")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(Color.white.opacity(0.15))
+                .cornerRadius(8)
+            }
+            .buttonStyle(.plain)
+            .disabled(abs(dataManager.stereoBaselineOffset) < 0.0005)
+            .opacity(abs(dataManager.stereoBaselineOffset) < 0.0005 ? 0.5 : 1.0)
+        }
+    }
+    
     // MARK: - Unified Camera Calibration Panel
     
     @State private var showCalibrationWizard: Bool = false
@@ -2746,7 +2981,7 @@ struct StatusOverlay: View {
             iconColor: statusColor
         ) {
             withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                expandedPanel = expandedPanel == .cameraCalibration ? .none : .cameraCalibration
+                expandedPanel = expandedPanel == .cameraCalibration ? .settings : .cameraCalibration
             }
         }
     }

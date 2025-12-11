@@ -85,7 +85,7 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
     }
     
     private func connectToServer(host: String, port: Int) async throws {
-        print("DEBUG: Attempting to connect to \(host):\(port)")
+        dlog("DEBUG: Attempting to connect to \(host):\(port)")
         await MainActor.run {
             DataManager.shared.connectionStatus = "Connecting to \(host):\(port)..."
         }
@@ -93,7 +93,7 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
             host: host,
             port: port
         )
-        print("DEBUG: Socket connection established to \(host):\(port)")
+        dlog("DEBUG: Socket connection established to \(host):\(port)")
         await MainActor.run {
             DataManager.shared.connectionStatus = "Socket connected to \(host):\(port)"
         }
@@ -104,7 +104,7 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
             throw WebRTCError.invalidOffer
         }
         
-        print("DEBUG: Received offer from server")
+        dlog("DEBUG: Received offer from server")
         await MainActor.run {
             DataManager.shared.connectionStatus = "Received offer from server"
         }
@@ -125,7 +125,7 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
         try await peerConnection?.setLocalDescription(answer)
         
         // Wait for ICE gathering to complete
-        print("DEBUG: Waiting for ICE gathering to complete")
+        dlog("DEBUG: Waiting for ICE gathering to complete")
         await MainActor.run {
             DataManager.shared.connectionStatus = "Waiting for ICE gathering..."
         }
@@ -145,7 +145,7 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
         var answerString = String(data: answerData, encoding: .utf8)! + "\n"
         try await outputStream.write(answerString.data(using: .utf8)!)
         
-        print("DEBUG: Answer sent to server")
+        dlog("DEBUG: Answer sent to server")
         await MainActor.run {
             DataManager.shared.connectionStatus = "Answer sent, waiting for video..."
         }
@@ -172,10 +172,10 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
                     }
 
                     if !sendResult {
-                        print("ERROR: Failed to send hand tracking update over WebRTC (channel not open or backpressure)")
+                        dlog("ERROR: Failed to send hand tracking update over WebRTC (channel not open or backpressure)")
                     }
                 } catch {
-                    print("ERROR: Unable to serialize hand tracking update: \(error)")
+                    dlog("ERROR: Unable to serialize hand tracking update: \(error)")
                 }
 
                 do {
@@ -205,7 +205,7 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
                 if !self.iceGatheringResumed, let cont = self.iceGatheringContinuation {
                     self.iceGatheringResumed = true
                     self.iceGatheringContinuation = nil
-                    print("DEBUG: ICE gathering timed out after 500ms (proceeding anyway)")
+                    dlog("DEBUG: ICE gathering timed out after 500ms (proceeding anyway)")
                     Task { @MainActor in
                         DataManager.shared.connectionStatus = "ICE ready"
                     }
@@ -217,7 +217,7 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
             if let pc = self.peerConnection, pc.iceGatheringState == .complete {
                 self.iceGatheringResumed = true
                 self.iceGatheringContinuation = nil
-                print("DEBUG: ICE gathering already complete")
+                dlog("DEBUG: ICE gathering already complete")
                 Task { @MainActor in
                     DataManager.shared.connectionStatus = "ICE gathering complete"
                 }
@@ -229,18 +229,18 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
     func addVideoRenderer(_ renderer: LKRTCVideoRenderer) {
         if let track = videoTrack {
             track.add(renderer)
-            print("DEBUG: Video renderer attached to track - track enabled: \(track.isEnabled)")
+            dlog("DEBUG: Video renderer attached to track - track enabled: \(track.isEnabled)")
         } else {
-            print("ERROR: Cannot attach renderer - no video track available")
+            dlog("ERROR: Cannot attach renderer - no video track available")
         }
     }
     
     func addAudioRenderer(_ renderer: LKRTCAudioRenderer) {
         if let track = audioTrack {
             track.add(renderer)
-            print("DEBUG: Audio renderer attached to track - track enabled: \(track.isEnabled)")
+            dlog("DEBUG: Audio renderer attached to track - track enabled: \(track.isEnabled)")
         } else {
-            print("INFO: No audio track available (audio may not be enabled on server)")
+            dlog("INFO: No audio track available (audio may not be enabled on server)")
         }
     }
     
@@ -256,7 +256,7 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
 // MARK: - RTCPeerConnectionDelegate
 extension WebRTCClient {
     func peerConnection(_ peerConnection: LKRTCPeerConnection, didChange stateChanged: LKRTCSignalingState) {
-        print("DEBUG: Signaling state changed to: \(stateChanged)")
+        dlog("DEBUG: Signaling state changed to: \(stateChanged)")
         Task { @MainActor in
             switch stateChanged.rawValue {
             case 0: DataManager.shared.connectionStatus = "Signaling: Stable"
@@ -270,21 +270,21 @@ extension WebRTCClient {
     }
     
     func peerConnection(_ peerConnection: LKRTCPeerConnection, didAdd stream: LKRTCMediaStream) {
-        print("DEBUG: Stream added - id: \(stream.streamId)")
-        print("DEBUG: Stream has \(stream.videoTracks.count) video tracks, \(stream.audioTracks.count) audio tracks")
+        dlog("DEBUG: Stream added - id: \(stream.streamId)")
+        dlog("DEBUG: Stream has \(stream.videoTracks.count) video tracks, \(stream.audioTracks.count) audio tracks")
         Task { @MainActor in
             DataManager.shared.connectionStatus = "Video stream received (\(stream.videoTracks.count) tracks)"
         }
         if let videoTrack = stream.videoTracks.first {
             self.videoTrack = videoTrack
-            print("DEBUG: Video track received - id: \(videoTrack.trackId), enabled: \(videoTrack.isEnabled)")
+            dlog("DEBUG: Video track received - id: \(videoTrack.trackId), enabled: \(videoTrack.isEnabled)")
             Task { @MainActor in
                 DataManager.shared.connectionStatus = "Video track enabled, waiting for frames..."
             }
         }
         if let audioTrack = stream.audioTracks.first {
             self.audioTrack = audioTrack
-            print("DEBUG: Audio track received - id: \(audioTrack.trackId), enabled: \(audioTrack.isEnabled)")
+            dlog("DEBUG: Audio track received - id: \(audioTrack.trackId), enabled: \(audioTrack.isEnabled)")
             Task { @MainActor in
                 DataManager.shared.connectionStatus = "Audio track enabled"
             }
@@ -292,31 +292,31 @@ extension WebRTCClient {
     }
     
     func peerConnection(_ peerConnection: LKRTCPeerConnection, didRemove stream: LKRTCMediaStream) {
-        print("DEBUG: Stream removed")
+        dlog("DEBUG: Stream removed")
     }
     
     func peerConnectionShouldNegotiate(_ peerConnection: LKRTCPeerConnection) {
-        print("DEBUG: Should negotiate")
+        dlog("DEBUG: Should negotiate")
     }
     
     
     func peerConnection(_ peerConnection: LKRTCPeerConnection, didChange newState: LKRTCIceConnectionState) {
-        print("DEBUG: ICE connection state changed to: \(newState.rawValue) (\(iceStateString(newState)))")
+        dlog("DEBUG: ICE connection state changed to: \(newState.rawValue) (\(iceStateString(newState)))")
         Task { @MainActor in
             if newState == .connected {
-                print("DEBUG: *** ICE CONNECTION SUCCESSFUL ***")
+                dlog("DEBUG: *** ICE CONNECTION SUCCESSFUL ***")
                 DataManager.shared.connectionStatus = "ICE connected successfully!"
                 self.onConnectionStateChanged?(true)
             } else if newState == .failed {
-                print("ERROR: ICE connection failed")
+                dlog("ERROR: ICE connection failed")
                 DataManager.shared.connectionStatus = "ICE connection failed"
                 self.onConnectionStateChanged?(false)
             } else if newState == .disconnected {
-                print("DEBUG: ICE disconnected")
+                dlog("DEBUG: ICE disconnected")
                 DataManager.shared.connectionStatus = "ICE disconnected"
                 self.onConnectionStateChanged?(false)
             } else if newState == .closed {
-                print("DEBUG: ICE closed")
+                dlog("DEBUG: ICE closed")
                 DataManager.shared.connectionStatus = "ICE closed"
                 self.onConnectionStateChanged?(false)
             } else if newState == .checking {
@@ -339,14 +339,14 @@ extension WebRTCClient {
     }
     
     func peerConnection(_ peerConnection: LKRTCPeerConnection, didChange newState: LKRTCIceGatheringState) {
-        print("DEBUG: ICE gathering state changed to: \(newState) (rawValue: \(newState.rawValue))")
+        dlog("DEBUG: ICE gathering state changed to: \(newState) (rawValue: \(newState.rawValue))")
         
         // Resume continuation when gathering is complete
         if newState == .complete {
             if !iceGatheringResumed, let continuation = iceGatheringContinuation {
                 iceGatheringResumed = true
                 iceGatheringContinuation = nil
-                print("DEBUG: ICE gathering completed via delegate callback")
+                dlog("DEBUG: ICE gathering completed via delegate callback")
                 Task { @MainActor in
                     DataManager.shared.connectionStatus = "ICE gathering complete"
                 }
@@ -356,15 +356,15 @@ extension WebRTCClient {
     }
     
     func peerConnection(_ peerConnection: LKRTCPeerConnection, didGenerate candidate: LKRTCIceCandidate) {
-        print("DEBUG: ICE candidate generated - \(candidate.sdp) [\(candidate.sdpMid ?? "no-mid")] type: \(candidate.sdp.contains("host") ? "host" : candidate.sdp.contains("srflx") ? "srflx" : "relay")")
+        dlog("DEBUG: ICE candidate generated - \(candidate.sdp) [\(candidate.sdpMid ?? "no-mid")] type: \(candidate.sdp.contains("host") ? "host" : candidate.sdp.contains("srflx") ? "srflx" : "relay")")
     }
     
     func peerConnection(_ peerConnection: LKRTCPeerConnection, didRemove candidates: [LKRTCIceCandidate]) {
-        print("DEBUG: ICE candidates removed")
+        dlog("DEBUG: ICE candidates removed")
     }
     
     func peerConnection(_ peerConnection: LKRTCPeerConnection, didOpen dataChannel: LKRTCDataChannel) {
-        print("🔔 [WebRTC] Data channel opened (label=\(dataChannel.label), state=\(dataChannel.readyState.rawValue))")
+        dlog("🔔 [WebRTC] Data channel opened (label=\(dataChannel.label), state=\(dataChannel.readyState.rawValue))")
         
         if dataChannel.label == "hand-tracking" {
             handDataChannel = dataChannel
@@ -377,12 +377,12 @@ extension WebRTCClient {
             simPosesDataChannel = dataChannel
             dataChannel.delegate = self
             let hasCallback = onSimPosesReceived != nil
-            print("🔔 [WebRTC] Sim-poses data channel connected! hasCallback=\(hasCallback)")
+            dlog("🔔 [WebRTC] Sim-poses data channel connected! hasCallback=\(hasCallback)")
             Task { @MainActor in
                 DataManager.shared.connectionStatus = "Sim-poses data channel open"
             }
         } else {
-            print("DEBUG: Unknown data channel: \(dataChannel.label)")
+            dlog("DEBUG: Unknown data channel: \(dataChannel.label)")
         }
     }
 }
@@ -391,7 +391,7 @@ extension WebRTCClient: LKRTCDataChannelDelegate {
     func dataChannelDidChangeState(_ dataChannel: LKRTCDataChannel) {
         let stateNames = ["connecting", "open", "closing", "closed"]
         let stateName = dataChannel.readyState.rawValue < stateNames.count ? stateNames[Int(dataChannel.readyState.rawValue)] : "unknown"
-        print("🔄 [WebRTC] Data channel '\(dataChannel.label)' state → \(stateName) (\(dataChannel.readyState.rawValue))")
+        dlog("🔄 [WebRTC] Data channel '\(dataChannel.label)' state → \(stateName) (\(dataChannel.readyState.rawValue))")
         
         if dataChannel.readyState == .closed || dataChannel.readyState == .closing {
             if dataChannel == handDataChannel {
@@ -400,7 +400,7 @@ extension WebRTCClient: LKRTCDataChannelDelegate {
                     DataManager.shared.connectionStatus = "Hand data channel closed"
                 }
             } else if dataChannel == simPosesDataChannel {
-                print("⚠️ [WebRTC] sim-poses channel is closing/closed! Total messages received: \(simPosesMessageCount)")
+                dlog("⚠️ [WebRTC] sim-poses channel is closing/closed! Total messages received: \(simPosesMessageCount)")
                 simPosesDataChannel = nil
                 Task { @MainActor in
                     DataManager.shared.connectionStatus = "Sim-poses data channel closed"
@@ -415,7 +415,7 @@ extension WebRTCClient: LKRTCDataChannelDelegate {
             
             // Log only first message and every 100th for debugging
             if simPosesMessageCount == 1 || simPosesMessageCount % 100 == 0 {
-                print("📥 [WebRTC sim-poses] Message #\(simPosesMessageCount), bytes=\(buffer.data.count)")
+                dlog("📥 [WebRTC sim-poses] Message #\(simPosesMessageCount), bytes=\(buffer.data.count)")
             }
             
             // Parse binary pose data
@@ -436,7 +436,7 @@ extension WebRTCClient: LKRTCDataChannelDelegate {
             
             // Need at least timestamp (8) + body_count (2) = 10 bytes
             guard data.count >= 10 else {
-                print("⚠️ [WebRTC sim-poses] Message too small: \(data.count) bytes")
+                dlog("⚠️ [WebRTC sim-poses] Message too small: \(data.count) bytes")
                 return
             }
             
@@ -535,9 +535,9 @@ extension WebRTCClient: LKRTCDataChannelDelegate {
                         let body1 = sortedBodies[1]
                         let pos0 = floatPoses[body0]!
                         let pos1 = floatPoses[body1]!
-                        print("🔍 [DEBUG] msg#\(simPosesMessageCount) ts=\(String(format: "%.3f", timestamp)) bodies=\(floatPoses.count)")
-                        print("   body0='\(body0)' pos=[\(String(format: "%.3f", pos0[0])),\(String(format: "%.3f", pos0[1])),\(String(format: "%.3f", pos0[2]))]")
-                        print("   body1='\(body1)' pos=[\(String(format: "%.3f", pos1[0])),\(String(format: "%.3f", pos1[1])),\(String(format: "%.3f", pos1[2]))]")
+                        dlog("🔍 [DEBUG] msg#\(simPosesMessageCount) ts=\(String(format: "%.3f", timestamp)) bodies=\(floatPoses.count)")
+                        dlog("   body0='\(body0)' pos=[\(String(format: "%.3f", pos0[0])),\(String(format: "%.3f", pos0[1])),\(String(format: "%.3f", pos0[2]))]")
+                        dlog("   body1='\(body1)' pos=[\(String(format: "%.3f", pos1[0])),\(String(format: "%.3f", pos1[1])),\(String(format: "%.3f", pos1[2]))]")
                     }
                 }
                 
@@ -545,7 +545,7 @@ extension WebRTCClient: LKRTCDataChannelDelegate {
                     callback(timestamp, floatPoses, qpos, ctrl)
                 }
             } else {
-                print("⚠️ [WebRTC sim-poses] Callback not set, dropping \(floatPoses.count) poses")
+                dlog("⚠️ [WebRTC sim-poses] Callback not set, dropping \(floatPoses.count) poses")
             }
         }
         // Other data channels silently ignored

@@ -213,9 +213,10 @@ struct ContentView: View {
             VStack(spacing: 4) {
                 Text("VisionProTeleop")
                     .font(.system(size: 72, weight: .bold))
+                    .foregroundColor(.white)
                 Text("Tracking Streamer")
                     .font(.largeTitle)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.white.opacity(0.7))
             }
             .padding(.top, 32)
                 
@@ -225,18 +226,18 @@ struct ContentView: View {
                 VStack(spacing: 4) {
                     Image(systemName: "video.fill")
                         .font(.title)
-                        .foregroundColor(.green)
+                        .foregroundColor(.cyan)
                     Text("Video · Audio")
                         .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text("Sim (MuJoCo)")
+                        .foregroundColor(.white.opacity(0.7))
+                    Text("MuJoCo · IsaacLab")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.white.opacity(0.7))
                 }
                 .frame(width: 120)
                 
                 // Arrows flowing right (from video/audio/sim toward button)
-                AnimatedArrows(color: .green)
+                AnimatedArrows(color: .cyan)
                     
                 // Simple START button
                 Button {
@@ -249,7 +250,7 @@ struct ContentView: View {
                         .padding(.horizontal, 60)
                         .background(
                             LinearGradient(
-                                colors: [Color.green, Color.orange],
+                                colors: [Color(hex: "#6366F1"), Color(hex: "#A855F7"), Color(hex: "#EC4899")],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
@@ -259,48 +260,36 @@ struct ContentView: View {
                 .buttonStyle(.plain)
                 
                 // Arrows flowing right (from button toward hand tracking)
-                AnimatedArrows(color: .orange)
+                AnimatedArrows(color: .pink)
                 
                 // Hand/Head tracking label (right side)
                 VStack(spacing: 4) {
                     Image(systemName: "hand.raised.fill")
                         .font(.title)
-                        .foregroundColor(.orange)
+                        .foregroundColor(.pink)
                     Text("Hand / Head")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.white.opacity(0.7))
                     Text("Tracking")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.white.opacity(0.7))
                 }
                 .frame(width: 100)
             }
             .padding(.top, 16)
             
-            VStack(spacing: 8) {
-                VStack(spacing: 4) {
-                    Text("Device IP Addresses:")
-                        .font(.title2)
-                        .foregroundColor(.secondary)
-                    
-                    ForEach(getIPAddresses(), id: \.address) { ip in
-                        HStack {
-                            Text(ip.name + ":")
-                                .font(.title3.bold())
-                                .foregroundColor(.secondary)
-                            Text(ip.address)
-                                .font(.title3)
-                        }
-                    }
-                }
-                .padding(.bottom, 8)
+            VStack(spacing: 12) {
+                // IP Addresses in a clean card layout
+                IPAddressCard(addresses: getIPAddresses())
                 
+                // Server status
                 HStack(spacing: 8) {
                     Circle()
                         .fill(serverReady ? Color.green : Color.orange)
-                        .frame(width: 16, height: 16)
+                        .frame(width: 12, height: 12)
+                        .shadow(color: serverReady ? Color.green.opacity(0.6) : Color.orange.opacity(0.6), radius: 6)
                     Text(serverReady ? "gRPC Server Ready" : "Starting gRPC Server...")
-                        .font(.title3)
+                        .font(.subheadline.weight(.medium))
                         .foregroundColor(serverReady ? .green : .orange)
                 }
                 .onAppear {
@@ -334,6 +323,81 @@ struct ContentView: View {
         }
         .padding(32)
         .frame(minWidth: 700, minHeight: 600)
+    }
+}
+
+// MARK: - IP Address Card Component
+struct IPAddressCard: View {
+    let addresses: [(name: String, address: String)]
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            if addresses.isEmpty {
+                Text("No network connection")
+                    .font(.title3)
+                    .foregroundColor(.white.opacity(0.6))
+            } else if addresses.count == 1 {
+                // Single address - centered
+                ForEach(addresses, id: \.address) { ip in
+                    HStack(spacing: 10) {
+                        Text(ip.name)
+                            .font(.system(size: 14, weight: .medium, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.7))
+                            .frame(width: 55)
+                            .padding(.vertical, 4)
+                            .padding(.horizontal, 8)
+                            .background(Color.white.opacity(0.15))
+                            .cornerRadius(6)
+                        Text(ip.address)
+                            .font(.system(size: 20, weight: .semibold, design: .monospaced))
+                            .foregroundColor(.white)
+                            .frame(width: 200, alignment: .trailing)
+                    }
+                }
+            } else {
+                // Grid layout for 2+ addresses
+                HStack(alignment: .top, spacing: 24) {
+                    // Left column
+                    VStack(spacing: 8) {
+                        ForEach(Array(addresses.enumerated()).filter { $0.offset % 2 == 0 }, id: \.element.address) { _, ip in
+                            HStack(spacing: 8) {
+                                Text(ip.name)
+                                    .font(.system(size: 14, weight: .medium, design: .monospaced))
+                                    .foregroundColor(.white.opacity(0.7))
+                                    .frame(width: 55)
+                                    .padding(.vertical, 4)
+                                    .padding(.horizontal, 8)
+                                    .background(Color.white.opacity(0.15))
+                                    .cornerRadius(6)
+                                Text(ip.address)
+                                    .font(.system(size: 20, weight: .semibold, design: .monospaced))
+                                    .foregroundColor(.white)
+                                    .frame(width: 180, alignment: .trailing)
+                            }
+                        }
+                    }
+                    // Right column
+                    VStack(spacing: 8) {
+                        ForEach(Array(addresses.enumerated()).filter { $0.offset % 2 == 1 }, id: \.element.address) { _, ip in
+                            HStack(spacing: 8) {
+                                Text(ip.name)
+                                    .font(.system(size: 14, weight: .medium, design: .monospaced))
+                                    .foregroundColor(.white.opacity(0.7))
+                                    .frame(width: 55)
+                                    .padding(.vertical, 4)
+                                    .padding(.horizontal, 8)
+                                    .background(Color.white.opacity(0.15))
+                                    .cornerRadius(6)
+                                Text(ip.address)
+                                    .font(.system(size: 20, weight: .semibold, design: .monospaced))
+                                    .foregroundColor(.white)
+                                    .frame(width: 180, alignment: .trailing)
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -1103,4 +1167,31 @@ func getWiFiName() -> String? {
   // CNCopyCurrentNetworkInfo is unavailable in visionOS
   // WiFi SSID access is restricted on this platform
   return nil
+}
+
+// MARK: - Color Extension for Hex Support
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3: // RGB (12-bit)
+            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6: // RGB (24-bit)
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: // ARGB (32-bit)
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (1, 1, 1, 0)
+        }
+        self.init(
+            .sRGB,
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue: Double(b) / 255,
+            opacity: Double(a) / 255
+        )
+    }
 }

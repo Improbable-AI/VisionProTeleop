@@ -62,7 +62,30 @@ struct CombinedStreamingView: View {
     // Hand joint visualization state
     @State private var handJointUpdateTrigger: UUID = UUID()
     
+    // Cached hand joint entities for performance (avoid repeated findEntity calls)
+    @State private var cachedLeftJointEntities: [ModelEntity] = []
+    @State private var cachedRightJointEntities: [ModelEntity] = []
+    @State private var cachedLeftBoneEntities: [ModelEntity] = []
+    @State private var cachedRightBoneEntities: [ModelEntity] = []
+    @State private var cachedHandJointsOpacity: Float = -1.0  // Track last opacity to avoid unnecessary material updates
+    @State private var cachedLeftJointMaterial: RealityKit.Material? = nil
+    @State private var cachedRightJointMaterial: RealityKit.Material? = nil
+    @State private var cachedLeftBoneMaterial: RealityKit.Material? = nil
+    @State private var cachedRightBoneMaterial: RealityKit.Material? = nil
+    
     private let applyInWorldSpace: Bool = true
+    
+    // Pre-computed bone connections (constant - no need to recreate each frame)
+    private static let fingerConnections: [(Int, Int)] = [
+        (0, 1), (1, 2),  // forearm
+        (2, 3), (3, 4), (4, 5), (5, 6),  // thumb
+        (2, 7), (7, 8), (8, 9), (9, 10), (10, 11),  // index
+        (2, 12), (12, 13), (13, 14), (14, 15), (15, 16),  // middle
+        (2, 17), (17, 18), (18, 19), (19, 20), (20, 21),  // ring
+        (2, 22), (22, 23), (23, 24), (24, 25), (25, 26)  // little
+    ]
+    private static let palmConnections: [(Int, Int)] = [(8, 13), (13, 18), (18, 23)]
+    private static let allBoneConnections: [(Int, Int)] = fingerConnections + palmConnections
     
     var body: some View {
         realityViewContent
@@ -136,12 +159,15 @@ struct CombinedStreamingView: View {
                 tryAutoMinimize: tryAutoMinimize
             ))
             .task {
-                // Hand joint visualization update loop (~60Hz when enabled)
+                // Hand joint visualization update loop (~90Hz when enabled)
+                // Uses a simple counter instead of UUID to reduce allocation overhead
+                var counter: UInt64 = 0
                 while !Task.isCancelled {
                     if dataManager.showHandJoints {
-                        handJointUpdateTrigger = UUID()
+                        counter &+= 1  // Overflow-safe increment
+                        handJointUpdateTrigger = UUID()  // Trigger view update
                     }
-                    try? await Task.sleep(nanoseconds: 16_666_666) // ~60Hz
+                    try? await Task.sleep(nanoseconds: 11_111_111) // ~90Hz for smoother tracking
                 }
             }
             .upperLimbVisibility(dataManager.upperLimbVisible ? .visible : .hidden)
@@ -155,6 +181,8 @@ struct CombinedStreamingView: View {
             let _ = updateTrigger
             let _ = dataManager.videoPlaneZDistance
             let _ = dataManager.videoPlaneYPosition
+            let _ = dataManager.videoPlaneScale  // Trigger update when scale changes
+            let _ = dataManager.stereoBaselineOffset // Trigger update when baseline offset changes
             let _ = dataManager.videoPlaneAutoPerpendicular
             let _ = dataManager.videoPlaneFixedToWorld
             let _ = previewZDistance
@@ -222,6 +250,12 @@ struct CombinedStreamingView: View {
                 
                 if shouldShowPreview && !framesAvailable {
                     previewEntity?.isEnabled = true
+                    // Update preview plane size based on current scale (even without video frames)
+                    let scale = dataManager.videoPlaneScale
+                    let previewHeight: Float = 9.6 * scale
+                    let previewWidth = previewHeight * (16.0 / 9.0)  // Default 16:9 aspect ratio for preview
+                    let previewMesh = MeshResource.generatePlane(width: previewWidth, height: previewHeight)
+                    previewEntity?.components[ModelComponent.self]?.mesh = previewMesh
                 } else {
                     previewEntity?.isEnabled = false
                 }
@@ -266,15 +300,25 @@ struct CombinedStreamingView: View {
                     let isUVCStereo = isUVCMode && UVCCameraManager.shared.stereoEnabled
                     let effectiveWidth = isUVCStereo ? imageWidth / 2 : imageWidth
                     let aspectRatio = Float(effectiveWidth / imageHeight)
+                    let scale = dataManager.videoPlaneScale
                     
                     if currentAspectRatio == nil || abs(currentAspectRatio! - aspectRatio) > 0.01 {
                         currentAspectRatio = aspectRatio
-                        let planeHeight: Float = 9.6
-                        let planeWidth = planeHeight * aspectRatio
-                        let newMesh = MeshResource.generatePlane(width: planeWidth, height: planeHeight)
-                        skyBox.components[ModelComponent.self]?.mesh = newMesh
-                        previewEntity?.components[ModelComponent.self]?.mesh = newMesh
                     }
+                    
+                    // Apply scale factor to plane dimensions
+                    let planeHeight: Float = 9.6 * scale
+                    var planeWidth = planeHeight * aspectRatio
+                    
+                    // Adjust plane width for stereo baseline cropping (crop not stretch)
+                    let baselineOffset = abs(dataManager.stereoBaselineOffset)
+                    if baselineOffset > 0.001 {
+                        planeWidth *= Float(1.0 - baselineOffset)
+                    }
+                    
+                    let newMesh = MeshResource.generatePlane(width: planeWidth, height: planeHeight)
+                    skyBox.components[ModelComponent.self]?.mesh = newMesh
+                    previewEntity?.components[ModelComponent.self]?.mesh = newMesh
                     
                     skyBox.isEnabled = !videoMinimized
                     
@@ -288,10 +332,10 @@ struct CombinedStreamingView: View {
                                 if dataManager.audioEnabled && !isUVCMode {
                                     hasAudio = true
                                 }
-                                print("🎬 [CombinedStreamingView] First video frame received (source: \(isUVCMode ? "UVC" : "Network")), hasFrames=\(hasFrames)")
+                                dlog("🎬 [CombinedStreamingView] First video frame received (source: \(isUVCMode ? "UVC" : "Network")), hasFrames=\(hasFrames)")
                                 // Small delay to ensure state is fully committed
                                 try? await Task.sleep(nanoseconds: 100_000_000)  // 100ms
-                                print("🎬 [CombinedStreamingView] Checking auto-minimize after delay")
+                                dlog("🎬 [CombinedStreamingView] Checking auto-minimize after delay")
                                 tryAutoMinimize()
                             }
                         }
@@ -326,27 +370,66 @@ struct CombinedStreamingView: View {
                         }
                         
                         if let leftCG = leftImage, let rightCG = rightImage {
+                            // Apply baseline offset cropping if needed
+                            let offset = CGFloat(dataManager.stereoBaselineOffset)
+                            let finalLeftImage: CGImage?
+                            let finalRightImage: CGImage?
+                            
+                            if abs(offset) > 0.001 {
+                                let width = CGFloat(leftCG.width)
+                                let height = CGFloat(leftCG.height)
+                                let cropWidth = width * (1.0 - abs(offset))
+                                
+                                // Calculate crop rects based on offset direction
+                                // Negative offset (Narrower): Crop outer sides (Left: Crop Left, Right: Crop Right) -> Visual shift inward
+                                // Positive offset (Wider): Crop inner sides (Left: Crop Right, Right: Crop Left) -> Visual shift outward
+                                
+                                let leftRect: CGRect
+                                let rightRect: CGRect
+                                
+                                if offset < 0 {
+                                    // Narrower: Left eye crops left side (keeps right), Right eye crops right side (keeps left)
+                                    leftRect = CGRect(x: abs(offset) * width, y: 0, width: cropWidth, height: height)
+                                    rightRect = CGRect(x: 0, y: 0, width: cropWidth, height: height)
+                                } else {
+                                    // Wider: Left eye crops right side (keeps left), Right eye crops left side (keeps right)
+                                    leftRect = CGRect(x: 0, y: 0, width: cropWidth, height: height)
+                                    rightRect = CGRect(x: abs(offset) * width, y: 0, width: cropWidth, height: height)
+                                }
+                                
+                                finalLeftImage = leftCG.cropping(to: leftRect)
+                                finalRightImage = rightCG.cropping(to: rightRect)
+                            } else {
+                                finalLeftImage = leftCG
+                                finalRightImage = rightCG
+                            }
+                            
                             do {
                                 guard let sphereEntity = stereoMaterialEntity,
                                       var stereoMaterial = sphereEntity.components[ModelComponent.self]?.materials.first as? ShaderGraphMaterial else {
                                     var skyBoxMaterial = UnlitMaterial()
                                     var textureOptions = TextureResource.CreateOptions(semantic: .hdrColor)
                                     textureOptions.mipmapsMode = .none
-                                    let texture = try TextureResource.generate(from: rightCG, options: textureOptions)
-                                    skyBoxMaterial.color = .init(texture: .init(texture))
-                                    skyBox.components[ModelComponent.self]?.materials = [skyBoxMaterial]
+                                    if let img = finalRightImage {
+                                        let texture = try TextureResource.generate(from: img, options: textureOptions)
+                                        skyBoxMaterial.color = .init(texture: .init(texture))
+                                        skyBox.components[ModelComponent.self]?.materials = [skyBoxMaterial]
+                                    }
                                     return
                                 }
                                 
                                 var textureOptions = TextureResource.CreateOptions(semantic: .hdrColor)
                                 textureOptions.mipmapsMode = .none
-                                let leftTexture = try TextureResource.generate(from: leftCG, options: textureOptions)
-                                let rightTexture = try TextureResource.generate(from: rightCG, options: textureOptions)
-                                try stereoMaterial.setParameter(name: "left", value: .textureResource(leftTexture))
-                                try stereoMaterial.setParameter(name: "right", value: .textureResource(rightTexture))
-                                skyBox.components[ModelComponent.self]?.materials = [stereoMaterial]
+                                
+                                if let lImg = finalLeftImage, let rImg = finalRightImage {
+                                    let leftTexture = try TextureResource.generate(from: lImg, options: textureOptions)
+                                    let rightTexture = try TextureResource.generate(from: rImg, options: textureOptions)
+                                    try stereoMaterial.setParameter(name: "left", value: .textureResource(leftTexture))
+                                    try stereoMaterial.setParameter(name: "right", value: .textureResource(rightTexture))
+                                    skyBox.components[ModelComponent.self]?.materials = [stereoMaterial]
+                                }
                             } catch {
-                                print("❌ ERROR: Failed to load stereo textures: \(error)")
+                                dlog("❌ ERROR: Failed to load stereo textures: \(error)")
                             }
                         } else {
                             // Fallback to mono if stereo split fails
@@ -358,7 +441,7 @@ struct CombinedStreamingView: View {
                                 skyBoxMaterial.color = .init(texture: .init(texture))
                                 skyBox.components[ModelComponent.self]?.materials = [skyBoxMaterial]
                             } catch {
-                                print("❌ ERROR: Failed to load fallback mono texture: \(error)")
+                                dlog("❌ ERROR: Failed to load fallback mono texture: \(error)")
                             }
                         }
                     } else {
@@ -371,7 +454,7 @@ struct CombinedStreamingView: View {
                             skyBoxMaterial.color = .init(texture: .init(texture))
                             skyBox.components[ModelComponent.self]?.materials = [skyBoxMaterial]
                         } catch {
-                            print("❌ ERROR: Failed to load mono texture: \(error)")
+                            dlog("❌ ERROR: Failed to load mono texture: \(error)")
                         }
                     }
                 } else {
@@ -421,7 +504,7 @@ struct CombinedStreamingView: View {
             if let mujocoRoot = findEntity(named: "mujocoRoot", in: updateContent.entities),
                let entity = mujocoEntity {
                 if entity.parent == nil {
-                    print("🔗 [CombinedStreamingView] Adding MuJoCo model to scene")
+                    dlog("🔗 [CombinedStreamingView] Adding MuJoCo model to scene")
                     mujocoRoot.addChild(entity)
                 }
             }
@@ -432,80 +515,133 @@ struct CombinedStreamingView: View {
                 headBeam.isEnabled = dataManager.showHeadBeam
             }
             
-            // === HAND JOINTS UPDATE ===
+            // === HAND JOINTS UPDATE (Optimized) ===
             if let handJointsRoot = findEntity(named: "handJointsRoot", in: updateContent.entities) {
                 handJointsRoot.isEnabled = dataManager.showHandJoints
                 
                 if dataManager.showHandJoints {
+                    // Use pre-computed static bone connections
+                    let allConnections = Self.allBoneConnections
+                    
+                    // Cache entity references on first access (avoids repeated findEntity calls)
+                    // Use local variables to ensure we have the entities on the same frame
+                    var leftJoints = cachedLeftJointEntities
+                    var rightJoints = cachedRightJointEntities
+                    var leftBones = cachedLeftBoneEntities
+                    var rightBones = cachedRightBoneEntities
+                    
+                    if leftJoints.isEmpty {
+                        for i in 0..<27 {
+                            if let entity = handJointsRoot.findEntity(named: "leftJoint_\(i)") as? ModelEntity {
+                                leftJoints.append(entity)
+                            }
+                        }
+                        cachedLeftJointEntities = leftJoints
+                    }
+                    if rightJoints.isEmpty {
+                        for i in 0..<27 {
+                            if let entity = handJointsRoot.findEntity(named: "rightJoint_\(i)") as? ModelEntity {
+                                rightJoints.append(entity)
+                            }
+                        }
+                        cachedRightJointEntities = rightJoints
+                    }
+                    if leftBones.isEmpty {
+                        for (idx, connection) in allConnections.enumerated() {
+                            if let entity = handJointsRoot.findEntity(named: "leftBone_\(idx)_\(connection.0)_\(connection.1)") as? ModelEntity {
+                                leftBones.append(entity)
+                            }
+                        }
+                        cachedLeftBoneEntities = leftBones
+                    }
+                    if rightBones.isEmpty {
+                        for (idx, connection) in allConnections.enumerated() {
+                            if let entity = handJointsRoot.findEntity(named: "rightBone_\(idx)_\(connection.0)_\(connection.1)") as? ModelEntity {
+                                rightBones.append(entity)
+                            }
+                        }
+                        cachedRightBoneEntities = rightBones
+                    }
+                    
                     let trackingData = DataManager.shared.latestHandTrackingData
                     let leftWrist = trackingData.leftWrist
                     let rightWrist = trackingData.rightWrist
-                    let opacity = CGFloat(dataManager.handJointsOpacity)
+                    let opacity = dataManager.handJointsOpacity
                     
-                    // Update materials with current opacity
-                    // Use UnlitMaterial when fully opaque (brighter), SimpleMaterial when transparent (supports alpha blending)
-                    let leftJointMaterial: RealityKit.Material
-                    let rightJointMaterial: RealityKit.Material
-                    let leftBoneMaterial: RealityKit.Material
-                    let rightBoneMaterial: RealityKit.Material
-                    
-                    if opacity >= 0.99 {
-                        // Fully opaque - use UnlitMaterial for brighter, unlit appearance
-                        var leftJoint = UnlitMaterial()
-                        leftJoint.color = .init(tint: UIColor(red: 0.2, green: 0.8, blue: 1.0, alpha: 1.0))
-                        leftJointMaterial = leftJoint
+                    // Only recreate materials if opacity changed (expensive operation)
+                    let opacityChanged = abs(cachedHandJointsOpacity - opacity) > 0.001
+                    if opacityChanged {
+                        cachedHandJointsOpacity = opacity
+                        let cgOpacity = CGFloat(opacity)
                         
-                        var rightJoint = UnlitMaterial()
-                        rightJoint.color = .init(tint: UIColor(red: 1.0, green: 0.6, blue: 0.2, alpha: 1.0))
-                        rightJointMaterial = rightJoint
+                        if opacity >= 0.99 {
+                            // Fully opaque - use UnlitMaterial for brighter, unlit appearance
+                            var leftJoint = UnlitMaterial()
+                            leftJoint.color = .init(tint: UIColor(red: 0.2, green: 0.8, blue: 1.0, alpha: 1.0))
+                            cachedLeftJointMaterial = leftJoint
+                            
+                            var rightJoint = UnlitMaterial()
+                            rightJoint.color = .init(tint: UIColor(red: 1.0, green: 0.6, blue: 0.2, alpha: 1.0))
+                            cachedRightJointMaterial = rightJoint
+                            
+                            var leftBone = UnlitMaterial()
+                            leftBone.color = .init(tint: UIColor(red: 0.1, green: 0.6, blue: 0.8, alpha: 1.0))
+                            cachedLeftBoneMaterial = leftBone
+                            
+                            var rightBone = UnlitMaterial()
+                            rightBone.color = .init(tint: UIColor(red: 0.9, green: 0.5, blue: 0.1, alpha: 1.0))
+                            cachedRightBoneMaterial = rightBone
+                        } else {
+                            // Transparent - use SimpleMaterial for proper alpha blending
+                            var leftJoint = SimpleMaterial()
+                            leftJoint.color = .init(tint: UIColor(red: 0.2, green: 0.8, blue: 1.0, alpha: cgOpacity))
+                            leftJoint.metallic = 0.0
+                            leftJoint.roughness = 1.0
+                            cachedLeftJointMaterial = leftJoint
+                            
+                            var rightJoint = SimpleMaterial()
+                            rightJoint.color = .init(tint: UIColor(red: 1.0, green: 0.6, blue: 0.2, alpha: cgOpacity))
+                            rightJoint.metallic = 0.0
+                            rightJoint.roughness = 1.0
+                            cachedRightJointMaterial = rightJoint
+                            
+                            var leftBone = SimpleMaterial()
+                            leftBone.color = .init(tint: UIColor(red: 0.1, green: 0.6, blue: 0.8, alpha: cgOpacity * 0.9))
+                            leftBone.metallic = 0.0
+                            leftBone.roughness = 1.0
+                            cachedLeftBoneMaterial = leftBone
+                            
+                            var rightBone = SimpleMaterial()
+                            rightBone.color = .init(tint: UIColor(red: 0.9, green: 0.5, blue: 0.1, alpha: cgOpacity * 0.9))
+                            rightBone.metallic = 0.0
+                            rightBone.roughness = 1.0
+                            cachedRightBoneMaterial = rightBone
+                        }
                         
-                        var leftBone = UnlitMaterial()
-                        leftBone.color = .init(tint: UIColor(red: 0.1, green: 0.6, blue: 0.8, alpha: 1.0))
-                        leftBoneMaterial = leftBone
-                        
-                        var rightBone = UnlitMaterial()
-                        rightBone.color = .init(tint: UIColor(red: 0.9, green: 0.5, blue: 0.1, alpha: 1.0))
-                        rightBoneMaterial = rightBone
-                    } else {
-                        // Transparent - use SimpleMaterial for proper alpha blending
-                        var leftJoint = SimpleMaterial()
-                        leftJoint.color = .init(tint: UIColor(red: 0.2, green: 0.8, blue: 1.0, alpha: opacity))
-                        leftJoint.metallic = 0.0
-                        leftJoint.roughness = 1.0
-                        leftJointMaterial = leftJoint
-                        
-                        var rightJoint = SimpleMaterial()
-                        rightJoint.color = .init(tint: UIColor(red: 1.0, green: 0.6, blue: 0.2, alpha: opacity))
-                        rightJoint.metallic = 0.0
-                        rightJoint.roughness = 1.0
-                        rightJointMaterial = rightJoint
-                        
-                        var leftBone = SimpleMaterial()
-                        leftBone.color = .init(tint: UIColor(red: 0.1, green: 0.6, blue: 0.8, alpha: opacity * 0.9))
-                        leftBone.metallic = 0.0
-                        leftBone.roughness = 1.0
-                        leftBoneMaterial = leftBone
-                        
-                        var rightBone = SimpleMaterial()
-                        rightBone.color = .init(tint: UIColor(red: 0.9, green: 0.5, blue: 0.1, alpha: opacity * 0.9))
-                        rightBone.metallic = 0.0
-                        rightBone.roughness = 1.0
-                        rightBoneMaterial = rightBone
+                        // Apply materials to all entities when opacity changes
+                        if let leftMat = cachedLeftJointMaterial {
+                            for entity in leftJoints {
+                                entity.model?.materials = [leftMat]
+                            }
+                        }
+                        if let rightMat = cachedRightJointMaterial {
+                            for entity in rightJoints {
+                                entity.model?.materials = [rightMat]
+                            }
+                        }
+                        if let leftBoneMat = cachedLeftBoneMaterial {
+                            for entity in leftBones {
+                                entity.model?.materials = [leftBoneMat]
+                            }
+                        }
+                        if let rightBoneMat = cachedRightBoneMaterial {
+                            for entity in rightBones {
+                                entity.model?.materials = [rightBoneMat]
+                            }
+                        }
                     }
                     
-                    // Skeleton bone connections (27 joints: 0=forearmArm, 1=forearmWrist, 2=wrist, 3-6=thumb, 7-11=index, 12-16=middle, 17-21=ring, 22-26=little)
-                    let fingerConnections: [(Int, Int)] = [
-                        (0, 1), (1, 2),  // forearm
-                        (2, 3), (3, 4), (4, 5), (5, 6),  // thumb
-                        (2, 7), (7, 8), (8, 9), (9, 10), (10, 11),  // index
-                        (2, 12), (12, 13), (13, 14), (14, 15), (15, 16),  // middle
-                        (2, 17), (17, 18), (18, 19), (19, 20), (20, 21),  // ring
-                        (2, 22), (22, 23), (23, 24), (24, 25), (25, 26)  // little
-                    ]
-                    let palmConnections: [(Int, Int)] = [(8, 13), (13, 18), (18, 23)]
-                    let allConnections = fingerConnections + palmConnections
-                    
-                    // Calculate all joint world positions for left hand
+                    // Calculate and update left hand positions (fast path - only position updates)
                     var leftJointPositions: [SIMD3<Float>] = []
                     let leftWristPos = SIMD3<Float>(leftWrist.columns.3.x, leftWrist.columns.3.y, leftWrist.columns.3.z)
                     let leftHandValid = simd_length(leftWristPos) > 0.01
@@ -516,11 +652,10 @@ struct CombinedStreamingView: View {
                         let position = SIMD3<Float>(jointWorld.columns.3.x, jointWorld.columns.3.y, jointWorld.columns.3.z)
                         leftJointPositions.append(position)
                         
-                        // Update joint sphere
-                        if let jointEntity = handJointsRoot.findEntity(named: "leftJoint_\(i)") as? ModelEntity {
+                        if i < leftJoints.count {
+                            let jointEntity = leftJoints[i]
                             if leftHandValid {
                                 jointEntity.position = position
-                                jointEntity.model?.materials = [leftJointMaterial]
                                 jointEntity.isEnabled = true
                             } else {
                                 jointEntity.isEnabled = false
@@ -530,14 +665,13 @@ struct CombinedStreamingView: View {
                     
                     // Update left hand bones
                     for (idx, connection) in allConnections.enumerated() {
-                        if let boneEntity = handJointsRoot.findEntity(named: "leftBone_\(idx)_\(connection.0)_\(connection.1)") as? ModelEntity {
-                            // Skip forearm bones if forearmArm (joint 0) is at origin (not tracked)
+                        if idx < leftBones.count {
+                            let boneEntity = leftBones[idx]
                             let skipForearm = (connection.0 == 0 || connection.1 == 0) && simd_length(leftJointPositions[0]) < 0.01
                             if leftHandValid && !skipForearm {
                                 let startPos = leftJointPositions[connection.0]
                                 let endPos = leftJointPositions[connection.1]
                                 updateBoneEntity(boneEntity, from: startPos, to: endPos)
-                                boneEntity.model?.materials = [leftBoneMaterial]
                                 boneEntity.isEnabled = true
                             } else {
                                 boneEntity.isEnabled = false
@@ -545,7 +679,7 @@ struct CombinedStreamingView: View {
                         }
                     }
                     
-                    // Calculate all joint world positions for right hand
+                    // Calculate and update right hand positions
                     var rightJointPositions: [SIMD3<Float>] = []
                     let rightWristPos = SIMD3<Float>(rightWrist.columns.3.x, rightWrist.columns.3.y, rightWrist.columns.3.z)
                     let rightHandValid = simd_length(rightWristPos) > 0.01
@@ -556,11 +690,10 @@ struct CombinedStreamingView: View {
                         let position = SIMD3<Float>(jointWorld.columns.3.x, jointWorld.columns.3.y, jointWorld.columns.3.z)
                         rightJointPositions.append(position)
                         
-                        // Update joint sphere
-                        if let jointEntity = handJointsRoot.findEntity(named: "rightJoint_\(i)") as? ModelEntity {
+                        if i < rightJoints.count {
+                            let jointEntity = rightJoints[i]
                             if rightHandValid {
                                 jointEntity.position = position
-                                jointEntity.model?.materials = [rightJointMaterial]
                                 jointEntity.isEnabled = true
                             } else {
                                 jointEntity.isEnabled = false
@@ -570,14 +703,13 @@ struct CombinedStreamingView: View {
                     
                     // Update right hand bones
                     for (idx, connection) in allConnections.enumerated() {
-                        if let boneEntity = handJointsRoot.findEntity(named: "rightBone_\(idx)_\(connection.0)_\(connection.1)") as? ModelEntity {
-                            // Skip forearm bones if forearmArm (joint 0) is at origin (not tracked)
+                        if idx < rightBones.count {
+                            let boneEntity = rightBones[idx]
                             let skipForearm = (connection.0 == 0 || connection.1 == 0) && simd_length(rightJointPositions[0]) < 0.01
                             if rightHandValid && !skipForearm {
                                 let startPos = rightJointPositions[connection.0]
                                 let endPos = rightJointPositions[connection.1]
                                 updateBoneEntity(boneEntity, from: startPos, to: endPos)
-                                boneEntity.model?.materials = [rightBoneMaterial]
                                 boneEntity.isEnabled = true
                             } else {
                                 boneEntity.isEnabled = false
@@ -632,7 +764,7 @@ struct CombinedStreamingView: View {
     // MARK: - RealityView Setup
     
     private func setupRealityViewContent(content: RealityViewContent, attachments: RealityViewAttachments) {
-        print("🟢 [CombinedStreamingView] RealityView content block called")
+        dlog("🟢 [CombinedStreamingView] RealityView content block called")
         
         // === VIDEO SETUP (from ImmersiveView) ===
         let videoAnchor = AnchorEntity(.head)
@@ -767,7 +899,7 @@ struct CombinedStreamingView: View {
         statusContainer.transform.translation = SIMD3<Float>(0.0, 0.0, -1.0)
         
         if let statusAttachment = attachments.entity(for: "status") {
-            print("🟢 [CombinedStreamingView] Status attachment found and attached")
+            dlog("🟢 [CombinedStreamingView] Status attachment found and attached")
             statusAttachment.setParent(statusContainer)
         }
         
@@ -790,9 +922,9 @@ struct CombinedStreamingView: View {
     
     /// Check if all required streams are ready and auto-minimize if conditions are met
     private func tryAutoMinimize() {
-        print("🔍 [AutoMinimize] Checking... hasAutoMinimized=\(hasAutoMinimized), userInteracted=\(userInteracted)")
+        dlog("🔍 [AutoMinimize] Checking... hasAutoMinimized=\(hasAutoMinimized), userInteracted=\(userInteracted)")
         guard !hasAutoMinimized && !userInteracted else {
-            print("🔍 [AutoMinimize] Early exit: already minimized or user interacted")
+            dlog("🔍 [AutoMinimize] Early exit: already minimized or user interacted")
             return
         }
         
@@ -803,8 +935,8 @@ struct CombinedStreamingView: View {
         let audioRequired = dm.audioEnabled
         let simRequired = dm.simEnabled
         
-        print("🔍 [AutoMinimize] Config: video=\(videoRequired), audio=\(audioRequired), sim=\(simRequired)")
-        print("🔍 [AutoMinimize] State: hasFrames=\(hasFrames), hasAudio=\(hasAudio), hasSimPoses=\(hasSimPoses)")
+        dlog("🔍 [AutoMinimize] Config: video=\(videoRequired), audio=\(audioRequired), sim=\(simRequired)")
+        dlog("🔍 [AutoMinimize] State: hasFrames=\(hasFrames), hasAudio=\(hasAudio), hasSimPoses=\(hasSimPoses)")
         
         // Check if all required streams are ready
         let videoReady = !videoRequired || hasFrames
@@ -820,16 +952,16 @@ struct CombinedStreamingView: View {
         let somethingConfigured = videoRequired || audioRequired || simRequired
         let somethingReady = hasFrames || hasAudio || hasSimPoses
         
-        print("🔍 [AutoMinimize] Ready: video=\(videoReady), audio=\(audioEffectivelyReady), sim=\(simReady), all=\(allReady)")
-        print("🔍 [AutoMinimize] somethingConfigured=\(somethingConfigured), somethingReady=\(somethingReady)")
+        dlog("🔍 [AutoMinimize] Ready: video=\(videoReady), audio=\(audioEffectivelyReady), sim=\(simReady), all=\(allReady)")
+        dlog("🔍 [AutoMinimize] somethingConfigured=\(somethingConfigured), somethingReady=\(somethingReady)")
         
         if allReady && somethingConfigured && somethingReady {
-            print("✅ [AutoMinimize] All required streams ready (video=\(videoRequired)/\(hasFrames), audio=\(audioRequired)/\(hasAudio), sim=\(simRequired)/\(hasSimPoses))")
+            dlog("✅ [AutoMinimize] All required streams ready (video=\(videoRequired)/\(hasFrames), audio=\(audioRequired)/\(hasAudio), sim=\(simRequired)/\(hasSimPoses))")
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 1_000_000_000)  // 1 second delay
-                print("✅ [AutoMinimize] After delay: hasAutoMinimized=\(hasAutoMinimized), userInteracted=\(userInteracted)")
+                dlog("✅ [AutoMinimize] After delay: hasAutoMinimized=\(hasAutoMinimized), userInteracted=\(userInteracted)")
                 if !hasAutoMinimized && !userInteracted {
-                    print("✅ [AutoMinimize] Minimizing status view now!")
+                    dlog("✅ [AutoMinimize] Minimizing status view now!")
                     withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
                         isMinimized = true
                         hasAutoMinimized = true
@@ -837,7 +969,7 @@ struct CombinedStreamingView: View {
                 }
             }
         } else {
-            print("⏳ [AutoMinimize] Waiting for streams (video=\(videoRequired)/\(hasFrames), audio=\(audioRequired)/\(hasAudio), sim=\(simRequired)/\(hasSimPoses))")
+            dlog("⏳ [AutoMinimize] Waiting for streams (video=\(videoRequired)/\(hasFrames), audio=\(audioRequired)/\(hasAudio), sim=\(simRequired)/\(hasSimPoses))")
         }
     }
     
@@ -845,7 +977,7 @@ struct CombinedStreamingView: View {
     
     private func loadMuJoCoModel(from url: URL) async {
         do {
-            print("📦 [MuJoCo] Loading USDZ from \(url.absoluteString)")
+            dlog("📦 [MuJoCo] Loading USDZ from \(url.absoluteString)")
             
             // Clear previous state
             mujocoEntity = nil
@@ -870,10 +1002,10 @@ struct CombinedStreamingView: View {
             }
             
             indexMuJoCoBodyEntities(newEntity)
-            print("✅ [MuJoCo] Model loaded with \(mujocoBodyEntities.count) bodies")
+            dlog("✅ [MuJoCo] Model loaded with \(mujocoBodyEntities.count) bodies")
             
         } catch {
-            print("❌ [MuJoCo] Failed to load USDZ: \(error)")
+            dlog("❌ [MuJoCo] Failed to load USDZ: \(error)")
         }
     }
     
@@ -883,7 +1015,7 @@ struct CombinedStreamingView: View {
         entityPathByObjectID.removeAll()
         pythonToSwiftTargets.removeAll()
         
-        print("🔍 [indexMuJoCoBodyEntities] Starting recursive indexing...")
+        dlog("🔍 [indexMuJoCoBodyEntities] Starting recursive indexing...")
         
         // Detect Isaac Lab mode for special orphan handling
         let isIsaacLabMode = mujocoUsdzURL?.lowercased().contains("isaac_") ?? false
@@ -903,7 +1035,7 @@ struct CombinedStreamingView: View {
                 // Skip and hide orphan prototypes (mesh_0, visuals, __Prototype*, etc.)
                 if entityName == "mesh_0" || entityName == "visuals" || entityName.hasPrefix("__Prototype") {
                     entity.isEnabled = false
-                    print("🚫 [indexMuJoCoBodyEntities] Hiding orphan: '\(entityName)'")
+                    dlog("🚫 [indexMuJoCoBodyEntities] Hiding orphan: '\(entityName)'")
                     // Still traverse children in case there are valid entities underneath
                     for child in entity.children {
                         indexRec(child, parentPath: "")  // Continue with empty parent path
@@ -918,7 +1050,7 @@ struct CombinedStreamingView: View {
                 initialLocalTransforms[pathKey] = modelEntity.transform
                 entityPathByObjectID[ObjectIdentifier(modelEntity)] = pathKey
                 
-                print("📎 Indexed ModelEntity: '\(pathKey)'")
+                dlog("📎 Indexed ModelEntity: '\(pathKey)'")
                 
                 for child in modelEntity.children {
                     indexRec(child, parentPath: pathKey)
@@ -943,7 +1075,7 @@ struct CombinedStreamingView: View {
                 initialLocalTransforms[pathKey] = wrapper.transform
                 entityPathByObjectID[ObjectIdentifier(wrapper)] = pathKey
                 
-                print("📎 Indexed Wrapper: '\(pathKey)'")
+                dlog("📎 Indexed Wrapper: '\(pathKey)'")
                 
                 for child in originalChildren {
                     indexRec(child, parentPath: pathKey)
@@ -972,7 +1104,7 @@ struct CombinedStreamingView: View {
                 // Orphan prototypes at root level (no "/" in path)
                 if !pathKey.contains("/") && (pathKey == "visuals" || pathKey == "mesh_0" || pathKey.hasPrefix("__Prototype")) {
                     entity.isEnabled = false
-                    print("🚫 [indexMuJoCoBodyEntities] Hiding orphan prototype: '\(pathKey)'")
+                    dlog("🚫 [indexMuJoCoBodyEntities] Hiding orphan prototype: '\(pathKey)'")
                 }
                 
                 // Robot root entities (env_X/RobotName) - these have duplicate geometry that won't move
@@ -983,13 +1115,13 @@ struct CombinedStreamingView: View {
                     // The child links will be visible and receive pose updates
                     if let modelEntity = entity as? ModelEntity, modelEntity.model != nil {
                         entity.isEnabled = false
-                        print("🚫 [indexMuJoCoBodyEntities] Hiding robot root with geometry: '\(pathKey)'")
+                        dlog("🚫 [indexMuJoCoBodyEntities] Hiding robot root with geometry: '\(pathKey)'")
                     }
                 }
             }
         }
         
-        print("📝 Indexed \(mujocoBodyEntities.count) entities")
+        dlog("📝 Indexed \(mujocoBodyEntities.count) entities")
     }
     
     // MARK: - MuJoCo Pose Transform
@@ -1117,7 +1249,7 @@ struct CombinedStreamingView: View {
                     result.append(child)
                 }
                 if result.count > 0 {
-                    print("🔍 [targets] Found \(result.count) visual children for '\(pyName)': \(result)")
+                    dlog("🔍 [targets] Found \(result.count) visual children for '\(pyName)': \(result)")
                 }
             }
         } else {
@@ -1143,12 +1275,12 @@ struct CombinedStreamingView: View {
         // If no leaf targets found, use the base entity itself
         if result.isEmpty {
             result = [base]
-            print("⚠️ [targets] No children found for '\(pyName)', using base: '\(base)'")
+            dlog("⚠️ [targets] No children found for '\(pyName)', using base: '\(base)'")
         }
         
         pythonToSwiftTargets[pyName] = result
         if result.count > 1 || result.first != base {
-            print("🎯 [targets] '\(pyName)' → [\(result.joined(separator: ", "))]")
+            dlog("🎯 [targets] '\(pyName)' → [\(result.joined(separator: ", "))]")
         }
         return result
     }
@@ -1200,9 +1332,9 @@ struct CombinedStreamingView: View {
         }
         
         if !nameMappingInitialized {
-            print("🔤 [WebRTC poses] Initializing name mapping...")
-            print("   Python names: \(Array(poses.keys).sorted())")
-            print("   Swift names: \(Array(mujocoBodyEntities.keys).sorted())")
+            dlog("🔤 [WebRTC poses] Initializing name mapping...")
+            dlog("   Python names: \(Array(poses.keys).sorted())")
+            dlog("   Swift names: \(Array(mujocoBodyEntities.keys).sorted())")
             initializeMuJoCoNameMapping(pythonNames: Array(poses.keys))
             let validMatches = poses.keys.reduce(0) { acc, py in
                 if let swift = pythonToSwiftNameMap[py], mujocoBodyEntities[swift] != nil { return acc + 1 }
@@ -1212,7 +1344,7 @@ struct CombinedStreamingView: View {
                 nameMappingInitialized = true
                 // Cache sorted body names for consistent iteration order
                 cachedSortedBodyNames = Array(poses.keys).sorted()
-                print("✅ Name mapping initialized with \(validMatches) valid matches, cached \(cachedSortedBodyNames.count) sorted names")
+                dlog("✅ Name mapping initialized with \(validMatches) valid matches, cached \(cachedSortedBodyNames.count) sorted names")
             }
         }
         
@@ -1313,6 +1445,7 @@ struct CombinedStreamingView: View {
     
     /// Updates a bone entity (cylinder) to connect two joint positions
     /// Uses scale on Y-axis to adjust length (mesh is created with height=1)
+    /// Optimized version with simplified quaternion calculation
     private func updateBoneEntity(_ entity: ModelEntity, from start: SIMD3<Float>, to end: SIMD3<Float>) {
         let direction = end - start
         let length = simd_length(direction)
@@ -1324,8 +1457,7 @@ struct CombinedStreamingView: View {
         }
         
         // Position at midpoint
-        let midpoint = (start + end) / 2.0
-        entity.position = midpoint
+        entity.position = (start + end) * 0.5
         
         // Scale Y to match bone length (mesh has height=1)
         entity.scale = SIMD3<Float>(1.0, length, 1.0)
@@ -1341,7 +1473,7 @@ struct CombinedStreamingView: View {
             // Already aligned
             entity.orientation = simd_quatf(ix: 0, iy: 0, iz: 0, r: 1)
         } else if dot < -0.9999 {
-            // Opposite direction, rotate 180° around X or Z
+            // Opposite direction, rotate 180° around X
             entity.orientation = simd_quatf(angle: .pi, axis: SIMD3<Float>(1, 0, 0))
         } else {
             // General case: rotate around the cross product axis
@@ -1479,7 +1611,7 @@ final class CombinedMuJoCoManager: ObservableObject, MuJoCoManager {
     }
     
     func startServer() async {
-        print("🚀 [CombinedMuJoCoManager] Starting gRPC server on port \(grpcPort)...")
+        dlog("🚀 [CombinedMuJoCoManager] Starting gRPC server on port \(grpcPort)...")
         updateConnectionStatus("Starting Server...")
         isServerRunning = true
         
@@ -1494,12 +1626,12 @@ final class CombinedMuJoCoManager: ObservableObject, MuJoCoManager {
             self.grpcServer = server
             
             updateConnectionStatus("Server Running")
-            print("✅ [CombinedMuJoCoManager] gRPC server started on port \(grpcPort)")
+            dlog("✅ [CombinedMuJoCoManager] gRPC server started on port \(grpcPort)")
             
             try await server.serve()
             
         } catch {
-            print("❌ [CombinedMuJoCoManager] Failed to start server: \(error)")
+            dlog("❌ [CombinedMuJoCoManager] Failed to start server: \(error)")
             updateConnectionStatus("Server Error")
             isServerRunning = false
         }
@@ -1511,7 +1643,7 @@ final class CombinedMuJoCoManager: ObservableObject, MuJoCoManager {
             grpcServer = nil
             isServerRunning = false
             updateConnectionStatus("Server Stopped")
-            print("🛑 [CombinedMuJoCoManager] gRPC server stopped")
+            dlog("🛑 [CombinedMuJoCoManager] gRPC server stopped")
         }
     }
     
@@ -1551,14 +1683,14 @@ struct CombinedMuJoCoARServiceImpl: MujocoAr_MuJoCoARService.SimpleServiceProtoc
     
     init(manager: CombinedMuJoCoManager) {
         self.manager = manager
-        print("🎯 [CombinedMuJoCoARServiceImpl] Initialized")
+        dlog("🎯 [CombinedMuJoCoARServiceImpl] Initialized")
     }
     
     func sendUsdzUrl(
         request: MujocoAr_UsdzUrlRequest,
         context: ServerContext
     ) async throws -> MujocoAr_UsdzUrlResponse {
-        print("📨 [sendUsdzUrl] URL: \(request.usdzURL)")
+        dlog("📨 [sendUsdzUrl] URL: \(request.usdzURL)")
         
         await MainActor.run {
             manager?.onUsdzReceived?(request.usdzURL, nil, nil)
@@ -1575,7 +1707,7 @@ struct CombinedMuJoCoARServiceImpl: MujocoAr_MuJoCoARService.SimpleServiceProtoc
         request: MujocoAr_UsdzDataRequest,
         context: ServerContext
     ) async throws -> MujocoAr_UsdzDataResponse {
-        print("📨 [sendUsdzData] Received \(request.usdzData.count) bytes")
+        dlog("📨 [sendUsdzData] Received \(request.usdzData.count) bytes")
         
         var response = MujocoAr_UsdzDataResponse()
         
@@ -1585,7 +1717,7 @@ struct CombinedMuJoCoARServiceImpl: MujocoAr_MuJoCoARService.SimpleServiceProtoc
             let localURL = tempDir.appendingPathComponent(fileName)
             
             try request.usdzData.write(to: localURL)
-            print("💾 [sendUsdzData] Saved to: \(localURL.path)")
+            dlog("💾 [sendUsdzData] Saved to: \(localURL.path)")
             
             var attachToPosition: SIMD3<Float>? = nil
             var attachToRotation: simd_quatf? = nil
@@ -1605,7 +1737,7 @@ struct CombinedMuJoCoARServiceImpl: MujocoAr_MuJoCoARService.SimpleServiceProtoc
             response.localFilePath = localURL.path
             
         } catch {
-            print("❌ [sendUsdzData] Error: \(error)")
+            dlog("❌ [sendUsdzData] Error: \(error)")
             response.success = false
             response.message = "Failed: \(error.localizedDescription)"
         }
@@ -1617,7 +1749,7 @@ struct CombinedMuJoCoARServiceImpl: MujocoAr_MuJoCoARService.SimpleServiceProtoc
         request: RPCAsyncSequence<MujocoAr_UsdzChunkRequest, any Error>,
         context: ServerContext
     ) async throws -> MujocoAr_UsdzDataResponse {
-        print("📦 [sendUsdzDataChunked] Starting chunked transfer")
+        dlog("📦 [sendUsdzDataChunked] Starting chunked transfer")
         
         var response = MujocoAr_UsdzDataResponse()
         var chunkData = Data()
@@ -1647,7 +1779,7 @@ struct CombinedMuJoCoARServiceImpl: MujocoAr_MuJoCoARService.SimpleServiceProtoc
             let localURL = tempDir.appendingPathComponent(finalFileName)
             
             try chunkData.write(to: localURL)
-            print("💾 [sendUsdzDataChunked] Saved \(chunkData.count) bytes to: \(localURL.path)")
+            dlog("💾 [sendUsdzDataChunked] Saved \(chunkData.count) bytes to: \(localURL.path)")
             
             await MainActor.run {
                 manager?.onUsdzReceived?(localURL.absoluteString, attachToPosition, attachToRotation)
@@ -1659,7 +1791,7 @@ struct CombinedMuJoCoARServiceImpl: MujocoAr_MuJoCoARService.SimpleServiceProtoc
             response.localFilePath = localURL.path
             
         } catch {
-            print("❌ [sendUsdzDataChunked] Error: \(error)")
+            dlog("❌ [sendUsdzDataChunked] Error: \(error)")
             response.success = false
             response.message = "Failed: \(error.localizedDescription)"
         }
@@ -1692,7 +1824,7 @@ struct CombinedMuJoCoARServiceImpl: MujocoAr_MuJoCoARService.SimpleServiceProtoc
         response: RPCWriter<MujocoAr_PoseUpdateResponse>,
         context: ServerContext
     ) async throws {
-        print("🔄 [streamPoses] Starting pose stream")
+        dlog("🔄 [streamPoses] Starting pose stream")
         
         do {
             for try await poseRequest in request {
@@ -1712,11 +1844,11 @@ struct CombinedMuJoCoARServiceImpl: MujocoAr_MuJoCoARService.SimpleServiceProtoc
                 try await response.write(responseMsg)
             }
         } catch {
-            print("❌ [streamPoses] Error: \(error)")
+            dlog("❌ [streamPoses] Error: \(error)")
             throw error
         }
         
-        print("🔄 [streamPoses] Stream ended")
+        dlog("🔄 [streamPoses] Stream ended")
     }
     
     func streamHandTracking(
@@ -1724,7 +1856,7 @@ struct CombinedMuJoCoARServiceImpl: MujocoAr_MuJoCoARService.SimpleServiceProtoc
         response: RPCWriter<MujocoAr_HandTrackingUpdate>,
         context: ServerContext
     ) async throws {
-        print("🖐️ [streamHandTracking] Client connected")
+        dlog("🖐️ [streamHandTracking] Client connected")
         
         do {
             while !Task.isCancelled {
@@ -1742,11 +1874,11 @@ struct CombinedMuJoCoARServiceImpl: MujocoAr_MuJoCoARService.SimpleServiceProtoc
                 try await Task.sleep(nanoseconds: 10_000_000) // ~100 Hz
             }
         } catch {
-            print("❌ [streamHandTracking] Error: \(error)")
+            dlog("❌ [streamHandTracking] Error: \(error)")
             throw error
         }
         
-        print("🖐️ [streamHandTracking] Client disconnected")
+        dlog("🖐️ [streamHandTracking] Client disconnected")
     }
     
     private func convertToMatrix4x4(from m: simd_float4x4) -> MujocoAr_Matrix4x4 {
@@ -1808,23 +1940,23 @@ private struct VideoSourceModifiers: ViewModifier {
     }
     
     private func handleVideoSourceChange(oldValue: VideoSource, newValue: VideoSource) {
-        print("📹 [CombinedStreamingView] Video source changed from \(oldValue.rawValue) to \(newValue.rawValue)")
+        dlog("📹 [CombinedStreamingView] Video source changed from \(oldValue.rawValue) to \(newValue.rawValue)")
         hasFrames = false
         currentAspectRatio = nil
         
         if newValue == .uvcCamera {
             if uvcCameraManager.selectedDevice != nil {
-                print("📹 [CombinedStreamingView] Starting UVC capture with selected device: \(uvcCameraManager.selectedDevice?.name ?? "unknown")")
+                dlog("📹 [CombinedStreamingView] Starting UVC capture with selected device: \(uvcCameraManager.selectedDevice?.name ?? "unknown")")
                 uvcCameraManager.startCapture()
             } else if let firstDevice = uvcCameraManager.availableDevices.first {
-                print("📹 [CombinedStreamingView] Selecting first available device: \(firstDevice.name)")
+                dlog("📹 [CombinedStreamingView] Selecting first available device: \(firstDevice.name)")
                 uvcCameraManager.selectDevice(firstDevice)
                 Task {
                     try? await Task.sleep(nanoseconds: 200_000_000)
                     await MainActor.run { uvcCameraManager.startCapture() }
                 }
             } else {
-                print("📹 [CombinedStreamingView] No UVC devices available")
+                dlog("📹 [CombinedStreamingView] No UVC devices available")
             }
         } else {
             uvcCameraManager.stopCapture()
@@ -1835,7 +1967,7 @@ private struct VideoSourceModifiers: ViewModifier {
     
     private func handleDevicesChange(oldDevices: [UVCDevice], newDevices: [UVCDevice]) {
         if dataManager.videoSource == .uvcCamera && !newDevices.isEmpty && oldDevices.isEmpty {
-            print("📹 [CombinedStreamingView] UVC device connected while in UVC mode, auto-starting capture")
+            dlog("📹 [CombinedStreamingView] UVC device connected while in UVC mode, auto-starting capture")
             if let firstDevice = newDevices.first {
                 uvcCameraManager.selectDevice(firstDevice)
                 Task {
@@ -1848,7 +1980,7 @@ private struct VideoSourceModifiers: ViewModifier {
     
     private func handleDeviceSelection(oldDevice: UVCDevice?, newDevice: UVCDevice?) {
         if dataManager.videoSource == .uvcCamera && newDevice != nil && !uvcCameraManager.isCapturing {
-            print("📹 [CombinedStreamingView] UVC device selected, starting capture")
+            dlog("📹 [CombinedStreamingView] UVC device selected, starting capture")
             Task {
                 try? await Task.sleep(nanoseconds: 100_000_000)
                 await MainActor.run { uvcCameraManager.startCapture() }
@@ -1892,14 +2024,14 @@ private struct LifecycleModifiers: ViewModifier {
     }
     
     private func handleOnAppear() {
-        print("🚀 [CombinedStreamingView] View appeared, starting services")
+        dlog("🚀 [CombinedStreamingView] View appeared, starting services")
         
         hasAutoMinimized = false
         userInteracted = false
         hasFrames = false
         hasAudio = false
         hasSimPoses = false
-        print("🔄 [CombinedStreamingView] Reset auto-minimize state: hasAutoMinimized=\(hasAutoMinimized), userInteracted=\(userInteracted)")
+        dlog("🔄 [CombinedStreamingView] Reset auto-minimize state: hasAutoMinimized=\(hasAutoMinimized), userInteracted=\(userInteracted)")
         
         setupTeleoperationMode()
         
@@ -1908,7 +2040,7 @@ private struct LifecycleModifiers: ViewModifier {
     }
     
     private func setupTeleoperationMode() {
-        print("🤖 [CombinedStreamingView] Teleoperation Mode - Full WebRTC support")
+        dlog("🤖 [CombinedStreamingView] Teleoperation Mode - Full WebRTC support")
         
         videoStreamManager.onSimPosesReceived = { timestamp, poses, qpos, ctrl in
             // Record simulation data on background thread to avoid blocking main thread
@@ -1944,7 +2076,7 @@ private struct LifecycleModifiers: ViewModifier {
                 mujocoManager.poseStreamingViaWebRTC = true
                 mujocoManager.simEnabled = true
                 mujocoManager.updateConnectionStatus("Streaming via WebRTC")
-                print("✅ [Callback] First pose received")
+                dlog("✅ [Callback] First pose received")
             }
             
             if !hasSimPoses {
@@ -1953,14 +2085,14 @@ private struct LifecycleModifiers: ViewModifier {
             }
         }
         
-        print("📝 [setupTeleoperationMode] onSimPosesReceived callback registered")
+        dlog("📝 [setupTeleoperationMode] onSimPosesReceived callback registered")
         
         videoStreamManager.start(imageData: imageData)
         
         Task { await mujocoManager.startServer() }
         
         if dataManager.videoSource == .uvcCamera {
-            print("📹 [CombinedStreamingView] UVC mode active on appear, initializing camera")
+            dlog("📹 [CombinedStreamingView] UVC mode active on appear, initializing camera")
             startUVCCapture()
         }
     }
@@ -1971,10 +2103,10 @@ private struct LifecycleModifiers: ViewModifier {
             if granted {
                 await MainActor.run {
                     if uvcCameraManager.selectedDevice != nil {
-                        print("📹 [CombinedStreamingView] Starting capture with existing device")
+                        dlog("📹 [CombinedStreamingView] Starting capture with existing device")
                         uvcCameraManager.startCapture()
                     } else if let firstDevice = uvcCameraManager.availableDevices.first {
-                        print("📹 [CombinedStreamingView] Selecting and starting first device: \(firstDevice.name)")
+                        dlog("📹 [CombinedStreamingView] Selecting and starting first device: \(firstDevice.name)")
                         uvcCameraManager.selectDevice(firstDevice)
                     }
                 }
@@ -1996,7 +2128,7 @@ private struct LifecycleModifiers: ViewModifier {
                     await MainActor.run {
                         stereoMaterialEntity = sphereEntity
                     }
-                    print("✅ [CombinedStreamingView] Loaded stereo material")
+                    dlog("✅ [CombinedStreamingView] Loaded stereo material")
                 }
             }
         }
@@ -2089,39 +2221,39 @@ private struct StateChangeModifiers: ViewModifier {
             }
             .onChange(of: hasFrames) { oldValue, newValue in
                 if newValue && !oldValue {
-                    print("🎬 [CombinedStreamingView] Video frames arrived, attempting auto-minimize")
+                    dlog("🎬 [CombinedStreamingView] Video frames arrived, attempting auto-minimize")
                     tryAutoMinimize()
                 }
             }
             .onChange(of: dataManager.videoEnabled) { _, newValue in
-                print("🔧 [CombinedStreamingView] videoEnabled changed to \(newValue)")
+                dlog("🔧 [CombinedStreamingView] videoEnabled changed to \(newValue)")
                 if newValue { tryAutoMinimize() }
             }
             .onChange(of: dataManager.audioEnabled) { _, newValue in
-                print("🔧 [CombinedStreamingView] audioEnabled changed to \(newValue)")
+                dlog("🔧 [CombinedStreamingView] audioEnabled changed to \(newValue)")
                 if newValue && hasFrames {
                     hasAudio = true
                     tryAutoMinimize()
                 }
             }
             .onChange(of: dataManager.simEnabled) { _, newValue in
-                print("🔧 [CombinedStreamingView] simEnabled changed to \(newValue)")
+                dlog("🔧 [CombinedStreamingView] simEnabled changed to \(newValue)")
                 if newValue { tryAutoMinimize() }
             }
             .onChange(of: dataManager.videoPlaneFixedToWorld) { _, isFixed in
                 handleVideoPlaneFixedChange(isFixed: isFixed)
             }
             .onChange(of: userInteracted) { oldValue, newValue in
-                print("⚠️ [CombinedStreamingView] userInteracted changed from \(oldValue) to \(newValue)")
+                dlog("⚠️ [CombinedStreamingView] userInteracted changed from \(oldValue) to \(newValue)")
                 if newValue {
-                    Thread.callStackSymbols.prefix(10).forEach { print("  \($0)") }
+                    Thread.callStackSymbols.prefix(10).forEach { dlog("  \($0)") }
                 }
             }
             .onDisappear { handleOnDisappear() }
     }
     
     private func handlePythonClientDisconnected() {
-        print("🔌 [CombinedStreamingView] Python client disconnected")
+        dlog("🔌 [CombinedStreamingView] Python client disconnected")
         recordingManager.onVideoSourceDisconnected(reason: "Python client disconnected")
         resetStreamingState()
     }
@@ -2189,7 +2321,7 @@ private struct StateChangeModifiers: ViewModifier {
     }
     
     private func handleOnDisappear() {
-        print("🛑 [CombinedStreamingView] View disappeared, stopping services")
+        dlog("🛑 [CombinedStreamingView] View disappeared, stopping services")
         videoStreamManager.stop()
         uvcCameraManager.stopCapture()
         fixedWorldTransform = nil
