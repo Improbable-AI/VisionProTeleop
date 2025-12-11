@@ -49,6 +49,7 @@ import torch
 import sys
 import threading
 import select
+from scipy.spatial.transform import Rotation as R
 
 import isaaclab.sim as sim_utils
 from isaaclab.assets import Articulation, AssetBaseCfg, RigidObject, RigidObjectCfg
@@ -72,38 +73,89 @@ WORKSPACE_LIMITS = {
 }
 
 
-def apply_hand_to_robot_mapping(
-    hand_pos: np.ndarray,
-    hand_initial_pos: np.ndarray,
-    robot_initial_pos: np.ndarray,
-    sensitivity: float = 1.0,
-) -> np.ndarray:
-    """Apply coordinate mapping from Vision Pro hand position to Franka end-effector.
+# def apply_hand_to_robot_mapping(
+#     hand_pos: np.ndarray,
+#     hand_initial_pos: np.ndarray,
+#     robot_initial_pos: np.ndarray,
+#     sensitivity: float = 1.0,
+# ) -> np.ndarray:
+#     """Apply coordinate mapping from Vision Pro hand position to Franka end-effector.
 
-    Uses relative position control: robot_pos = robot_initial_pos + (hand_pos - hand_initial_pos) * sensitivity
+#     Uses relative position control: robot_pos = robot_initial_pos + (hand_pos - hand_initial_pos) * sensitivity
 
-    Args:
-        hand_pos: Current hand position [x, y, z] in meters (Z-up Vision Pro coords)
-        hand_initial_pos: Hand's reference position when teleoperation started
-        robot_initial_pos: Initial end-effector position in robot workspace
-        sensitivity: Position scaling factor
+#     Args:
+#         hand_pos: Current hand position [x, y, z] in meters (Z-up Vision Pro coords)
+#         hand_initial_pos: Hand's reference position when teleoperation started
+#         robot_initial_pos: Initial end-effector position in robot workspace
+#         sensitivity: Position scaling factor
 
-    Returns:
-        robot_pos: Target position for robot EE in world frame [x, y, z]
+#     Returns:
+#         robot_pos: Target position for robot EE in world frame [x, y, z]
+#     """
+#     # Compute relative movement from initial position
+#     hand_delta = (hand_pos - hand_initial_pos) * sensitivity
+
+#     # Vision Pro uses Z-up coordinate system, same as Isaac Lab
+#     # Direct mapping: X forward, Y left, Z up
+#     robot_pos = robot_initial_pos + hand_delta
+
+#     # Apply workspace limits for safety
+#     robot_pos[0] = np.clip(robot_pos[0], WORKSPACE_LIMITS["x"][0], WORKSPACE_LIMITS["x"][1])
+#     robot_pos[1] = np.clip(robot_pos[1], WORKSPACE_LIMITS["y"][0], WORKSPACE_LIMITS["y"][1])
+#     robot_pos[2] = np.clip(robot_pos[2], WORKSPACE_LIMITS["z"][0], WORKSPACE_LIMITS["z"][1])
+
+#     return robot_pos
+
+
+def hand2pose(hand, side="right"):
     """
-    # Compute relative movement from initial position
-    hand_delta = (hand_pos - hand_initial_pos) * sensitivity
+    Convert hand tracking data to a 4x4 pose matrix suitable for robot control.
+    
+    The pose is computed from thumb and index finger positions to create
+    a natural grasping orientation:
+    - Z-axis points from finger base to fingertip (grasp direction)
+    - X-axis points from thumb to index (lateral direction)
+    - Y-axis is the cross product
+    
+    Args:
+        hand: Dictionary containing hand tracking data from VisionProStreamer
+        side: "left" or "right" hand (default: "right")
+    
+    Returns:
+        4x4 numpy array representing the hand pose in world coordinates
+    """
+    wrist = hand[f"{side}_wrist"]
+    finger = wrist @ hand[f"{side}_fingers"]
 
-    # Vision Pro uses Z-up coordinate system, same as Isaac Lab
-    # Direct mapping: X forward, Y left, Z up
-    robot_pos = robot_initial_pos + hand_delta
+    thumb_tip = finger[4, :3, -1]
+    thumb_base = finger[2, :3, -1]
+    index_tip = finger[9, :3, -1]
+    index_base = finger[7, :3, -1]
 
-    # Apply workspace limits for safety
-    robot_pos[0] = np.clip(robot_pos[0], WORKSPACE_LIMITS["x"][0], WORKSPACE_LIMITS["x"][1])
-    robot_pos[1] = np.clip(robot_pos[1], WORKSPACE_LIMITS["y"][0], WORKSPACE_LIMITS["y"][1])
-    robot_pos[2] = np.clip(robot_pos[2], WORKSPACE_LIMITS["z"][0], WORKSPACE_LIMITS["z"][1])
+    base_middle = (thumb_base + index_base) * 0.5
+    tip_middle = (thumb_tip + index_tip) * 0.5
 
-    return robot_pos
+    z_axis = tip_middle - base_middle
+    z_axis /= np.linalg.norm(z_axis)
+
+    # Use thumb→index direction as x
+    x_axis = index_base - thumb_base
+    x_axis -= np.dot(x_axis, z_axis) * z_axis  # Make x ⟂ z
+    x_axis /= np.linalg.norm(x_axis)
+
+    y_axis = np.cross(z_axis, x_axis)
+    y_axis /= np.linalg.norm(y_axis)
+
+    rot = np.column_stack((x_axis, y_axis, z_axis))
+    rot /= np.cbrt(np.linalg.det(rot))  # Ensure det = 1
+
+    mat = np.eye(4)
+    mat[:3, :3] = rot
+    mat[:3, 3] = tip_middle
+
+    return mat
+
+
 
 
 @configclass
@@ -150,9 +202,8 @@ class FrankaVisionProSceneCfg(InteractiveSceneCfg):
     target_marker = RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/TargetMarker",
         spawn=sim_utils.CuboidCfg(
-            size=(0.03, 0.03, 0.03),  # 3cm cube
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),  # Kinematic = can set pose freely
-            mass_props=sim_utils.MassPropertiesCfg(mass=0.1),
+            size=(0.1, 0.1, 0.1),  # 3cm cube
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=False, disable_gravity=True),  # Kinematic = can set pose freely
             collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled=False),  # No collisions
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.2, 0.2), metallic=0.5),  # Red
         ),
@@ -305,14 +356,16 @@ def run_simulator(
         sim.step()
         scene.update(sim_dt)
 
-    # Get initial end-effector position
+    # Get initial end-effector position and orientation
     robot_initial_pos = robot.data.body_pos_w[0, ee_body_idx].cpu().numpy()
+    robot_initial_quat = robot.data.body_quat_w[0, ee_body_idx].cpu().numpy()  # (w, x, y, z)
     target_pos = robot_initial_pos.copy()  # Current target position
+    target_quat = robot_initial_quat.copy()  # Current target orientation (w, x, y, z)
     hand_initial_pos = None  # Will be set on first valid hand tracking
 
-    # Setup IK controller
+    # Setup IK controller - now using "pose" for position + orientation tracking
     ik_controller_cfg = DifferentialIKControllerCfg(
-        command_type="position",
+        command_type="pose",
         use_relative_mode=False,
         ik_method="dls",
         ik_params={"lambda_val": 0.05},
@@ -330,7 +383,9 @@ def run_simulator(
 
     ik_controller = DifferentialIKController(cfg=ik_controller_cfg, num_envs=scene.num_envs, device=sim.device)
     initial_ee_quat = robot.data.body_quat_w[:, ee_body_idx]
-    ik_controller.set_command(command=torch.zeros(scene.num_envs, 3, device=sim.device), ee_quat=initial_ee_quat)
+    # For pose command, we need 7 values: pos (3) + quat (4) in (w, x, y, z) format
+    initial_command = torch.zeros(scene.num_envs, 7, device=sim.device)
+    ik_controller.set_command(command=initial_command, ee_quat=initial_ee_quat)
 
     # Gripper state
     gripper_target = 0.04  # Open
@@ -379,7 +434,8 @@ def run_simulator(
             scene.reset()
             ik_controller.reset()
             hand_initial_pos = None  # Reset hand reference
-            target_pos = robot_initial_pos.copy()  # Reset target
+            target_pos = robot_initial_pos.copy()  # Reset target position
+            target_quat = robot_initial_quat.copy()  # Reset target orientation
             print("[INFO]: Resetting robot state...")
 
         if use_keyboard:
@@ -420,14 +476,16 @@ def run_simulator(
                 print(f"{'='*60}\n")
 
             if hand is not None and hand.get("right_wrist") is not None:
-                # Extract right wrist position
-                right_wrist = hand["right_wrist"]  # (1, 4, 4) matrix
-                hand_pos = right_wrist[0, :3, 3]  # Extract position
-
-                # Initialize hand reference on first valid tracking
-                if hand_initial_pos is None:
-                    hand_initial_pos = hand_pos.copy()
-                    print(f"[INFO] Hand tracking initialized at: {hand_initial_pos}")
+                # Extract right hand pose (position + rotation)
+                hand_pose = hand2pose(hand)
+                hand_pos = hand_pose[:3, 3]
+                hand_rot_matrix = hand_pose[:3, :3]
+                
+                # Convert rotation matrix to quaternion (w, x, y, z) format
+                # scipy uses (x, y, z, w) so we need to reorder
+                rot = R.from_matrix(hand_rot_matrix)
+                quat_xyzw = rot.as_quat()  # Returns (x, y, z, w)
+                hand_quat = np.array([quat_xyzw[3], quat_xyzw[0], quat_xyzw[1], quat_xyzw[2]])  # Convert to (w, x, y, z)
 
                 # Get pinch distance for gripper control
                 pinch_distance = hand.get("right_pinch_distance", 0.05)
@@ -438,21 +496,17 @@ def run_simulator(
                 else:
                     gripper_target = 0.04  # Open
 
-                # Compute target robot position from hand
-                target_pos = apply_hand_to_robot_mapping(
-                    hand_pos,
-                    hand_initial_pos,
-                    robot_initial_pos,
-                    sensitivity=args_cli.pos_sensitivity,
-                )
+                target_pos = hand_pos
+                target_quat = hand_quat
 
-        # Convert target to tensor
+        # Convert target to tensors
         target_pos_tensor = torch.tensor(target_pos, dtype=torch.float32, device=sim.device).unsqueeze(0)
+        target_quat_tensor = torch.tensor(target_quat, dtype=torch.float32, device=sim.device).unsqueeze(0)
         
-        # Update the kinematic target marker cuboid position (this syncs to Vision Pro)
+        # Update the kinematic target marker cuboid position and orientation (this syncs to Vision Pro)
         marker_root_state = torch.zeros((1, 7), dtype=torch.float32, device=sim.device)
         marker_root_state[:, :3] = target_pos_tensor  # Set position
-        marker_root_state[:, 3:7] = torch.tensor([[1.0, 0.0, 0.0, 0.0]], device=sim.device)  # Identity quaternion (w, x, y, z)
+        marker_root_state[:, 3:7] = target_quat_tensor  # Set orientation
         target_marker_obj.write_root_pose_to_sim(marker_root_state)
 
         # Get current robot state
@@ -460,9 +514,11 @@ def run_simulator(
         ee_pos_w = robot.data.body_pos_w[:, ee_body_idx]
         ee_quat_w = robot.data.body_quat_w[:, ee_body_idx]
 
-        # Compute IK
+        # Compute IK with pose command (position + orientation)
         jacobian = robot.root_physx_view.get_jacobians()[:, ee_body_idx, :, arm_joint_indices]
-        ik_controller.set_command(command=target_pos_tensor, ee_quat=ee_quat_w)
+        # Pose command: [pos_x, pos_y, pos_z, quat_w, quat_x, quat_y, quat_z]
+        pose_command = torch.cat([target_pos_tensor, target_quat_tensor], dim=1)
+        ik_controller.set_command(command=pose_command, ee_quat=ee_quat_w)
         joint_pos_des = ik_controller.compute(ee_pos_w, ee_quat_w, jacobian, current_joint_pos)
 
         # Update joint targets
@@ -473,14 +529,13 @@ def run_simulator(
         robot.set_joint_position_target(joint_pos_target.unsqueeze(0))
 
         # Step simulation
-        for _ in range(5):
-            scene.write_data_to_sim()
-            sim.step()
-            scene.update(sim_dt)
+        scene.write_data_to_sim()
+        sim.step()
+        scene.update(sim_dt)
 
-            # Stream updated poses back to Vision Pro
-            if streamer is not None:
-                streamer.update_sim()
+        # Stream updated poses back to Vision Pro
+        if streamer is not None:
+            streamer.update_sim()
 
 
         count += 1
@@ -499,7 +554,7 @@ def main():
     scene = InteractiveScene(scene_cfg)
 
     # Determine mode based on --ip argument
-    use_keyboard = True 
+    use_keyboard = False 
     streamer = None
     
     sim.reset()
@@ -513,9 +568,10 @@ def main():
         # Configure Isaac Lab streaming
         streamer.configure_isaac(
             scene=scene,
-            relative_to=[0, 0.5, 0.0, 0],  # Position scene at comfortable viewing height
+            relative_to=[0, 0.5, -0.3, 0],  # Position scene at comfortable viewing height
             include_ground=False,
             env_indices=[0],
+            streaming_hz = 60
         )
         streamer.start_webrtc()
         
