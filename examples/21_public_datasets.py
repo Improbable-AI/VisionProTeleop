@@ -7,18 +7,6 @@ This example demonstrates how to use the avp_stream.datasets module to:
 2. View recording metadata
 3. Download recordings to a local directory
 
-Setup
------
-Before running this script, you need to set your CloudKit API token:
-
-    export CLOUDKIT_API_TOKEN="your-api-token"
-
-To get an API token:
-1. Go to https://icloud.developer.apple.com/dashboard/
-2. Select container: iCloud.com.younghyopark.VisionProTeleop
-3. Navigate to "API Access" → "Server-to-Server Keys"
-4. Create a new key with Read-only, Public Database permissions
-5. Copy the generated token
 
 Usage
 -----
@@ -46,8 +34,6 @@ def main():
     except RuntimeError as e:
         print(f"❌ Error: {e}")
         print()
-        print("Make sure you have set your CloudKit API token:")
-        print("  export CLOUDKIT_API_TOKEN='your-token-here'")
         return
     
     if not recordings:
