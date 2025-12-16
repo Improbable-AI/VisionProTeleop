@@ -59,6 +59,7 @@ enum ExpandedPanel: Equatable {
     case handTracking  // Hand tracking configuration (prediction, etc.)
     case stereoBaseline  // Stereo IPD/baseline adjustment
     case markerDetection  // ArUco marker detection settings
+    case accessoryTracking  // Spatial controller tracking (visionOS 26+)
 }
 
 /// App mode: Teleop (network-based teleoperation) vs Egorecord (local UVC recording)
@@ -1619,6 +1620,23 @@ struct StatusOverlay: View {
                         expandedPanel = .markerDetection
                     }
                 }
+                
+                // Accessory Tracking (visionOS 26+ only)
+                if #available(visionOS 26.0, *) {
+                    let accessoryManager = AccessoryTrackingManager.shared
+                    menuItem(
+                        icon: accessoryManager.isEnabled ? "pencil.tip.crop.circle.fill" : "pencil.tip.crop.circle",
+                        title: "Stylus Tracking",
+                        subtitle: accessoryManager.isEnabled ? (accessoryManager.stylusAnchorEntity != nil ? "Active" : "Searching") : "Off",
+                        isExpanded: false,
+                        accentColor: .cyan,
+                        iconColor: accessoryManager.isEnabled ? .green : nil
+                    ) {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            expandedPanel = .accessoryTracking
+                        }
+                    }
+                }
             }
         }
     }
@@ -1650,6 +1668,12 @@ struct StatusOverlay: View {
                 stereoBaselinePanelContent
             case .markerDetection:
                 markerDetectionPanelContent
+            case .accessoryTracking:
+                if #available(visionOS 26.0, *) {
+                    accessoryTrackingPanelContent
+                } else {
+                    EmptyView()
+                }
             case .settings, .none:
                 EmptyView()
             }
@@ -1670,6 +1694,7 @@ struct StatusOverlay: View {
         case .handTracking: return "Hand Tracking"
         case .stereoBaseline: return "Stereo Baseline"
         case .markerDetection: return "Marker Detection"
+        case .accessoryTracking: return "Accessory Tracking"
         case .none: return ""
         }
     }
@@ -3238,6 +3263,140 @@ struct StatusOverlay: View {
             
             // Custom Images section
             customImagesSection
+        }
+    }
+    
+    // MARK: - Accessory Tracking Panel Content (visionOS 26+)
+    
+    @available(visionOS 26.0, *)
+    private var accessoryTrackingPanelContent: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            let accessoryManager = AccessoryTrackingManager.shared
+            
+            // Description
+            Text("Track spatial stylus (Apple Pencil Pro) and visualize its pose in 3D.")
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.6))
+                .fixedSize(horizontal: false, vertical: true)
+            
+            Divider()
+                .background(Color.white.opacity(0.2))
+            
+            // Enable toggle
+            Toggle(isOn: Binding(
+                get: { accessoryManager.isEnabled },
+                set: { accessoryManager.isEnabled = $0 }
+            )) {
+                HStack(spacing: 8) {
+                    Image(systemName: accessoryManager.isEnabled ? "pencil.tip.crop.circle.fill" : "pencil.tip.crop.circle")
+                        .font(.system(size: 16))
+                        .foregroundColor(accessoryManager.isEnabled ? .green : .white.opacity(0.6))
+                    Text("Enable Tracking")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                }
+            }
+            .tint(.green)
+            
+            // Status
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(accessoryManager.isTrackingActive ? Color.green : Color.orange)
+                    .frame(width: 8, height: 8)
+                Text(accessoryManager.statusMessage)
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.7))
+                Spacer()
+                
+                // Refresh button
+                Button {
+                    accessoryManager.refreshStyluses()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.6))
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color.white.opacity(0.1))
+            .cornerRadius(8)
+            
+            // Available styluses for selection
+            if !accessoryManager.availableStyluses.isEmpty {
+                Divider()
+                    .background(Color.white.opacity(0.2))
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Available Styluses")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white.opacity(0.7))
+                    
+                    ForEach(accessoryManager.availableStyluses) { stylus in
+                        Button {
+                            accessoryManager.toggleStylus(id: stylus.id)
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: stylus.isSelected ? "checkmark.circle.fill" : "circle")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(stylus.isSelected ? .cyan : .white.opacity(0.4))
+                                Image(systemName: "pencil.tip")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.white.opacity(0.7))
+                                Text(stylus.name)
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.white)
+                                Spacer()
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(stylus.isSelected ? Color.cyan.opacity(0.15) : Color.white.opacity(0.05))
+                            .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            
+            // Currently tracking
+            if accessoryManager.stylusAnchorEntity != nil {
+                Divider()
+                    .background(Color.white.opacity(0.2))
+                
+                HStack(spacing: 12) {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 8, height: 8)
+                    Text("Stylus anchor active")
+                        .font(.caption)
+                        .foregroundColor(.white)
+                    Spacer()
+                    Text("Tracking")
+                        .font(.caption2)
+                        .foregroundColor(.green)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color.white.opacity(0.05))
+                .cornerRadius(6)
+            }
+            
+            // Note
+            Divider()
+                .background(Color.white.opacity(0.2))
+            
+            HStack(spacing: 6) {
+                Image(systemName: "info.circle")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.5))
+                Text("visionOS 26.0+ and Apple Pencil Pro required")
+                    .font(.caption2)
+                    .foregroundColor(.white.opacity(0.5))
+            }
         }
     }
     

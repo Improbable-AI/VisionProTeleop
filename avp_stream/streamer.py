@@ -893,6 +893,10 @@ class VisionProStreamer:
         self._detected_markers: Dict[int, Dict[str, Any]] = {}  # marker_id -> {"dict": int, "pose": np.ndarray}
         self._tracked_images: Dict[str, Dict[str, Any]] = {}  # image_id -> unified tracked image dict
         self._markers_lock = Lock()
+        
+        # Stylus tracking state
+        self._stylus_data: Optional[Dict[str, Any]] = None  # Full stylus data dict
+        self._stylus_lock = Lock()
 
         self._start_info_server()  # Start HTTP endpoint immediately
         self._start_hand_tracking()  # Start hand tracking stream
@@ -1039,6 +1043,73 @@ class VisionProStreamer:
                     if self._detected_markers:
                         self._detected_markers = {}
                         self._tracked_images = {}
+            
+            # Parse stylus tracking data (after marker data)
+            # Format: header matrix (m00=777.0, m01=count), then stylus pose matrices
+            stylus_start_idx = 27  # Start after hand joints
+            # Skip past marker data if present
+            if len(right_joints) > 27:
+                header = right_joints[27]
+                if abs(getattr(header, "m00", 0.0) - 666.0) < 0.1:
+                    marker_count = int(getattr(header, "m01", 0))
+                    stylus_start_idx = 28 + marker_count  # Skip header + marker matrices
+            
+            # Check for stylus header
+            if len(right_joints) > stylus_start_idx:
+                stylus_header = right_joints[stylus_start_idx]
+                if abs(getattr(stylus_header, "m00", 0.0) - 777.0) < 0.1:
+                    stylus_count = int(getattr(stylus_header, "m01", 0))
+                    if stylus_count > 0 and len(right_joints) > stylus_start_idx + 1:
+                        stylus_mat = right_joints[stylus_start_idx + 1]
+                        
+                        # Extract button data from matrix fields
+                        tip_pressure = getattr(stylus_mat, "m30", 0.0)
+                        primary_pressure = getattr(stylus_mat, "m31", 0.0)
+                        secondary_pressure = getattr(stylus_mat, "m32", 0.0)
+                        flags_raw = getattr(stylus_mat, "m33", 1.0)
+                        
+                        # Decode button pressed states from flags
+                        # Format: 1000 + (tip?1:0) + (primary?2:0) + (secondary?4:0) + timestamp_frac
+                        if flags_raw >= 1000:
+                            flags_int = int(flags_raw - 1000)
+                            tip_pressed = bool(flags_int & 1)
+                            primary_pressed = bool(flags_int & 2)
+                            secondary_pressed = bool(flags_int & 4)
+                        else:
+                            tip_pressed = tip_pressure > 0.1
+                            primary_pressed = primary_pressure > 0.1
+                            secondary_pressed = secondary_pressure > 0.1
+                        
+                        # Apply YUP2ZUP transform (same as hand tracking)
+                        pose = self.axis_transform @ process_matrix(stylus_mat)
+                        # If origin="sim", also transform to simulation's attach_to frame
+                        if self.origin == "sim":
+                            inv_attach = np.linalg.inv(self._attach_to_mat)[np.newaxis, :, :]
+                            pose = inv_attach @ pose
+                        
+                        stylus_data = {
+                            "pose": pose[0],  # (4, 4) array
+                            "tip_pressed": tip_pressed,
+                            "tip_pressure": float(tip_pressure),
+                            "primary_pressed": primary_pressed,
+                            "primary_pressure": float(primary_pressure),
+                            "secondary_pressed": secondary_pressed,
+                            "secondary_pressure": float(secondary_pressure),
+                        }
+                        
+                        with self._stylus_lock:
+                            self._stylus_data = stylus_data
+                    else:
+                        with self._stylus_lock:
+                            self._stylus_data = None
+                else:
+                    with self._stylus_lock:
+                        if self._stylus_data is not None:
+                            self._stylus_data = None
+            else:
+                with self._stylus_lock:
+                    if self._stylus_data is not None:
+                        self._stylus_data = None
         except Exception as exc:
             self._log(f"[HAND-TRACKING] Failed to process hand update from {source}: {exc}", force=True)
             return
@@ -1448,6 +1519,51 @@ class VisionProStreamer:
         """
         with self._markers_lock:
             return dict(self._tracked_images)
+    
+    def get_stylus(self) -> Optional[Dict[str, Any]]:
+        """Get the current stylus (Apple Pencil Pro) state.
+        
+        Returns a dict with the tracked spatial stylus data including pose,
+        button states, and pressure values. Stylus tracking must be enabled
+        on the VisionOS app (Settings > Stylus Tracking) and requires visionOS 26.0+.
+        
+        The pose is in the same coordinate frame as hand tracking data
+        (affected by `set_origin()` setting).
+        
+        Returns:
+            Dict with stylus data if tracked, None if no stylus or tracking disabled.
+            Keys:
+            - ``pose``: (4, 4) homogeneous transformation matrix
+            - ``tip_pressed``: bool - whether tip is pressed
+            - ``tip_pressure``: float (0.0-1.0) - tip pressure
+            - ``primary_pressed``: bool - whether primary button is pressed
+            - ``primary_pressure``: float (0.0-1.0) - primary button pressure
+            - ``secondary_pressed``: bool - whether secondary button is pressed
+            - ``secondary_pressure``: float (0.0-1.0) - secondary button pressure
+        
+        Example::
+        
+            stylus = streamer.get_stylus()
+            if stylus is not None:
+                pose = stylus["pose"]  # 4x4 matrix
+                position = pose[:3, 3]  # XYZ position
+                if stylus["tip_pressed"]:
+                    pressure = stylus["tip_pressure"]
+                    print(f"Drawing at {position} with pressure {pressure:.2f}")
+        """
+        with self._stylus_lock:
+            if self._stylus_data is None:
+                return None
+            # Return a copy with pose copied
+            return {
+                "pose": self._stylus_data["pose"].copy(),
+                "tip_pressed": self._stylus_data["tip_pressed"],
+                "tip_pressure": self._stylus_data["tip_pressure"],
+                "primary_pressed": self._stylus_data["primary_pressed"],
+                "primary_pressure": self._stylus_data["primary_pressure"],
+                "secondary_pressed": self._stylus_data["secondary_pressed"],
+                "secondary_pressure": self._stylus_data["secondary_pressure"],
+            }
     
     def set_origin(self, origin: str):
         """Set the coordinate frame origin for hand tracking data.

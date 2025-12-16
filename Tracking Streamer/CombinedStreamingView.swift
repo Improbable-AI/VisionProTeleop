@@ -1112,6 +1112,12 @@ struct CombinedStreamingView: View {
                 }
             }
             
+            // === ACCESSORY TRACKING ===
+            // Update snapshots for streaming (captures current stylus transform)
+            if #available(visionOS 26.0, *) {
+                AccessoryTrackingManager.shared.updateSnapshots()
+            }
+            
             // === MUJOCO POSE UPDATE ===
             if !mujocoFinalTransforms.isEmpty {
                 applyMuJoCoTransforms(mujocoFinalTransforms)
@@ -1524,6 +1530,18 @@ struct CombinedStreamingView: View {
             let edge = ModelEntity(mesh: verBoundaryMesh, materials: [verBoundaryMaterial])
             edge.name = "boundary_\(j)"
             verificationMarker.addChild(edge)
+        }
+        
+        // === ACCESSORY TRACKING (visionOS 26+) ===
+        // Set the root entity for AccessoryTrackingManager so it can add anchor entities
+        if #available(visionOS 26.0, *) {
+            // Create a dedicated root for accessory anchors
+            let accessoryRoot = Entity()
+            accessoryRoot.name = "accessoryRoot"
+            content.add(accessoryRoot)
+            
+            // Set the root entity on the manager - visualization is created when stylus connects
+            AccessoryTrackingManager.shared.rootEntity = accessoryRoot
         }
     }
     

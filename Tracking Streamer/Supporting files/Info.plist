@@ -17,6 +17,17 @@
 	
 	<key>NSCameraUsageDescription</key>
 	<string>VisionProTeleop needs camera access to display video from connected USB cameras (UVC devices).</string>
+	
+	<!-- Accessory Tracking (visionOS 26.0+) -->
+	<key>NSAccessoryTrackingUsageDescription</key>
+	<string>VisionProTeleop uses accessory tracking to stream spatial controller poses for teleoperation.</string>
+	<key>GCSupportedGameControllers</key>
+	<array>
+		<dict>
+			<key>ProfileName</key>
+			<string>SpatialGamepad</string>
+		</dict>
+	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

@@ -604,7 +604,70 @@ func fill_handUpdate() -> Handtracking_HandUpdate {
         }
     }
     
+    // STYLUS TRACKING: Append tracked stylus pose after marker data
+    // Format: Header matrix (m00=777.0, m01=stylus_count), then pose matrices
+    if #available(visionOS 26.0, *) {
+        if let stylusData = getStylusMatrices() {
+            for matrix in stylusData {
+                handUpdate.rightHand.skeleton.jointMatrices.append(matrix)
+            }
+        }
+    }
+    
     return handUpdate
+}
+
+/// Get stylus tracking matrices to append to the hand update
+/// Returns nil if stylus tracking is disabled or no stylus connected
+/// Encodes: pose (4x4), button states, pressures, timestamp
+/// Only available on visionOS 26.0+
+@available(visionOS 26.0, *)
+func getStylusMatrices() -> [Handtracking_Matrix4x4]? {
+    let manager = AccessoryTrackingManager.shared
+    let snapshot = manager.snapshot
+    
+    // Check if tracking is active with valid position
+    guard snapshot.isTracking,
+          let position = snapshot.position,
+          let orientation = snapshot.orientation else {
+        return nil
+    }
+    
+    var matrices: [Handtracking_Matrix4x4] = []
+    
+    // Header matrix: signals stylus data presence
+    var header = Handtracking_Matrix4x4()
+    header.m00 = 777.0  // Stylus data signal
+    header.m01 = 1.0    // Number of styluses
+    matrices.append(header)
+    
+    // Build pose matrix from position + orientation
+    var transform = simd_float4x4(orientation)
+    transform.columns.3 = SIMD4<Float>(position.x, position.y, position.z, 1)
+    var matrix = createMatrix4x4(from: transform)
+    
+    // Encode button data in the last row (m30, m31, m32) and flags in m33
+    // m30 = tip_pressure (0.0-1.0)
+    // m31 = primary_pressure (0.0-1.0)
+    // m32 = secondary_pressure (0.0-1.0)
+    // m33 = button_flags encoded: 1000 + (tip?1:0) + (primary?2:0) + (secondary?4:0) + timestamp_fraction*10
+    matrix.m30 = snapshot.tipPressure
+    matrix.m31 = snapshot.primaryPressure
+    matrix.m32 = snapshot.secondaryPressure
+    
+    // Encode button pressed states as flags + timestamp fraction for uniqueness
+    var flags: Float = 1000.0  // Base value to distinguish from normal m33=1.0
+    if snapshot.tipPressed { flags += 1.0 }
+    if snapshot.primaryPressed { flags += 2.0 }
+    if snapshot.secondaryPressed { flags += 4.0 }
+    // Add timestamp fraction (0-999) for temporal info
+    let timestampFraction = Float(Int(snapshot.timestamp * 1000) % 1000)
+    flags += timestampFraction / 1000.0 * 10.0
+    matrix.m33 = flags
+    
+    matrices.append(matrix)
+    
+    return matrices
 }
 
 /// Get marker detection matrices to append to the hand update

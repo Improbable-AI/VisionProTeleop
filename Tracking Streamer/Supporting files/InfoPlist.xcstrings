@@ -31,6 +31,18 @@
         }
       }
     },
+    "NSAccessoryTrackingUsageDescription" : {
+      "comment" : "Privacy - Accessory Tracking Usage Description",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "VisionProTeleop uses accessory tracking to stream spatial controller poses for teleoperation."
+          }
+        }
+      }
+    },
     "NSCameraUsageDescription" : {
       "comment" : "Privacy - Camera Usage Description",
       "extractionState" : "extracted_with_value",
