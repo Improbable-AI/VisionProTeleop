@@ -221,12 +221,41 @@ struct ArucoMarkerReference {
     let imageData: Data  // PNG image data
 }
 
+// MARK: - ArUco Detection Feedback
+
+/// Feedback about the current ArUco marker detection state for UI
+struct ArucoDetectionFeedback {
+    /// Whether a marker was detected in the current frame
+    var isDetected: Bool = false
+    /// ID of the detected marker (if any)
+    var detectedMarkerId: Int? = nil
+    /// Estimated marker size in pixels (averaged from corner distances)
+    var markerSizePixels: Float = 0
+    /// Whether the marker appears too far/small for reliable pose estimation
+    var isTooFar: Bool = false
+    /// Minimum recommended marker size threshold (pixels)
+    static let minMarkerSize: Float = 50.0
+    /// User guidance message
+    var guidanceMessage: String {
+        if !isDetected {
+            return "Looking for ArUco marker..."
+        } else if isTooFar {
+            return "Move closer - marker is too small"
+        } else {
+            return "Marker detected!"
+        }
+    }
+}
+
 // MARK: - Extrinsic Calibration Manager
 
 /// Manages extrinsic calibration between Vision Pro head and external camera
 @MainActor
 class ExtrinsicCalibrationManager: ObservableObject {
     static let shared = ExtrinsicCalibrationManager()
+    
+    // DEBUG: Throttle logging to once per second
+    private static var lastDebugLogTime: Date? = nil
     
     // MARK: - Published Properties
     
@@ -260,6 +289,9 @@ class ExtrinsicCalibrationManager: ObservableObject {
     /// Currently tracked markers from ARKit (actively being tracked right now)
     @Published var arkitTrackedMarkers: [Int: simd_float4x4] = [:]  // markerId -> T_world^marker
     
+    /// Whether pose updates are frozen (visualization stays at last known positions)
+    @Published var isMarkerVisualizationFrozen: Bool = false
+    
     /// Remembered marker positions in world frame (persist even when ARKit stops tracking)
     /// Since markers are stationary, once we know their world position, we can keep using it
     @Published var rememberedMarkerPositions: [Int: simd_float4x4] = [:]  // markerId -> T_world^marker
@@ -272,6 +304,36 @@ class ExtrinsicCalibrationManager: ObservableObject {
     
     /// Current head pose from ARKit
     @Published var currentHeadPose: simd_float4x4 = matrix_identity_float4x4
+    
+    /// Preview frame for calibration wizard UI (throttled UIImage from UVC stream)
+    @Published var previewFrame: UIImage? = nil
+    private var previewFrameCounter: Int = 0
+    
+    /// Proposed calibration result pending user verification
+    @Published var proposedCalibration: ExtrinsicCalibrationData? = nil
+    
+    /// Estimated world pose of the marker based on current proposed calibration
+    /// Used to render a "ghost" marker in AR to verify calibration accuracy
+    @Published var verificationMarkerPose: simd_float4x4? = nil
+    
+    /// Which camera side is currently being verified (for stereo)
+    @Published var verificationSide: CameraSide = .left
+    
+    /// Preview frame with ArUco visualization overlay
+    @Published var previewWithVisualization: UIImage? = nil
+    
+    /// Current ArUco detection feedback for UI display
+    @Published var arucoDetectionFeedback: ArucoDetectionFeedback = .init()
+    
+    // MARK: - Debug Properties (for real-time UI display)
+    @Published var debugHeadPos: SIMD3<Float> = .zero
+    @Published var debugCamMarkerPos: SIMD3<Float> = .zero
+    @Published var debugWorldMarkerPos: SIMD3<Float> = .zero
+    @Published var debugARKitMarkerPos: SIMD3<Float> = .zero  // ARKit's direct marker pose for comparison
+    @Published var debugIntrinsics: String = "N/A"  // fx, fy, cx, cy for debugging
+    
+    /// Latest ArUco detections for visualization
+    private var latestDetections: [ArucoDetectionResult] = []
     
     // MARK: - Configuration
     
@@ -312,7 +374,17 @@ class ExtrinsicCalibrationManager: ObservableObject {
     var minHeadMovement: Float = 0.02  // Smaller movement threshold for more samples
     
     /// Whether we're calibrating a stereo camera
-    private var isStereoCalibration: Bool = false
+    /// Whether the current calibration is stereo
+    @Published var isStereoCalibration: Bool = false
+    
+    /// Temporarily stored pixel buffer for debug recording
+    private var latestPixelBuffer: CVPixelBuffer?
+    
+    /// Debug recording counters
+    private var debugRecordingFrameCounter: Int = 0
+    private var debugRecordingSamplesPerMarker: [Int: Int] = [:]  // markerId -> sample count
+    private let debugRecordingFrameInterval: Int = 10  // Record every Nth frame
+    private let debugRecordingMaxPerMarker: Int = 30
     
     /// Known stereo baseline in meters (distance between left and right camera optical centers)
     /// Set this to a positive value to enforce baseline constraint during stereo calibration
@@ -493,44 +565,8 @@ class ExtrinsicCalibrationManager: ObservableObject {
         
         statusMessage = "Display marker ID \(currentMarkerId) on iPhone..."
         
-        // Setup ARKit image tracking with ALL markers
-        // ARKit will track whichever marker is visible
-        do {
-            let referenceImages = generateReferenceImages()
-            dlog("📐 [ExtrinsicCalibrationManager] Generated \(referenceImages.count) reference images for markers: \(referenceImages.compactMap { $0.name })")
-            
-            guard !referenceImages.isEmpty else {
-                lastError = "Failed to generate reference images"
-                isCalibrating = false
-                return
-            }
-            
-            arkitSession = ARKitSession()
-            imageTrackingProvider = ImageTrackingProvider(referenceImages: referenceImages)
-            
-            dlog("📐 [ExtrinsicCalibrationManager] ImageTrackingProvider created with \(referenceImages.count) images")
-            
-            guard ImageTrackingProvider.isSupported else {
-                lastError = "Image tracking is not supported on this device"
-                isCalibrating = false
-                return
-            }
-            
-            try await arkitSession?.run([imageTrackingProvider!])
-            
-            // Start listening for anchor updates
-            Task {
-                await processImageAnchorUpdates()
-            }
-            
-            statusMessage = "Show marker ID \(currentMarkerId) on iPhone, look at it with Vision Pro"
-            dlog("📐 [ExtrinsicCalibrationManager] ARKit image tracking started - waiting for marker \(currentMarkerId)")
-            
-        } catch {
-            lastError = "Failed to start ARKit: \(error.localizedDescription)"
-            isCalibrating = false
-            dlog("❌ [ExtrinsicCalibrationManager] ARKit setup failed: \(error)")
-        }
+        // Setup ARKit
+        await setupARSession()
     }
     
     /// Advance to the next marker in the sequence
@@ -548,6 +584,12 @@ class ExtrinsicCalibrationManager: ObservableObject {
         // Reset head tracking for new position
         lastHeadPosition = .zero
         lastCaptureTime = .distantPast
+        
+        // Clear current marker detection state for new phase
+        // (rememberedMarkerPositions is intentionally kept - those are valid for the whole session)
+        arkitTrackedMarkers = [:]
+        cameraDetectedMarkers = [:]
+        rightCameraDetectedMarkers = [:]
         
         statusMessage = "Now show marker ID \(currentMarkerId) at a DIFFERENT position"
         dlog("📐 [ExtrinsicCalibrationManager] Advanced to marker \(currentMarkerId) (position \(currentMarkerIndex + 1)/\(markerIds.count))")
@@ -569,11 +611,77 @@ class ExtrinsicCalibrationManager: ObservableObject {
         return uniqueMarkers >= minUniqueMarkers && samplesCollected >= minSamples
     }
     
+    /// Start a verification session using an existing calibration
+    /// This starts ARKit and sets up the detector without resetting gathered samples or current calibration state
+    func startVerificationSession(isStereo: Bool) async {
+        dlog("📐 [ExtrinsicCalibrationManager] Starting Verification Session")
+        
+        // Ensure we flag as active (needed for processCameraFrame)
+        // But we don't clear samples or collected data
+        isCalibrating = true
+        isStereoCalibration = isStereo
+        
+        // Ensure detector is ready
+        if arucoDetector == nil {
+            arucoDetector = OpenCVArucoDetector(dictionary: arucoDictionary)
+        }
+        
+        // Start ARKit if not running
+        if arkitSession == nil {
+            await setupARSession()
+        } else {
+            // Already running, just ensure status is correct
+            dlog("📐 [ExtrinsicCalibrationManager] ARKit session already running")
+        }
+        
+        statusMessage = "Verify alignment..."
+    }
+    
+    /// Setup and start ARKit session (shared between calibration and verification)
+    private func setupARSession() async {
+        // Setup ARKit image tracking with ALL markers
+        // ARKit will track whichever marker is visible
+        do {
+            let referenceImages = generateReferenceImages()
+            dlog("📐 [ExtrinsicCalibrationManager] Generated \(referenceImages.count) reference images")
+            
+            guard !referenceImages.isEmpty else {
+                lastError = "Failed to generate reference images"
+                isCalibrating = false
+                return
+            }
+            
+            arkitSession = ARKitSession()
+            imageTrackingProvider = ImageTrackingProvider(referenceImages: referenceImages)
+            
+            guard ImageTrackingProvider.isSupported else {
+                lastError = "Image tracking is not supported on this device"
+                isCalibrating = false
+                return
+            }
+            
+            try await arkitSession?.run([imageTrackingProvider!])
+            
+            // Start listening for anchor updates
+            Task {
+                await processImageAnchorUpdates()
+            }
+            
+            dlog("📐 [ExtrinsicCalibrationManager] ARKit session started")
+            
+        } catch {
+            lastError = "Failed to start ARKit: \(error.localizedDescription)"
+            isCalibrating = false
+            dlog("❌ [ExtrinsicCalibrationManager] ARKit setup failed: \(error)")
+        }
+    }
+
     /// Process ARKit image anchor updates
     private func processImageAnchorUpdates() async {
         guard let provider = imageTrackingProvider else { return }
         
         dlog("📐 [ExtrinsicCalibrationManager] Started listening for image anchor updates...")
+        
         
         for await update in provider.anchorUpdates {
             let anchor = update.anchor
@@ -626,6 +734,53 @@ class ExtrinsicCalibrationManager: ObservableObject {
     func processCameraFrame(_ pixelBuffer: CVPixelBuffer, intrinsics: CameraIntrinsics?, rightIntrinsics: CameraIntrinsics? = nil) {
         guard isCalibrating, let detector = arucoDetector else { return }
         
+        // === DEBUG RECORDING: Capture frame + head pose + ARKit marker pose at exact same moment ===
+        // Throttled: every 10 frames, max 30 samples per marker
+        // ONLY record when ARKit has detected the marker
+        if CalibrationDebugRecorder.shared.isRecording {
+            debugRecordingFrameCounter += 1
+            let currentMarkerSamples = debugRecordingSamplesPerMarker[currentMarkerId] ?? 0
+            
+            // Get ARKit marker pose - prefer remembered over actively tracked
+            let arkitMarkerPose = rememberedMarkerPositions[currentMarkerId] ?? arkitTrackedMarkers[currentMarkerId]
+            
+            // Only record if ARKit has detected this marker (pose is non-nil)
+            if debugRecordingFrameCounter % debugRecordingFrameInterval == 0 
+                && currentMarkerSamples < debugRecordingMaxPerMarker
+                && arkitMarkerPose != nil {
+                let headPose = getCurrentHeadPose()
+                
+                CalibrationDebugRecorder.shared.recordExtrinsicSample(
+                    pixelBuffer: pixelBuffer,
+                    headPose: headPose,
+                    arkitMarkerPose: arkitMarkerPose,
+                    markerId: currentMarkerId,
+                    isStereo: isStereoCalibration
+                )
+                debugRecordingSamplesPerMarker[currentMarkerId] = currentMarkerSamples + 1
+                dlog("📹 [DEBUG] Recorded sample \(currentMarkerSamples + 1)/30 for marker \(currentMarkerId)")
+            }
+        }
+        
+        // Generate preview frame for wizard UI (throttled to every 3rd frame for performance)
+        previewFrameCounter += 1
+        if previewFrameCounter % 3 == 0 {
+            if let image = pixelBufferToUIImage(pixelBuffer) {
+                Task { @MainActor in
+                    self.previewFrame = image
+                }
+            }
+        }
+        
+        // If we have a proposed calibration, run verification logic (visualize reprojected marker)
+        if let proposed = proposedCalibration {
+            updateVerificationPose(pixelBuffer: pixelBuffer, proposedData: proposed)
+            return
+        }
+        
+        // Otherwise, run standard calibration detection
+        guard isCalibrating else { return }
+        
         if isStereoCalibration {
             // For stereo, split the frame and process each half
             processStereoFrame(pixelBuffer, leftIntrinsics: intrinsics, rightIntrinsics: rightIntrinsics)
@@ -634,8 +789,147 @@ class ExtrinsicCalibrationManager: ObservableObject {
             processMonoFrame(pixelBuffer, intrinsics: intrinsics)
         }
         
+        // Store latest pixel buffer for debug recording
+        latestPixelBuffer = pixelBuffer
+        
         // Try to collect a sample if we have matching observations
         tryCollectSample()
+        
+        // DEBUG: Update debug values during calibration (with identity head-to-camera for visualization)
+        // This allows us to see the transform chain in real-time during calibration
+        if let cameraMarkerPose = cameraDetectedMarkers.values.first {
+            // Get ARKit marker pose if available (use remembered or active)
+            let arkitMarkerPose = rememberedMarkerPositions.values.first ?? arkitTrackedMarkers.values.first
+            
+            Task { @MainActor in
+                let t_world_head = self.currentHeadPose
+                let t_camera_marker = cameraMarkerPose
+                
+                // Use identity for head-to-camera during calibration debug
+                let t_head_camera = matrix_identity_float4x4
+                
+                // OpenCV to ARKit conversion
+                let opencv_to_arkit = simd_float4x4(
+                    SIMD4<Float>(1,  0,  0, 0),
+                    SIMD4<Float>(0, -1,  0, 0),
+                    SIMD4<Float>(0,  0, -1, 0),
+                    SIMD4<Float>(0,  0,  0, 1)
+                )
+                
+                // Transform chain: T_world_marker = T_world_head * T_head_camera * T_camera_marker * opencv_to_arkit
+                let t_world_camera = t_world_head * t_head_camera
+                let t_world_marker_opencv = t_world_camera * t_camera_marker
+                let t_world_marker = t_world_marker_opencv * opencv_to_arkit
+                
+                // Update debug values for UI
+                self.debugHeadPos = SIMD3<Float>(t_world_head.columns.3.x, t_world_head.columns.3.y, t_world_head.columns.3.z)
+                self.debugCamMarkerPos = SIMD3<Float>(t_camera_marker.columns.3.x, t_camera_marker.columns.3.y, t_camera_marker.columns.3.z)
+                self.debugWorldMarkerPos = SIMD3<Float>(t_world_marker.columns.3.x, t_world_marker.columns.3.y, t_world_marker.columns.3.z)
+                
+                // ARKit's direct marker pose (ground truth - should be stationary!)
+                if let arkitPose = arkitMarkerPose {
+                    self.debugARKitMarkerPos = SIMD3<Float>(arkitPose.columns.3.x, arkitPose.columns.3.y, arkitPose.columns.3.z)
+                }
+            }
+        }
+    }
+    
+    /// Convert CVPixelBuffer to UIImage for preview display
+    private func pixelBufferToUIImage(_ pixelBuffer: CVPixelBuffer) -> UIImage? {
+        let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
+        let context = CIContext()
+        guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else {
+            return nil
+        }
+        return UIImage(cgImage: cgImage)
+    }
+    
+    /// Calculate marker size from corners (average of edge lengths)
+    private func calculateMarkerSize(_ corners: [NSValue]) -> Float {
+        guard corners.count == 4 else { return 0 }
+        
+        var totalSize: Float = 0
+        for i in 0..<4 {
+            let p1 = corners[i].cgPointValue
+            let p2 = corners[(i + 1) % 4].cgPointValue
+            let dx = Float(p2.x - p1.x)
+            let dy = Float(p2.y - p1.y)
+            totalSize += sqrt(dx * dx + dy * dy)
+        }
+        
+        return totalSize / 4.0  // Average edge length
+    }
+    
+    /// Create visualized preview with ArUco markers drawn
+    private func createVisualizedPreview(_ pixelBuffer: CVPixelBuffer, detections: [ArucoDetectionResult], intrinsics: CameraIntrinsics?) -> UIImage? {
+        guard let detector = arucoDetector, !detections.isEmpty else {
+            return pixelBufferToUIImage(pixelBuffer)
+        }
+        
+        var cameraMatrix: [NSNumber]? = nil
+        var distCoeffs: [NSNumber]? = nil
+        
+        if let intrinsics = intrinsics {
+            cameraMatrix = [
+                NSNumber(value: intrinsics.fx), NSNumber(value: 0), NSNumber(value: intrinsics.cx),
+                NSNumber(value: 0), NSNumber(value: intrinsics.fy), NSNumber(value: intrinsics.cy),
+                NSNumber(value: 0), NSNumber(value: 0), NSNumber(value: 1)
+            ]
+            distCoeffs = intrinsics.distortionCoeffs.map { NSNumber(value: $0) }
+        }
+        
+        if let jpegData = detector.visualizeMarkers(
+            pixelBuffer: pixelBuffer,
+            detections: detections,
+            drawAxes: intrinsics != nil,
+            cameraMatrix: cameraMatrix,
+            distCoeffs: distCoeffs,
+            axisLength: 0.03
+        ) {
+            return UIImage(data: jpegData)
+        }
+        
+        return pixelBufferToUIImage(pixelBuffer)
+    }
+    
+    /// Create visualized preview with ArUco markers drawn on both halves of stereo frame
+    private func createStereoVisualizedPreview(_ pixelBuffer: CVPixelBuffer, leftDetections: [ArucoDetectionResult], rightDetections: [ArucoDetectionResult]) -> UIImage? {
+        guard let detector = arucoDetector else {
+            return pixelBufferToUIImage(pixelBuffer)
+        }
+        
+        // Use stereo visualization method
+        if let jpegData = detector.visualizeStereoMarkers(
+            pixelBuffer: pixelBuffer,
+            leftDetections: leftDetections,
+            rightDetections: rightDetections
+        ) {
+            return UIImage(data: jpegData)
+        }
+        
+        return pixelBufferToUIImage(pixelBuffer)
+    }
+    
+    /// Update ArUco detection feedback based on current detection results
+    private func updateArucoDetectionFeedback(detections: [ArucoDetectionResult]) {
+        var feedback = ArucoDetectionFeedback()
+        
+        // Find the current target marker in detections
+        if let targetDetection = detections.first(where: { $0.markerId == currentMarkerId }) {
+            feedback.isDetected = true
+            feedback.detectedMarkerId = Int(targetDetection.markerId)
+            feedback.markerSizePixels = calculateMarkerSize(targetDetection.corners)
+            feedback.isTooFar = feedback.markerSizePixels < ArucoDetectionFeedback.minMarkerSize
+        } else if !detections.isEmpty {
+            // Detected a different marker
+            let firstDetection = detections[0]
+            feedback.isDetected = true
+            feedback.detectedMarkerId = Int(firstDetection.markerId)
+            feedback.markerSizePixels = calculateMarkerSize(firstDetection.corners)
+            feedback.isTooFar = feedback.markerSizePixels < ArucoDetectionFeedback.minMarkerSize
+        }
+        
+        arucoDetectionFeedback = feedback
     }
     
     /// Process a mono camera frame
@@ -653,6 +947,11 @@ class ExtrinsicCalibrationManager: ObservableObject {
             ]
             let distCoeffs = intrinsics.distortionCoeffs.map { NSNumber(value: $0) }
             
+            // DEBUG: Capture intrinsic values for UI display
+            Task { @MainActor in
+                self.debugIntrinsics = "fx=\(Int(intrinsics.fx)) fy=\(Int(intrinsics.fy)) cx=\(Int(intrinsics.cx)) cy=\(Int(intrinsics.cy)) img:\(intrinsics.imageWidth)x\(intrinsics.imageHeight)"
+            }
+            
             detections = detector.detectMarkers(
                 in: pixelBuffer,
                 cameraMatrix: cameraMatrix,
@@ -665,6 +964,27 @@ class ExtrinsicCalibrationManager: ObservableObject {
         }
         
         guard let results = detections else { return }
+        
+        // Store for visualization
+        latestDetections = results
+        
+        // Generate visualized preview (throttled)
+        if previewFrameCounter % 3 == 0 {
+            Task { @MainActor in
+                // Create basic preview
+                if let image = self.pixelBufferToUIImage(pixelBuffer) {
+                    self.previewFrame = image
+                }
+                
+                // Create visualized preview with markers drawn
+                if let visualized = self.createVisualizedPreview(pixelBuffer, detections: results, intrinsics: intrinsics) {
+                    self.previewWithVisualization = visualized
+                }
+                
+                // Update detection feedback
+                self.updateArucoDetectionFeedback(detections: results)
+            }
+        }
         
         // Update detected markers
         cameraDetectedMarkers.removeAll()
@@ -688,9 +1008,8 @@ class ExtrinsicCalibrationManager: ObservableObject {
         CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
         defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
         
-        // Create left and right cropped pixel buffers
-        // For now, we'll use the full frame detection and adjust cx for each half
-        // A more robust approach would crop the pixel buffer, but this is simpler
+        var leftDetectionResults: [ArucoDetectionResult] = []
+        var rightDetectionResults: [ArucoDetectionResult] = []
         
         // Process left half
         if let leftIntrinsics = leftIntrinsics {
@@ -710,6 +1029,7 @@ class ExtrinsicCalibrationManager: ObservableObject {
                     distCoeffs: distCoeffs,
                     markerLength: markerSizeMeters
                 ) {
+                    leftDetectionResults = detections
                     cameraDetectedMarkers.removeAll()
                     for result in detections {
                         if result.poseValid, let transformArray = result.transformMatrix {
@@ -738,6 +1058,7 @@ class ExtrinsicCalibrationManager: ObservableObject {
                     distCoeffs: distCoeffs,
                     markerLength: markerSizeMeters
                 ) {
+                    rightDetectionResults = detections
                     rightCameraDetectedMarkers.removeAll()
                     for result in detections {
                         if result.poseValid, let transformArray = result.transformMatrix {
@@ -748,11 +1069,37 @@ class ExtrinsicCalibrationManager: ObservableObject {
                 }
             }
         }
+        
+        // Store all detections for visualization
+        latestDetections = leftDetectionResults + rightDetectionResults
+        
+        // Generate stereo visualized preview (throttled)
+        if previewFrameCounter % 3 == 0 {
+            Task { @MainActor in
+                // Create basic preview
+                if let image = self.pixelBufferToUIImage(pixelBuffer) {
+                    self.previewFrame = image
+                }
+                
+                // Create stereo visualized preview with markers drawn on BOTH halves
+                if let visualized = self.createStereoVisualizedPreview(pixelBuffer, leftDetections: leftDetectionResults, rightDetections: rightDetectionResults) {
+                    self.previewWithVisualization = visualized
+                }
+                
+                // Update detection feedback (prefer left detections for feedback)
+                self.updateArucoDetectionFeedback(detections: leftDetectionResults.isEmpty ? rightDetectionResults : leftDetectionResults)
+            }
+        }
     }
     
     /// Crop a pixel buffer to a specific region
     private func cropPixelBuffer(_ pixelBuffer: CVPixelBuffer, rect: CGRect) -> CVPixelBuffer? {
-        let ciImage = CIImage(cvPixelBuffer: pixelBuffer).cropped(to: rect)
+        // Crop the image - this keeps the original coordinate system
+        var ciImage = CIImage(cvPixelBuffer: pixelBuffer).cropped(to: rect)
+        
+        // IMPORTANT: Translate the image so the crop rect's origin becomes (0,0)
+        // This ensures corner coordinates from detection are relative to 0, not the original crop position
+        ciImage = ciImage.transformed(by: CGAffineTransform(translationX: -rect.origin.x, y: -rect.origin.y))
         
         // Create a new pixel buffer for the cropped image
         var newPixelBuffer: CVPixelBuffer?
@@ -784,6 +1131,11 @@ class ExtrinsicCalibrationManager: ObservableObject {
     /// Try to collect a calibration sample if conditions are met
     /// Sequential workflow: only collects samples for the CURRENT marker ID
     private func tryCollectSample() {
+        // Only collect samples when freeze toggle is ON
+        guard isMarkerVisualizationFrozen else {
+            return
+        }
+        
         // Check if collection is paused (from iPhone motion detection)
         if useMotionDetection && isCollectionPaused {
             return
@@ -926,12 +1278,12 @@ class ExtrinsicCalibrationManager: ObservableObject {
         dlog("📐 [ExtrinsicCalibrationManager] Sample captured for marker \(targetMarkerId) - position \(currentMarkerIndex + 1): \(samplesForCurrentMarker)/\(samplesPerPosition), total: \(samplesCollected)")
     }
     
-    /// Finish calibration and compute the transform(s)
-    /// - Parameters:
-    ///   - deviceId: Unique identifier for the camera device
-    ///   - deviceName: Human-readable device name
-    ///   - isStereo: Whether this is a stereo camera
-    func finishCalibration(deviceId: String, deviceName: String, isStereo: Bool) -> ExtrinsicCalibrationData? {
+    // MARK: - Calibration Computation and Saving
+    
+    /// Computes extrinsic calibration but DOES NOT save it yet.
+    /// Can be called for verification step.
+    /// - Returns: Proposed calibration data
+    func computeCalibration(deviceId: String, deviceName: String, isStereo: Bool) -> ExtrinsicCalibrationData? {
         // Separate samples by camera side
         let leftSamples = samples.filter { $0.cameraSide == .left || $0.cameraSide == .mono }
         let rightSamples = samples.filter { $0.cameraSide == .right }
@@ -1013,25 +1365,11 @@ class ExtrinsicCalibrationManager: ObservableObject {
             stereoBaselineMeters: isStereo ? knownStereoBaseline : nil
         )
         
-        // Save calibration
-        allCalibrations[deviceId] = calibrationData
-        currentCalibration = calibrationData
-        saveAllCalibrations()
-        
-        statusMessage = "Calibration complete!"
-        isCalibrating = false
-        isStereoCalibration = false
-        
-        // Stop ARKit
-        arkitSession = nil
-        imageTrackingProvider = nil
-        
-        dlog("✅ [ExtrinsicCalibrationManager] Calibration saved for: \(deviceName)")
+        dlog("✅ [ExtrinsicCalibrationManager] Calibration computed for: \(deviceName)")
         dlog("   Left reproj error: \(leftError) meters (\(leftSamples.count) samples)")
         if let rightError = rightError {
             dlog("   Right reproj error: \(rightError) meters (\(rightSamples.count) samples)")
         }
-        dlog("   Markers used: \(uniqueMarkers)")
         
         // Print transform details for verification
         let t = SIMD3<Float>(leftTransform.columns.3.x, leftTransform.columns.3.y, leftTransform.columns.3.z)
@@ -1053,6 +1391,47 @@ class ExtrinsicCalibrationManager: ObservableObject {
         }
         
         return calibrationData
+    }
+    
+    /// Saves the proposed calibration and finalizes the wizard
+    func saveProposedCalibration() {
+        guard let calibrationData = proposedCalibration else { return }
+        
+        // Save calibration
+        allCalibrations[calibrationData.cameraDeviceId] = calibrationData
+        currentCalibration = calibrationData
+        saveAllCalibrations()
+        
+        statusMessage = "Calibration complete!"
+        isCalibrating = false
+        isStereoCalibration = false
+        
+        // Stop ARKit
+        arkitSession = nil
+        imageTrackingProvider = nil
+        
+        // Clear proposal
+        proposedCalibration = nil
+        verificationMarkerPose = nil
+        
+        dlog("💾 [ExtrinsicCalibrationManager] Calibration SAVED to disk")
+    }
+    
+    /// Discards the proposed calibration and resets for retry
+    func discardProposedCalibration() {
+        proposedCalibration = nil
+        verificationMarkerPose = nil
+        statusMessage = "Calibration discarded. Ready to retry."
+    }
+    
+    /// Legacy wrapper for backward compatibility
+    func finishCalibration(deviceId: String, deviceName: String, isStereo: Bool) -> ExtrinsicCalibrationData? {
+        if let data = computeCalibration(deviceId: deviceId, deviceName: deviceName, isStereo: isStereo) {
+            proposedCalibration = data
+            saveProposedCalibration()
+            return data
+        }
+        return nil
     }
     
     /// Compute T_head^camera from a set of samples using point-based registration (Kabsch algorithm)
@@ -1434,6 +1813,174 @@ class ExtrinsicCalibrationManager: ObservableObject {
         samplesForCurrentMarker = 0
         
         dlog("📐 [ExtrinsicCalibrationManager] Calibration cancelled")
+    }
+    
+    // MARK: - Verification Logic expected to be called on non-main thread
+    
+    /// Updates the verification marker pose based on current camera frame and proposed calibration
+    private func updateVerificationPose(pixelBuffer: CVPixelBuffer, proposedData: ExtrinsicCalibrationData) {
+        guard let detector = arucoDetector else { return }
+        
+        // Perform detection (just for verification, not adding samples)
+        // Note: For stereo verification, we check the selected side
+        var detections: [ArucoDetectionResult]?
+        
+        if proposedData.isStereo {
+            // Split stereo frame
+            let width = CVPixelBufferGetWidth(pixelBuffer)
+            let height = CVPixelBufferGetHeight(pixelBuffer)
+            let halfWidth = width / 2
+            
+            let rect: CGRect
+            let intrinsics: CameraIntrinsics?
+            
+            // Get current calibration
+            guard let currentCal = CameraCalibrationManager.shared.currentCalibration else {
+                 Task { @MainActor in self.verificationMarkerPose = nil }
+                 return
+            }
+
+            if verificationSide == .left {
+                rect = CGRect(x: 0, y: 0, width: CGFloat(halfWidth), height: CGFloat(height))
+                intrinsics = currentCal.leftIntrinsics
+            } else {
+                rect = CGRect(x: CGFloat(halfWidth), y: 0, width: CGFloat(halfWidth), height: CGFloat(height))
+                intrinsics = currentCal.rightIntrinsics
+            }
+            
+            guard let croppedBuffer = cropPixelBuffer(pixelBuffer, rect: rect),
+                  let camIntrinsics = intrinsics else {
+                Task { @MainActor in self.verificationMarkerPose = nil }
+                return
+            }
+            
+            let cameraMatrix: [NSNumber] = [
+                NSNumber(value: camIntrinsics.fx), NSNumber(value: 0), NSNumber(value: camIntrinsics.cx),
+                NSNumber(value: 0), NSNumber(value: camIntrinsics.fy), NSNumber(value: camIntrinsics.cy),
+                NSNumber(value: 0), NSNumber(value: 0), NSNumber(value: 1)
+            ]
+            let distCoeffs = camIntrinsics.distortionCoeffs.map { NSNumber(value: $0) }
+            
+            detections = detector.detectMarkers(
+                in: croppedBuffer,
+                cameraMatrix: cameraMatrix,
+                distCoeffs: distCoeffs,
+                markerLength: markerSizeMeters
+            )
+        } else {
+            // Mono
+            guard let currentCal = CameraCalibrationManager.shared.currentCalibration else {
+                 Task { @MainActor in self.verificationMarkerPose = nil }
+                 return
+            }
+            let intrinsics = currentCal.leftIntrinsics
+            let cameraMatrix: [NSNumber] = [
+                NSNumber(value: intrinsics.fx), NSNumber(value: 0), NSNumber(value: intrinsics.cx),
+                NSNumber(value: 0), NSNumber(value: intrinsics.fy), NSNumber(value: intrinsics.cy),
+                NSNumber(value: 0), NSNumber(value: 0), NSNumber(value: 1)
+            ]
+            let distCoeffs = intrinsics.distortionCoeffs.map { NSNumber(value: $0) }
+            
+            detections = detector.detectMarkers(
+                in: pixelBuffer,
+                cameraMatrix: cameraMatrix,
+                distCoeffs: distCoeffs,
+                markerLength: markerSizeMeters
+            )
+        }
+        
+        // Find current marker
+        guard let results = detections,
+              let result = results.first(where: { Int($0.markerId) == currentMarkerId }),
+              result.poseValid,
+              let transformArray = result.transformMatrix else {
+            // Verify marker lost
+            Task { @MainActor in
+                self.verificationMarkerPose = nil
+            }
+            return
+        }
+        
+        // T_camera_marker (from OpenCV)
+        let t_camera_marker = arrayToSimdMatrix(transformArray.map { $0.doubleValue })
+        
+        // T_head_camera (from proposed calibration)
+        let t_head_camera_array: [Double]?
+        if proposedData.isStereo {
+            t_head_camera_array = (verificationSide == .left) ? proposedData.leftHeadToCamera : proposedData.rightHeadToCamera
+        } else {
+            t_head_camera_array = proposedData.leftHeadToCamera
+        }
+        
+        guard let t_head_camera_arr = t_head_camera_array else {
+            Task { @MainActor in self.verificationMarkerPose = nil }
+            return
+        }
+        let t_head_camera = ExtrinsicCalibrationSample.arrayToMatrix(t_head_camera_arr)
+        
+        // DEBUG: Override head-to-camera with identity to test if marker stays stationary
+        // If marker is stationary with identity, then the transform chain is correct
+        // and the issue is with how we're using the calibrated transform
+        let DEBUG_USE_IDENTITY_HEAD_TO_CAMERA = true
+        let t_head_camera_debug = DEBUG_USE_IDENTITY_HEAD_TO_CAMERA ? matrix_identity_float4x4 : t_head_camera
+        _ = t_head_camera  // silence unused warning
+        
+        // T_world_head (current ARKit pose)
+        // Accessing main actor property from background - need to be careful or use a cached value
+        // But currentHeadPose is @Published on MainActor, so we should access it safely
+        // Since we are not on main thread here (processCameraFrame is bg), we can't access currentHeadPose directly safely if strict concurrency on.
+        // However, ExtrinsicCalibrationManager is @MainActor, so this method should be constrained or run on MainActor.
+        // Let's dispatch to MainActor for the final update state
+        
+        Task { @MainActor in
+            let t_world_head = self.currentHeadPose
+            
+            // === COORDINATE SYSTEM CONVERSION ===
+            // OpenCV: X-right, Y-down, Z-forward
+            // ARKit:  X-right, Y-up,   Z-backward
+            // Conversion: 180° rotation around X axis
+            let opencv_to_arkit = simd_float4x4(
+                SIMD4<Float>(1,  0,  0, 0),
+                SIMD4<Float>(0, -1,  0, 0),
+                SIMD4<Float>(0,  0, -1, 0),
+                SIMD4<Float>(0,  0,  0, 1)
+            )
+            
+            // === TRANSFORM CHAIN ===
+            // Kabsch computed: T such that P_camera = T * P_head
+            // This is T_camera_head (transforms FROM head TO camera)
+            // For pose chaining, we need T_head_camera = inv(T_camera_head)
+            let t_head_camera_proper = t_head_camera_debug.inverse  // DEBUG: using t_head_camera_debug
+            
+            // t_camera_marker: Maps Camera (OpenCV) → Marker (OpenCV) pose
+            // Chain: T_world_marker = T_world_head * T_head_camera * T_camera_marker
+            // But T_camera_marker is in OpenCV convention, so apply conversion at end
+            
+            let t_world_camera = t_world_head * t_head_camera_proper
+            let t_world_marker_opencv = t_world_camera * t_camera_marker
+            let t_world_marker = t_world_marker_opencv * opencv_to_arkit
+            
+            // DEBUG: Update published properties for real-time UI display (every frame)
+            let headPos = SIMD3<Float>(t_world_head.columns.3.x, t_world_head.columns.3.y, t_world_head.columns.3.z)
+            let camMarkerPos = SIMD3<Float>(t_camera_marker.columns.3.x, t_camera_marker.columns.3.y, t_camera_marker.columns.3.z)
+            let worldMarkerPos = SIMD3<Float>(t_world_marker.columns.3.x, t_world_marker.columns.3.y, t_world_marker.columns.3.z)
+            
+            self.debugHeadPos = headPos
+            self.debugCamMarkerPos = camMarkerPos
+            self.debugWorldMarkerPos = worldMarkerPos
+            
+            // Throttled logging to console
+            let now = Date()
+            if Self.lastDebugLogTime == nil || now.timeIntervalSince(Self.lastDebugLogTime!) > 1.0 {
+                Self.lastDebugLogTime = now
+                dlog("🔬 DEBUG Verification:")
+                dlog("   Head pos: (\(String(format: "%.3f", headPos.x)), \(String(format: "%.3f", headPos.y)), \(String(format: "%.3f", headPos.z)))")
+                dlog("   CamMarker pos: (\(String(format: "%.3f", camMarkerPos.x)), \(String(format: "%.3f", camMarkerPos.y)), \(String(format: "%.3f", camMarkerPos.z)))")
+                dlog("   WorldMarker pos: (\(String(format: "%.3f", worldMarkerPos.x)), \(String(format: "%.3f", worldMarkerPos.y)), \(String(format: "%.3f", worldMarkerPos.z)))")
+            }
+            
+            self.verificationMarkerPose = t_world_marker
+        }
     }
     
     // MARK: - Helper Functions

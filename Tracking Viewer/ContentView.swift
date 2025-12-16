@@ -7,6 +7,13 @@
 
 import SwiftUI
 
+
+func dlog(_ msg: @autoclosure () -> String) {
+    #if DEBUG
+    print(msg())
+    #endif
+}
+
 // MARK: - Main Tab View
 
 struct ContentView: View {

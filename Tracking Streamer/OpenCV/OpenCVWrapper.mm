@@ -8,11 +8,13 @@
 #include <cmath>
 #include <limits>
 #include <vector>
+#include <map>
 
 #include <opencv2/calib3d.hpp>
 #import <opencv2/imgproc.hpp>
 #import <opencv2/imgcodecs.hpp>
 #import <opencv2/objdetect/aruco_detector.hpp>
+#import <opencv2/objdetect/charuco_detector.hpp>
 
 // MARK: - StereoCalibrationResult Implementation
 
@@ -42,6 +44,24 @@
         _foundRight = NO;
         _leftCorners = nil;
         _rightCorners = nil;
+        _visualizedImageData = nil;
+    }
+    return self;
+}
+@end
+
+// MARK: - CharucoDetection Implementation
+
+@implementation CharucoDetection
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        _foundLeft = NO;
+        _foundRight = NO;
+        _leftCorners = nil;
+        _leftIds = nil;
+        _rightCorners = nil;
+        _rightIds = nil;
         _visualizedImageData = nil;
     }
     return self;
@@ -138,11 +158,18 @@ std::vector<cv::Point2f> nsArrayToCorners(NSArray<NSValue *> *array) {
     float _squareSize;
     std::vector<cv::Point3f> _objectPoints;
     
-    // Collected calibration data
+    // Collected calibration data (protected by @synchronized(self))
     std::vector<std::vector<cv::Point2f>> _leftImagePoints;
     std::vector<std::vector<cv::Point2f>> _rightImagePoints;
     std::vector<std::vector<cv::Point3f>> _objectPointsList;
     cv::Size _imageSize;
+    
+    // ChArUco members
+    cv::Ptr<cv::aruco::CharucoBoard> _charucoBoard;
+    cv::Ptr<cv::aruco::CharucoDetector> _charucoDetector;
+    
+    // Lock object for thread-safe access to calibration data
+    NSLock *_dataLock;
 }
 @end
 
@@ -153,6 +180,7 @@ std::vector<cv::Point2f> nsArrayToCorners(NSArray<NSValue *> *array) {
                                    squareSize:(float)squareSize {
     self = [super init];
     if (self) {
+        _dataLock = [[NSLock alloc] init];
         _boardSize = cv::Size(innerCornersX, innerCornersY);
         _squareSize = squareSize;
         
@@ -170,6 +198,46 @@ std::vector<cv::Point2f> nsArrayToCorners(NSArray<NSValue *> *array) {
         
         NSLog(@"📷 [OpenCVCalibrator] Initialized with %dx%d inner corners, %.3fm square size",
               innerCornersX, innerCornersY, squareSize);
+    }
+    return self;
+}
+
+// Helper to convert dictionary type (duplicated from OpenCVArucoDetector to avoid dependency)
+- (cv::aruco::PredefinedDictionaryType)getDictionaryType:(ArucoDictionaryType)type {
+    switch (type) {
+        case ArucoDictionaryTypeDict4X4_50: return cv::aruco::DICT_4X4_50;
+        case ArucoDictionaryTypeDict4X4_100: return cv::aruco::DICT_4X4_100;
+        case ArucoDictionaryTypeDict4X4_250: return cv::aruco::DICT_4X4_250;
+        case ArucoDictionaryTypeDict4X4_1000: return cv::aruco::DICT_4X4_1000;
+        case ArucoDictionaryTypeDict5X5_50: return cv::aruco::DICT_5X5_50;
+        case ArucoDictionaryTypeDict5X5_100: return cv::aruco::DICT_5X5_100;
+        default: return cv::aruco::DICT_4X4_50;
+    }
+}
+
+- (instancetype)initWithCharucoSquaresX:(int)squaresX
+                               squaresY:(int)squaresY
+                             squareSize:(float)squareSize
+                             markerSize:(float)markerSize
+                             dictionary:(ArucoDictionaryType)dictionaryType {
+    self = [super init];
+    if (self) {
+        _dataLock = [[NSLock alloc] init];
+        _boardSize = cv::Size(squaresX, squaresY);
+        _squareSize = squareSize;
+        
+        cv::aruco::PredefinedDictionaryType dictType = [self getDictionaryType:dictionaryType];
+        cv::aruco::Dictionary dictionary = cv::aruco::getPredefinedDictionary(dictType);
+        
+        _charucoBoard = new cv::aruco::CharucoBoard(cv::Size(squaresX, squaresY), squareSize, markerSize, dictionary);
+        _charucoDetector = new cv::aruco::CharucoDetector(*_charucoBoard);
+        
+        // Refine parameters for better accuracy
+        _charucoDetector->setDetectorParameters(cv::aruco::DetectorParameters());
+        _charucoDetector->setRefineParameters(cv::aruco::RefineParameters(10.0f, 3.0f, true)); // minRepDistance, errorCorrectionRate, checkAllOrders
+        
+        NSLog(@"📷 [OpenCVCalibrator] Initialized ChArUco with %dx%d squares, %.3fm square size, %.3fm marker size",
+              squaresX, squaresY, squareSize, markerSize);
     }
     return self;
 }
@@ -201,7 +269,8 @@ std::vector<cv::Point2f> nsArrayToCorners(NSArray<NSValue *> *array) {
 
     // Find corners in left image - try both orientations
     std::vector<cv::Point2f> cornersLeft;
-    int flags = cv::CALIB_CB_ADAPTIVE_THRESH | cv::CALIB_CB_NORMALIZE_IMAGE;
+    // FAST_CHECK quickly rejects frames where pattern is definitely not present
+    int flags = cv::CALIB_CB_ADAPTIVE_THRESH | cv::CALIB_CB_NORMALIZE_IMAGE | cv::CALIB_CB_FAST_CHECK;
     result.foundLeft = cv::findChessboardCorners(grayLeft, _boardSize, cornersLeft, flags);
     
     // If not found, try rotated 90° (swapped dimensions)
@@ -233,6 +302,85 @@ std::vector<cv::Point2f> nsArrayToCorners(NSArray<NSValue *> *array) {
     return result;
 }
 
+- (CharucoDetection * _Nullable)detectCharucoInStereoFrame:(CVPixelBufferRef)pixelBuffer {
+    if (pixelBuffer == nil) {
+        NSLog(@"📷 [OpenCVCalibrator] detectCharucoInStereoFrame: pixelBuffer is nil");
+        return nil;
+    }
+    if (!_charucoDetector) {
+        NSLog(@"📷 [OpenCVCalibrator] detectCharucoInStereoFrame: _charucoDetector is nil - was calibrator initialized with ChArUco?");
+        return nil;
+    }
+
+    CVPixelBufferLockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
+    cv::Mat gray;
+    const bool hasGray = CreateGrayImage(pixelBuffer, gray);
+    CVPixelBufferUnlockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
+
+    if (!hasGray || gray.empty()) {
+        NSLog(@"📷 [OpenCVCalibrator] detectCharucoInStereoFrame: Failed to create gray image");
+        return nil;
+    }
+
+    // Split side-by-side stereo image
+    int width = gray.cols;
+    int height = gray.rows;
+    int halfWidth = width / 2;
+
+    NSLog(@"📷 [OpenCVCalibrator] detectCharucoInStereoFrame: Image size %dx%d, half width %d", width, height, halfWidth);
+
+    cv::Mat grayLeft = gray(cv::Rect(0, 0, halfWidth, height));
+    cv::Mat grayRight = gray(cv::Rect(halfWidth, 0, halfWidth, height));
+
+    CharucoDetection *result = [[CharucoDetection alloc] init];
+
+    // Detect in Left
+    std::vector<int> charucoIdsLeft;
+    std::vector<cv::Point2f> charucoCornersLeft;
+    cv::Mat currentCharucoCornersLeft, currentCharucoIdsLeft;
+    
+    _charucoDetector->detectBoard(grayLeft, currentCharucoCornersLeft, currentCharucoIdsLeft);
+    
+    NSLog(@"📷 [OpenCVCalibrator] Left detection: found %lu corners", (unsigned long)currentCharucoIdsLeft.total());
+    
+    if (currentCharucoIdsLeft.total() > 0) {
+        result.foundLeft = YES;
+        currentCharucoCornersLeft.copyTo(charucoCornersLeft);
+        currentCharucoIdsLeft.copyTo(charucoIdsLeft);
+        
+        result.leftCorners = cornersToNSArray(charucoCornersLeft);
+        NSMutableArray<NSNumber *> *ids = [NSMutableArray arrayWithCapacity:charucoIdsLeft.size()];
+        for (int id : charucoIdsLeft) {
+            [ids addObject:@(id)];
+        }
+        result.leftIds = ids;
+    }
+
+    // Detect in Right
+    std::vector<int> charucoIdsRight;
+    std::vector<cv::Point2f> charucoCornersRight;
+    cv::Mat currentCharucoCornersRight, currentCharucoIdsRight;
+    
+    _charucoDetector->detectBoard(grayRight, currentCharucoCornersRight, currentCharucoIdsRight);
+    
+    NSLog(@"📷 [OpenCVCalibrator] Right detection: found %lu corners", (unsigned long)currentCharucoIdsRight.total());
+    
+    if (currentCharucoIdsRight.total() > 0) {
+        result.foundRight = YES;
+        currentCharucoCornersRight.copyTo(charucoCornersRight);
+        currentCharucoIdsRight.copyTo(charucoIdsRight);
+        
+        result.rightCorners = cornersToNSArray(charucoCornersRight);
+        NSMutableArray<NSNumber *> *ids = [NSMutableArray arrayWithCapacity:charucoIdsRight.size()];
+        for (int id : charucoIdsRight) {
+            [ids addObject:@(id)];
+        }
+        result.rightIds = ids;
+    }
+
+    return result;
+}
+
 - (CheckerboardDetection * _Nullable)detectCheckerboardInMonoFrame:(CVPixelBufferRef)pixelBuffer {
     if (pixelBuffer == nil) {
         return nil;
@@ -250,7 +398,8 @@ std::vector<cv::Point2f> nsArrayToCorners(NSArray<NSValue *> *array) {
     CheckerboardDetection *result = [[CheckerboardDetection alloc] init];
 
     std::vector<cv::Point2f> corners;
-    int flags = cv::CALIB_CB_ADAPTIVE_THRESH | cv::CALIB_CB_NORMALIZE_IMAGE;
+    // FAST_CHECK quickly rejects frames where pattern is definitely not present
+    int flags = cv::CALIB_CB_ADAPTIVE_THRESH | cv::CALIB_CB_NORMALIZE_IMAGE | cv::CALIB_CB_FAST_CHECK;
     
     // Try original orientation first
     result.foundLeft = cv::findChessboardCorners(gray, _boardSize, corners, flags);
@@ -270,6 +419,44 @@ std::vector<cv::Point2f> nsArrayToCorners(NSArray<NSValue *> *array) {
     return result;
 }
 
+- (CharucoDetection * _Nullable)detectCharucoInMonoFrame:(CVPixelBufferRef)pixelBuffer {
+    if (pixelBuffer == nil || !_charucoDetector) {
+        return nil;
+    }
+
+    CVPixelBufferLockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
+    cv::Mat gray;
+    const bool hasGray = CreateGrayImage(pixelBuffer, gray);
+    CVPixelBufferUnlockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
+
+    if (!hasGray || gray.empty()) {
+        return nil;
+    }
+
+    CharucoDetection *result = [[CharucoDetection alloc] init];
+
+    std::vector<int> charucoIds;
+    std::vector<cv::Point2f> charucoCorners;
+    cv::Mat currentCharucoCorners, currentCharucoIds;
+    
+    _charucoDetector->detectBoard(gray, currentCharucoCorners, currentCharucoIds);
+    
+    if (currentCharucoIds.total() > 0) {
+        result.foundLeft = YES;  // Use 'foundLeft' for mono
+        currentCharucoCorners.copyTo(charucoCorners);
+        currentCharucoIds.copyTo(charucoIds);
+        
+        result.leftCorners = cornersToNSArray(charucoCorners);
+        NSMutableArray<NSNumber *> *ids = [NSMutableArray arrayWithCapacity:charucoIds.size()];
+        for (int id : charucoIds) {
+            [ids addObject:@(id)];
+        }
+        result.leftIds = ids;
+    }
+
+    return result;
+}
+
 - (int)addCalibrationSampleWithLeftCorners:(NSArray<NSValue *> *)leftCorners
                               rightCorners:(NSArray<NSValue *> *)rightCorners
                                 imageWidth:(int)imageWidth
@@ -277,13 +464,16 @@ std::vector<cv::Point2f> nsArrayToCorners(NSArray<NSValue *> *array) {
     auto cornersL = nsArrayToCorners(leftCorners);
     auto cornersR = nsArrayToCorners(rightCorners);
 
+    [_dataLock lock];
     _leftImagePoints.push_back(cornersL);
     _rightImagePoints.push_back(cornersR);
     _objectPointsList.push_back(_objectPoints);
     _imageSize = cv::Size(imageWidth, imageHeight);
+    int count = static_cast<int>(_leftImagePoints.size());
+    [_dataLock unlock];
 
-    NSLog(@"📷 [OpenCVCalibrator] Added stereo sample #%lu", _leftImagePoints.size());
-    return static_cast<int>(_leftImagePoints.size());
+    NSLog(@"📷 [OpenCVCalibrator] Added stereo sample #%d", count);
+    return count;
 }
 
 - (int)addMonoCalibrationSampleWithCorners:(NSArray<NSValue *> *)corners
@@ -291,48 +481,168 @@ std::vector<cv::Point2f> nsArrayToCorners(NSArray<NSValue *> *array) {
                                imageHeight:(int)imageHeight {
     auto cornersVec = nsArrayToCorners(corners);
 
+    [_dataLock lock];
     _leftImagePoints.push_back(cornersVec);
     _objectPointsList.push_back(_objectPoints);
     _imageSize = cv::Size(imageWidth, imageHeight);
+    int count = static_cast<int>(_leftImagePoints.size());
+    [_dataLock unlock];
 
-    NSLog(@"📷 [OpenCVCalibrator] Added mono sample #%lu", _leftImagePoints.size());
-    return static_cast<int>(_leftImagePoints.size());
+    NSLog(@"📷 [OpenCVCalibrator] Added mono sample #%d", count);
+    return count;
 }
 
+- (int)addCharucoSampleWithLeftCorners:(NSArray<NSValue *> *)leftCorners
+                               leftIds:(NSArray<NSNumber *> *)leftIds
+                          rightCorners:(NSArray<NSValue *> *)rightCorners
+                              rightIds:(NSArray<NSNumber *> *)rightIds
+                            imageWidth:(int)imageWidth
+                           imageHeight:(int)imageHeight {
+    if (!_charucoBoard) return 0;
+    
+    auto cornersL = nsArrayToCorners(leftCorners);
+    auto cornersR = nsArrayToCorners(rightCorners);
+    
+    std::vector<int> idsL;
+    for (NSNumber *num in leftIds) idsL.push_back([num intValue]);
+    
+    std::vector<int> idsR;
+    for (NSNumber *num in rightIds) idsR.push_back([num intValue]);
+    
+    // For ChArUco, we need to find the common subset of object points for both views if we want stereo calibration?
+    // Actually, cv::stereoCalibrate takes objectPoints for each image pair. 
+    // BUT, the objectPoints for the pair MUST be the same (the pattern in the world).
+    // The detected corners must correspond to the SAME object points.
+    // In ChArUco, left and right might detect slightly different subsets of corners.
+    // We must find the INTERSECTION of detected corner IDs and only use those.
+    
+    // Find common IDs
+    std::vector<int> commonIds;
+    std::vector<cv::Point2f> commonCornersL;
+    std::vector<cv::Point2f> commonCornersR;
+    
+    // Map ID -> Index for fast lookup
+    std::map<int, int> leftMap;
+    for (size_t i = 0; i < idsL.size(); i++) leftMap[idsL[i]] = i;
+    
+    for (size_t i = 0; i < idsR.size(); i++) {
+        int id = idsR[i];
+        if (leftMap.count(id)) {
+            commonIds.push_back(id);
+            commonCornersL.push_back(cornersL[leftMap[id]]);
+            commonCornersR.push_back(cornersR[i]);
+        }
+    }
+    
+    if (commonIds.size() < 4) {
+        [_dataLock lock];
+        int count = static_cast<int>(_leftImagePoints.size());
+        [_dataLock unlock];
+        NSLog(@"⚠️ [OpenCVCalibrator] Skipping ChArUco sample: only %lu common corners (need 4+)", commonIds.size());
+        return count;
+    }
+    
+    // Get object points for common IDs
+    std::vector<cv::Point3f> objPoints;
+    std::vector<cv::Point2f> imgPointsUnused; // We already have them
+    _charucoBoard->matchImagePoints(commonCornersL, commonIds, objPoints, imgPointsUnused);
+    
+    [_dataLock lock];
+    _leftImagePoints.push_back(commonCornersL);
+    _rightImagePoints.push_back(commonCornersR);
+    _objectPointsList.push_back(objPoints);
+    _imageSize = cv::Size(imageWidth, imageHeight);
+    int count = static_cast<int>(_leftImagePoints.size());
+    [_dataLock unlock];
+    
+    NSLog(@"📷 [OpenCVCalibrator] Added ChArUco stereo sample #%d with %lu common corners", 
+          count, commonIds.size());
+    return count;
+}
+
+- (int)addMonoCharucoSampleWithCorners:(NSArray<NSValue *> *)corners
+                                   ids:(NSArray<NSNumber *> *)ids
+                            imageWidth:(int)imageWidth
+                           imageHeight:(int)imageHeight {
+    if (!_charucoBoard) return 0;
+
+    auto cornersVec = nsArrayToCorners(corners);
+    std::vector<int> idsVec;
+    for (NSNumber *num in ids) idsVec.push_back([num intValue]);
+    
+    if (idsVec.size() < 4) {
+        [_dataLock lock];
+        int count = static_cast<int>(_leftImagePoints.size());
+        [_dataLock unlock];
+        return count;
+    }
+    
+    // Get object points
+    std::vector<cv::Point3f> objPoints;
+    std::vector<cv::Point2f> imgPointsUnused;
+    _charucoBoard->matchImagePoints(cornersVec, idsVec, objPoints, imgPointsUnused);
+    
+    [_dataLock lock];
+    _leftImagePoints.push_back(cornersVec);
+    _objectPointsList.push_back(objPoints);
+    _imageSize = cv::Size(imageWidth, imageHeight);
+    int count = static_cast<int>(_leftImagePoints.size());
+    [_dataLock unlock];
+    
+    NSLog(@"📷 [OpenCVCalibrator] Added ChArUco mono sample #%d with %lu corners", 
+          count, idsVec.size());
+    return count;
+}
+
+
+
 - (int)sampleCount {
-    return static_cast<int>(_leftImagePoints.size());
+    [_dataLock lock];
+    int count = static_cast<int>(_leftImagePoints.size());
+    [_dataLock unlock];
+    return count;
 }
 
 - (void)clearSamples {
+    [_dataLock lock];
     _leftImagePoints.clear();
     _rightImagePoints.clear();
     _objectPointsList.clear();
+    [_dataLock unlock];
     NSLog(@"📷 [OpenCVCalibrator] Cleared all calibration samples");
 }
 
 - (StereoCalibrationResult * _Nullable)performStereoCalibrationWithMinSamples:(int)minSamples {
     StereoCalibrationResult *result = [[StereoCalibrationResult alloc] init];
 
-    if (_leftImagePoints.size() < static_cast<size_t>(minSamples)) {
+    // Copy data under lock to avoid holding lock during calibration
+    [_dataLock lock];
+    std::vector<std::vector<cv::Point3f>> objectPoints = _objectPointsList;
+    std::vector<std::vector<cv::Point2f>> leftImagePoints = _leftImagePoints;
+    std::vector<std::vector<cv::Point2f>> rightImagePoints = _rightImagePoints;
+    cv::Size imageSize = _imageSize;
+    [_dataLock unlock];
+    
+    if (leftImagePoints.size() < static_cast<size_t>(minSamples)) {
         result.success = NO;
         result.errorMessage = [NSString stringWithFormat:@"Not enough samples: %lu < %d", 
-                               _leftImagePoints.size(), minSamples];
+                               leftImagePoints.size(), minSamples];
         return result;
     }
 
-    if (_leftImagePoints.size() != _rightImagePoints.size()) {
+    if (leftImagePoints.size() != rightImagePoints.size()) {
         result.success = NO;
         result.errorMessage = @"Left and right sample counts don't match";
         return result;
     }
 
-    NSLog(@"📷 [OpenCVCalibrator] Starting stereo calibration with %lu samples...", _leftImagePoints.size());
+    NSLog(@"📷 [OpenCVCalibrator] Starting stereo calibration with %lu samples...", leftImagePoints.size());
 
     try {
         // Calibrate left camera
         cv::Mat K_L, dist_L;
         std::vector<cv::Mat> rvecs_L, tvecs_L;
-        double retL = cv::calibrateCamera(_objectPointsList, _leftImagePoints, _imageSize,
+        double retL = cv::calibrateCamera(objectPoints, leftImagePoints, imageSize,
                                           K_L, dist_L, rvecs_L, tvecs_L);
         result.leftReprojectionError = retL;
         NSLog(@"📷 [OpenCVCalibrator] Left camera reprojection error: %.4f", retL);
@@ -340,7 +650,7 @@ std::vector<cv::Point2f> nsArrayToCorners(NSArray<NSValue *> *array) {
         // Calibrate right camera
         cv::Mat K_R, dist_R;
         std::vector<cv::Mat> rvecs_R, tvecs_R;
-        double retR = cv::calibrateCamera(_objectPointsList, _rightImagePoints, _imageSize,
+        double retR = cv::calibrateCamera(objectPoints, rightImagePoints, imageSize,
                                           K_R, dist_R, rvecs_R, tvecs_R);
         result.rightReprojectionError = retR;
         NSLog(@"📷 [OpenCVCalibrator] Right camera reprojection error: %.4f", retR);
@@ -349,11 +659,11 @@ std::vector<cv::Point2f> nsArrayToCorners(NSArray<NSValue *> *array) {
         cv::Mat R, T, E, F;
         cv::TermCriteria criteria(cv::TermCriteria::MAX_ITER | cv::TermCriteria::EPS, 100, 1e-5);
         double rms = cv::stereoCalibrate(
-            _objectPointsList,
-            _leftImagePoints, _rightImagePoints,
+            objectPoints,
+            leftImagePoints, rightImagePoints,
             K_L, dist_L,
             K_R, dist_R,
-            _imageSize,
+            imageSize,
             R, T, E, F,
             cv::CALIB_FIX_INTRINSIC,
             criteria
@@ -410,8 +720,8 @@ std::vector<cv::Point2f> nsArrayToCorners(NSArray<NSValue *> *array) {
         }
         result.translationVector = translation;
 
-        result.imageWidth = _imageSize.width;
-        result.imageHeight = _imageSize.height;
+        result.imageWidth = imageSize.width;
+        result.imageHeight = imageSize.height;
         result.success = YES;
 
         NSLog(@"✅ [OpenCVCalibrator] Stereo calibration successful!");
@@ -425,25 +735,106 @@ std::vector<cv::Point2f> nsArrayToCorners(NSArray<NSValue *> *array) {
     return result;
 }
 
-- (StereoCalibrationResult * _Nullable)performMonoCalibrationWithMinSamples:(int)minSamples {
+- (StereoCalibrationResult * _Nullable)performMonoCalibrationWithMinSamples:(int)minSamples
+                                                          outlierRejection:(BOOL)outlierRejection {
     StereoCalibrationResult *result = [[StereoCalibrationResult alloc] init];
 
-    if (_leftImagePoints.size() < static_cast<size_t>(minSamples)) {
+    // Copy data under lock to avoid holding lock during calibration
+    [_dataLock lock];
+    std::vector<std::vector<cv::Point3f>> objectPoints = _objectPointsList;
+    std::vector<std::vector<cv::Point2f>> imagePoints = _leftImagePoints;
+    cv::Size imageSize = _imageSize;
+    size_t totalSampleCount = _leftImagePoints.size();
+    [_dataLock unlock];
+    
+    if (imagePoints.size() < static_cast<size_t>(minSamples)) {
         result.success = NO;
         result.errorMessage = [NSString stringWithFormat:@"Not enough samples: %lu < %d", 
-                               _leftImagePoints.size(), minSamples];
+                               imagePoints.size(), minSamples];
         return result;
     }
 
-    NSLog(@"📷 [OpenCVCalibrator] Starting mono calibration with %lu samples...", _leftImagePoints.size());
+    NSLog(@"📷 [OpenCVCalibrator] Starting mono calibration with %lu samples (outlier rejection: %@)...", 
+          imagePoints.size(), outlierRejection ? @"YES" : @"NO");
 
     try {
         cv::Mat K, dist;
         std::vector<cv::Mat> rvecs, tvecs;
-        double ret = cv::calibrateCamera(_objectPointsList, _leftImagePoints, _imageSize,
+        
+        // Initial calibration
+        double ret = cv::calibrateCamera(objectPoints, imagePoints, imageSize,
                                          K, dist, rvecs, tvecs);
+        NSLog(@"📷 [OpenCVCalibrator] Initial reprojection error: %.4f", ret);
+        
+        // Outlier rejection: only run when requested (slower but more accurate)
+        if (outlierRejection) {
+            const int maxIterations = 3;
+            for (int iteration = 0; iteration < maxIterations; ++iteration) {
+            if (imagePoints.size() < static_cast<size_t>(minSamples)) break;
+            
+            std::vector<double> sampleErrors;
+            for (size_t i = 0; i < imagePoints.size(); ++i) {
+                std::vector<cv::Point2f> projected;
+                cv::projectPoints(objectPoints[i], rvecs[i], tvecs[i], K, dist, projected);
+                
+                double sumErr = 0.0;
+                for (size_t j = 0; j < projected.size(); ++j) {
+                    double dx = projected[j].x - imagePoints[i][j].x;
+                    double dy = projected[j].y - imagePoints[i][j].y;
+                    sumErr += sqrt(dx*dx + dy*dy);
+                }
+                sampleErrors.push_back(sumErr / projected.size());
+            }
+            
+            // Compute mean and std of sample errors
+            double mean = 0.0;
+            for (double e : sampleErrors) mean += e;
+            mean /= sampleErrors.size();
+            
+            double variance = 0.0;
+            for (double e : sampleErrors) variance += (e - mean) * (e - mean);
+            double std = sqrt(variance / sampleErrors.size());
+            
+            // Threshold: mean + 1.5 * std
+            double threshold = mean + 1.5 * std;
+            
+            // Remove outliers
+            std::vector<std::vector<cv::Point3f>> newObjectPoints;
+            std::vector<std::vector<cv::Point2f>> newImagePoints;
+            int removed = 0;
+            for (size_t i = 0; i < sampleErrors.size(); ++i) {
+                if (sampleErrors[i] <= threshold) {
+                    newObjectPoints.push_back(objectPoints[i]);
+                    newImagePoints.push_back(imagePoints[i]);
+                } else {
+                    removed++;
+                }
+            }
+            
+            if (removed == 0) break;  // No outliers to remove
+            
+            NSLog(@"📷 [OpenCVCalibrator] Outlier rejection iter %d: removed %d samples (threshold: %.3f)", 
+                  iteration + 1, removed, threshold);
+            
+            // Re-calibrate without outliers
+            objectPoints = newObjectPoints;
+            imagePoints = newImagePoints;
+            
+            if (imagePoints.size() < static_cast<size_t>(minSamples)) {
+                NSLog(@"⚠️ [OpenCVCalibrator] Too few samples after outlier rejection");
+                break;
+            }
+            
+            rvecs.clear();
+            tvecs.clear();
+            ret = cv::calibrateCamera(objectPoints, imagePoints, imageSize,
+                                      K, dist, rvecs, tvecs);
+            NSLog(@"📷 [OpenCVCalibrator] Reprojection error after removal: %.4f", ret);
+            }
+        }  // end if (outlierRejection)
+        
         result.leftReprojectionError = ret;
-        NSLog(@"📷 [OpenCVCalibrator] Camera reprojection error: %.4f", ret);
+        NSLog(@"📷 [OpenCVCalibrator] Final reprojection error: %.4f (used %lu samples)", ret, imagePoints.size());
 
         // Convert results to NSArrays
         NSMutableArray<NSNumber *> *intrinsicK = [NSMutableArray arrayWithCapacity:9];
@@ -460,8 +851,8 @@ std::vector<cv::Point2f> nsArrayToCorners(NSArray<NSValue *> *array) {
         }
         result.leftDistortionCoeffs = distCoeffs;
 
-        result.imageWidth = _imageSize.width;
-        result.imageHeight = _imageSize.height;
+        result.imageWidth = imageSize.width;
+        result.imageHeight = imageSize.height;
         result.success = YES;
 
         NSLog(@"✅ [OpenCVCalibrator] Mono calibration successful!");
@@ -524,6 +915,132 @@ std::vector<cv::Point2f> nsArrayToCorners(NSArray<NSValue *> *array) {
     return [NSData dataWithBytes:buffer.data() length:buffer.size()];
 }
 
+- (NSData * _Nullable)visualizeStereoCheckerboardInPixelBuffer:(CVPixelBufferRef)pixelBuffer
+                                                   leftCorners:(NSArray<NSValue *> * _Nullable)leftCorners
+                                                  rightCorners:(NSArray<NSValue *> * _Nullable)rightCorners
+                                                     foundLeft:(BOOL)foundLeft
+                                                    foundRight:(BOOL)foundRight {
+    if (pixelBuffer == nil) {
+        return nil;
+    }
+
+    CVPixelBufferLockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
+    cv::Mat color;
+    const bool hasColor = CreateColorImage(pixelBuffer, color);
+    CVPixelBufferUnlockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
+
+    if (!hasColor || color.empty()) {
+        return nil;
+    }
+
+    int width = color.cols;
+    int halfWidth = width / 2;
+    int height = color.rows;
+
+    // Draw on left half
+    if (foundLeft && leftCorners != nil) {
+        cv::Mat leftHalf = color(cv::Rect(0, 0, halfWidth, height));
+        auto cornersVec = nsArrayToCorners(leftCorners);
+        cv::drawChessboardCorners(leftHalf, _boardSize, cornersVec, foundLeft);
+    }
+
+    // Draw on right half (corners need to be offset by halfWidth)
+    if (foundRight && rightCorners != nil) {
+        auto cornersVec = nsArrayToCorners(rightCorners);
+        // Offset corners to the right half of the image
+        for (auto& corner : cornersVec) {
+            corner.x += halfWidth;
+        }
+        cv::Mat fullImage = color;  // Work on full image with offset corners
+        cv::drawChessboardCorners(fullImage, _boardSize, cornersVec, foundRight);
+    }
+
+    // Encode as JPEG
+    std::vector<uchar> buffer;
+    std::vector<int> params = {cv::IMWRITE_JPEG_QUALITY, 85};
+    if (!cv::imencode(".jpg", color, buffer, params)) {
+        return nil;
+    }
+
+    return [NSData dataWithBytes:buffer.data() length:buffer.size()];
+}
+
+- (NSData * _Nullable)visualizeCharucoInPixelBuffer:(CVPixelBufferRef)pixelBuffer
+                                            corners:(NSArray<NSValue *> * _Nullable)corners
+                                                ids:(NSArray<NSNumber *> * _Nullable)ids
+                                              found:(BOOL)found {
+    if (pixelBuffer == nil) return nil;
+
+    CVPixelBufferLockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
+    cv::Mat color;
+    const bool hasColor = CreateColorImage(pixelBuffer, color);
+    CVPixelBufferUnlockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
+
+    if (!hasColor || color.empty()) return nil;
+
+    if (found && corners != nil && ids != nil) {
+        auto cornersVec = nsArrayToCorners(corners);
+        std::vector<int> idsVec;
+        for (NSNumber *num in ids) idsVec.push_back([num intValue]);
+        
+        cv::aruco::drawDetectedCornersCharuco(color, cornersVec, idsVec, cv::Scalar(0, 255, 0));
+    }
+
+    std::vector<uchar> buffer;
+    std::vector<int> params = {cv::IMWRITE_JPEG_QUALITY, 85};
+    if (!cv::imencode(".jpg", color, buffer, params)) return nil;
+    return [NSData dataWithBytes:buffer.data() length:buffer.size()];
+}
+
+- (NSData * _Nullable)visualizeStereoCharucoInPixelBuffer:(CVPixelBufferRef)pixelBuffer
+                                              leftCorners:(NSArray<NSValue *> * _Nullable)leftCorners
+                                                  leftIds:(NSArray<NSNumber *> * _Nullable)leftIds
+                                             rightCorners:(NSArray<NSValue *> * _Nullable)rightCorners
+                                                 rightIds:(NSArray<NSNumber *> * _Nullable)rightIds
+                                                foundLeft:(BOOL)foundLeft
+                                               foundRight:(BOOL)foundRight {
+    if (pixelBuffer == nil) return nil;
+
+    CVPixelBufferLockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
+    cv::Mat color;
+    const bool hasColor = CreateColorImage(pixelBuffer, color);
+    CVPixelBufferUnlockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
+
+    if (!hasColor || color.empty()) return nil;
+
+    int width = color.cols;
+    int halfWidth = width / 2;
+    int height = color.rows;
+
+    // Draw Left
+    if (foundLeft && leftCorners != nil && leftIds != nil) {
+        cv::Mat leftHalf = color(cv::Rect(0, 0, halfWidth, height));
+        auto cornersVec = nsArrayToCorners(leftCorners);
+        std::vector<int> idsVec;
+        for (NSNumber *num in leftIds) idsVec.push_back([num intValue]);
+        
+        cv::aruco::drawDetectedCornersCharuco(leftHalf, cornersVec, idsVec, cv::Scalar(0, 255, 0));
+    }
+
+    // Draw Right
+    if (foundRight && rightCorners != nil && rightIds != nil) {
+        auto cornersVec = nsArrayToCorners(rightCorners);
+        std::vector<int> idsVec;
+        for (NSNumber *num in rightIds) idsVec.push_back([num intValue]);
+        
+        // Offset
+        for (auto& corner : cornersVec) corner.x += halfWidth;
+        
+        cv::Mat fullImage = color;
+        cv::aruco::drawDetectedCornersCharuco(fullImage, cornersVec, idsVec, cv::Scalar(0, 255, 0));
+    }
+
+    std::vector<uchar> buffer;
+    std::vector<int> params = {cv::IMWRITE_JPEG_QUALITY, 85};
+    if (!cv::imencode(".jpg", color, buffer, params)) return nil;
+    return [NSData dataWithBytes:buffer.data() length:buffer.size()];
+}
+
 @end
 
 // MARK: - ArucoDetectionResult Implementation
@@ -569,27 +1086,27 @@ std::vector<cv::Point2f> nsArrayToCorners(NSArray<NSValue *> *array) {
 
 - (cv::aruco::PredefinedDictionaryType)cvDictionaryType:(ArucoDictionaryType)type {
     switch (type) {
-        case ArucoDictionary_4X4_50: return cv::aruco::DICT_4X4_50;
-        case ArucoDictionary_4X4_100: return cv::aruco::DICT_4X4_100;
-        case ArucoDictionary_4X4_250: return cv::aruco::DICT_4X4_250;
-        case ArucoDictionary_4X4_1000: return cv::aruco::DICT_4X4_1000;
-        case ArucoDictionary_5X5_50: return cv::aruco::DICT_5X5_50;
-        case ArucoDictionary_5X5_100: return cv::aruco::DICT_5X5_100;
-        case ArucoDictionary_5X5_250: return cv::aruco::DICT_5X5_250;
-        case ArucoDictionary_5X5_1000: return cv::aruco::DICT_5X5_1000;
-        case ArucoDictionary_6X6_50: return cv::aruco::DICT_6X6_50;
-        case ArucoDictionary_6X6_100: return cv::aruco::DICT_6X6_100;
-        case ArucoDictionary_6X6_250: return cv::aruco::DICT_6X6_250;
-        case ArucoDictionary_6X6_1000: return cv::aruco::DICT_6X6_1000;
-        case ArucoDictionary_7X7_50: return cv::aruco::DICT_7X7_50;
-        case ArucoDictionary_7X7_100: return cv::aruco::DICT_7X7_100;
-        case ArucoDictionary_7X7_250: return cv::aruco::DICT_7X7_250;
-        case ArucoDictionary_7X7_1000: return cv::aruco::DICT_7X7_1000;
-        case ArucoDictionary_ARUCO_ORIGINAL: return cv::aruco::DICT_ARUCO_ORIGINAL;
-        case ArucoDictionary_APRILTAG_16h5: return cv::aruco::DICT_APRILTAG_16h5;
-        case ArucoDictionary_APRILTAG_25h9: return cv::aruco::DICT_APRILTAG_25h9;
-        case ArucoDictionary_APRILTAG_36h10: return cv::aruco::DICT_APRILTAG_36h10;
-        case ArucoDictionary_APRILTAG_36h11: return cv::aruco::DICT_APRILTAG_36h11;
+        case ArucoDictionaryTypeDict4X4_50: return cv::aruco::DICT_4X4_50;
+        case ArucoDictionaryTypeDict4X4_100: return cv::aruco::DICT_4X4_100;
+        case ArucoDictionaryTypeDict4X4_250: return cv::aruco::DICT_4X4_250;
+        case ArucoDictionaryTypeDict4X4_1000: return cv::aruco::DICT_4X4_1000;
+        case ArucoDictionaryTypeDict5X5_50: return cv::aruco::DICT_5X5_50;
+        case ArucoDictionaryTypeDict5X5_100: return cv::aruco::DICT_5X5_100;
+        case ArucoDictionaryTypeDict5X5_250: return cv::aruco::DICT_5X5_250;
+        case ArucoDictionaryTypeDict5X5_1000: return cv::aruco::DICT_5X5_1000;
+        case ArucoDictionaryTypeDict6X6_50: return cv::aruco::DICT_6X6_50;
+        case ArucoDictionaryTypeDict6X6_100: return cv::aruco::DICT_6X6_100;
+        case ArucoDictionaryTypeDict6X6_250: return cv::aruco::DICT_6X6_250;
+        case ArucoDictionaryTypeDict6X6_1000: return cv::aruco::DICT_6X6_1000;
+        case ArucoDictionaryTypeDict7X7_50: return cv::aruco::DICT_7X7_50;
+        case ArucoDictionaryTypeDict7X7_100: return cv::aruco::DICT_7X7_100;
+        case ArucoDictionaryTypeDict7X7_250: return cv::aruco::DICT_7X7_250;
+        case ArucoDictionaryTypeDict7X7_1000: return cv::aruco::DICT_7X7_1000;
+        case ArucoDictionaryTypeDictOriginal: return cv::aruco::DICT_ARUCO_ORIGINAL;
+        case ArucoDictionaryTypeDictAprilTag16h5: return cv::aruco::DICT_APRILTAG_16h5;
+        case ArucoDictionaryTypeDictAprilTag25h9: return cv::aruco::DICT_APRILTAG_25h9;
+        case ArucoDictionaryTypeDictAprilTag36h10: return cv::aruco::DICT_APRILTAG_36h10;
+        case ArucoDictionaryTypeDictAprilTag36h11: return cv::aruco::DICT_APRILTAG_36h11;
         default: return cv::aruco::DICT_4X4_50;
     }
 }
@@ -777,27 +1294,27 @@ std::vector<cv::Point2f> nsArrayToCorners(NSArray<NSValue *> *array) {
                                      dictionary:(ArucoDictionaryType)dictionaryType {
     cv::aruco::PredefinedDictionaryType cvType;
     switch (dictionaryType) {
-        case ArucoDictionary_4X4_50: cvType = cv::aruco::DICT_4X4_50; break;
-        case ArucoDictionary_4X4_100: cvType = cv::aruco::DICT_4X4_100; break;
-        case ArucoDictionary_4X4_250: cvType = cv::aruco::DICT_4X4_250; break;
-        case ArucoDictionary_4X4_1000: cvType = cv::aruco::DICT_4X4_1000; break;
-        case ArucoDictionary_5X5_50: cvType = cv::aruco::DICT_5X5_50; break;
-        case ArucoDictionary_5X5_100: cvType = cv::aruco::DICT_5X5_100; break;
-        case ArucoDictionary_5X5_250: cvType = cv::aruco::DICT_5X5_250; break;
-        case ArucoDictionary_5X5_1000: cvType = cv::aruco::DICT_5X5_1000; break;
-        case ArucoDictionary_6X6_50: cvType = cv::aruco::DICT_6X6_50; break;
-        case ArucoDictionary_6X6_100: cvType = cv::aruco::DICT_6X6_100; break;
-        case ArucoDictionary_6X6_250: cvType = cv::aruco::DICT_6X6_250; break;
-        case ArucoDictionary_6X6_1000: cvType = cv::aruco::DICT_6X6_1000; break;
-        case ArucoDictionary_7X7_50: cvType = cv::aruco::DICT_7X7_50; break;
-        case ArucoDictionary_7X7_100: cvType = cv::aruco::DICT_7X7_100; break;
-        case ArucoDictionary_7X7_250: cvType = cv::aruco::DICT_7X7_250; break;
-        case ArucoDictionary_7X7_1000: cvType = cv::aruco::DICT_7X7_1000; break;
-        case ArucoDictionary_ARUCO_ORIGINAL: cvType = cv::aruco::DICT_ARUCO_ORIGINAL; break;
-        case ArucoDictionary_APRILTAG_16h5: cvType = cv::aruco::DICT_APRILTAG_16h5; break;
-        case ArucoDictionary_APRILTAG_25h9: cvType = cv::aruco::DICT_APRILTAG_25h9; break;
-        case ArucoDictionary_APRILTAG_36h10: cvType = cv::aruco::DICT_APRILTAG_36h10; break;
-        case ArucoDictionary_APRILTAG_36h11: cvType = cv::aruco::DICT_APRILTAG_36h11; break;
+        case ArucoDictionaryTypeDict4X4_50: cvType = cv::aruco::DICT_4X4_50; break;
+        case ArucoDictionaryTypeDict4X4_100: cvType = cv::aruco::DICT_4X4_100; break;
+        case ArucoDictionaryTypeDict4X4_250: cvType = cv::aruco::DICT_4X4_250; break;
+        case ArucoDictionaryTypeDict4X4_1000: cvType = cv::aruco::DICT_4X4_1000; break;
+        case ArucoDictionaryTypeDict5X5_50: cvType = cv::aruco::DICT_5X5_50; break;
+        case ArucoDictionaryTypeDict5X5_100: cvType = cv::aruco::DICT_5X5_100; break;
+        case ArucoDictionaryTypeDict5X5_250: cvType = cv::aruco::DICT_5X5_250; break;
+        case ArucoDictionaryTypeDict5X5_1000: cvType = cv::aruco::DICT_5X5_1000; break;
+        case ArucoDictionaryTypeDict6X6_50: cvType = cv::aruco::DICT_6X6_50; break;
+        case ArucoDictionaryTypeDict6X6_100: cvType = cv::aruco::DICT_6X6_100; break;
+        case ArucoDictionaryTypeDict6X6_250: cvType = cv::aruco::DICT_6X6_250; break;
+        case ArucoDictionaryTypeDict6X6_1000: cvType = cv::aruco::DICT_6X6_1000; break;
+        case ArucoDictionaryTypeDict7X7_50: cvType = cv::aruco::DICT_7X7_50; break;
+        case ArucoDictionaryTypeDict7X7_100: cvType = cv::aruco::DICT_7X7_100; break;
+        case ArucoDictionaryTypeDict7X7_250: cvType = cv::aruco::DICT_7X7_250; break;
+        case ArucoDictionaryTypeDict7X7_1000: cvType = cv::aruco::DICT_7X7_1000; break;
+        case ArucoDictionaryTypeDictOriginal: cvType = cv::aruco::DICT_ARUCO_ORIGINAL; break;
+        case ArucoDictionaryTypeDictAprilTag16h5: cvType = cv::aruco::DICT_APRILTAG_16h5; break;
+        case ArucoDictionaryTypeDictAprilTag25h9: cvType = cv::aruco::DICT_APRILTAG_25h9; break;
+        case ArucoDictionaryTypeDictAprilTag36h10: cvType = cv::aruco::DICT_APRILTAG_36h10; break;
+        case ArucoDictionaryTypeDictAprilTag36h11: cvType = cv::aruco::DICT_APRILTAG_36h11; break;
         default: cvType = cv::aruco::DICT_4X4_50; break;
     }
 
@@ -807,6 +1324,187 @@ std::vector<cv::Point2f> nsArrayToCorners(NSArray<NSValue *> *array) {
 
     std::vector<uchar> buffer;
     if (!cv::imencode(".png", markerImage, buffer)) {
+        return nil;
+    }
+
+    return [NSData dataWithBytes:buffer.data() length:buffer.size()];
+}
+
+- (NSData * _Nullable)visualizeMarkersInPixelBuffer:(CVPixelBufferRef)pixelBuffer
+                                         detections:(NSArray<ArucoDetectionResult *> *)detections
+                                           drawAxes:(BOOL)drawAxes
+                                       cameraMatrix:(NSArray<NSNumber *> * _Nullable)cameraMatrix
+                                         distCoeffs:(NSArray<NSNumber *> * _Nullable)distCoeffs
+                                         axisLength:(float)axisLength {
+    if (pixelBuffer == nil || detections == nil || detections.count == 0) {
+        return nil;
+    }
+
+    CVPixelBufferLockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
+    cv::Mat color;
+    const bool hasColor = CreateColorImage(pixelBuffer, color);
+    CVPixelBufferUnlockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
+
+    if (!hasColor || color.empty()) {
+        return nil;
+    }
+
+    // Build camera matrix if provided (for axis drawing)
+    cv::Mat K, dist;
+    bool canDrawAxes = drawAxes && cameraMatrix != nil && cameraMatrix.count == 9;
+    if (canDrawAxes) {
+        K = cv::Mat::zeros(3, 3, CV_64F);
+        for (int i = 0; i < 3; ++i) {
+            for (int j = 0; j < 3; ++j) {
+                K.at<double>(i, j) = cameraMatrix[i * 3 + j].doubleValue;
+            }
+        }
+        if (distCoeffs != nil) {
+            dist = cv::Mat::zeros(1, static_cast<int>(distCoeffs.count), CV_64F);
+            for (NSUInteger i = 0; i < distCoeffs.count; ++i) {
+                dist.at<double>(0, static_cast<int>(i)) = distCoeffs[i].doubleValue;
+            }
+        } else {
+            dist = cv::Mat::zeros(1, 5, CV_64F);
+        }
+    }
+
+    // Draw each detected marker
+    for (ArucoDetectionResult *detection in detections) {
+        if (detection.corners.count != 4) {
+            continue;
+        }
+
+        // Convert corners to OpenCV format
+        std::vector<cv::Point2f> markerCorners;
+        for (NSValue *value in detection.corners) {
+            CGPoint point = [value CGPointValue];
+            markerCorners.push_back(cv::Point2f(static_cast<float>(point.x), static_cast<float>(point.y)));
+        }
+
+        // Draw marker outline (thick green line)
+        for (int j = 0; j < 4; ++j) {
+            cv::line(color, 
+                     cv::Point(static_cast<int>(markerCorners[j].x), static_cast<int>(markerCorners[j].y)),
+                     cv::Point(static_cast<int>(markerCorners[(j + 1) % 4].x), static_cast<int>(markerCorners[(j + 1) % 4].y)),
+                     cv::Scalar(0, 255, 0), 3);
+        }
+
+        // Draw corner circles
+        for (int j = 0; j < 4; ++j) {
+            cv::Scalar cornerColor = (j == 0) ? cv::Scalar(255, 0, 0) : cv::Scalar(0, 0, 255);  // First corner blue, others red
+            cv::circle(color, 
+                       cv::Point(static_cast<int>(markerCorners[j].x), static_cast<int>(markerCorners[j].y)),
+                       6, cornerColor, -1);
+        }
+
+        // Draw marker ID
+        cv::Point textPos(static_cast<int>(markerCorners[0].x), static_cast<int>(markerCorners[0].y) - 10);
+        std::string idText = "ID: " + std::to_string(detection.markerId);
+        cv::putText(color, idText, textPos, cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 255, 0), 2);
+
+        // Draw pose axes if available and requested
+        if (canDrawAxes && detection.poseValid && detection.rvec != nil && detection.tvec != nil) {
+            cv::Vec3d rvec, tvec;
+            rvec[0] = detection.rvec[0].doubleValue;
+            rvec[1] = detection.rvec[1].doubleValue;
+            rvec[2] = detection.rvec[2].doubleValue;
+            tvec[0] = detection.tvec[0].doubleValue;
+            tvec[1] = detection.tvec[1].doubleValue;
+            tvec[2] = detection.tvec[2].doubleValue;
+
+            cv::drawFrameAxes(color, K, dist, rvec, tvec, axisLength, 3);
+        }
+    }
+
+    // Encode as JPEG
+    std::vector<uchar> buffer;
+    std::vector<int> params = {cv::IMWRITE_JPEG_QUALITY, 85};
+    if (!cv::imencode(".jpg", color, buffer, params)) {
+        return nil;
+    }
+
+    return [NSData dataWithBytes:buffer.data() length:buffer.size()];
+}
+
+- (NSData * _Nullable)visualizeStereoMarkersInPixelBuffer:(CVPixelBufferRef)pixelBuffer
+                                           leftDetections:(NSArray<ArucoDetectionResult *> *)leftDetections
+                                          rightDetections:(NSArray<ArucoDetectionResult *> *)rightDetections {
+    if (pixelBuffer == nil) {
+        return nil;
+    }
+
+    BOOL hasAnyDetections = (leftDetections != nil && leftDetections.count > 0) || 
+                            (rightDetections != nil && rightDetections.count > 0);
+    if (!hasAnyDetections) {
+        return nil;
+    }
+
+    CVPixelBufferLockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
+    cv::Mat color;
+    const bool hasColor = CreateColorImage(pixelBuffer, color);
+    CVPixelBufferUnlockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
+
+    if (!hasColor || color.empty()) {
+        return nil;
+    }
+
+    int width = color.cols;
+    int halfWidth = width / 2;
+
+    // Helper lambda to draw a marker
+    auto drawMarker = [&color](ArucoDetectionResult *detection, int xOffset) {
+        if (detection.corners.count != 4) {
+            return;
+        }
+
+        // Convert and offset corners
+        std::vector<cv::Point2f> markerCorners;
+        for (NSValue *value in detection.corners) {
+            CGPoint point = [value CGPointValue];
+            markerCorners.push_back(cv::Point2f(static_cast<float>(point.x) + xOffset, static_cast<float>(point.y)));
+        }
+
+        // Draw marker outline (thick green line)
+        for (int j = 0; j < 4; ++j) {
+            cv::line(color, 
+                     cv::Point(static_cast<int>(markerCorners[j].x), static_cast<int>(markerCorners[j].y)),
+                     cv::Point(static_cast<int>(markerCorners[(j + 1) % 4].x), static_cast<int>(markerCorners[(j + 1) % 4].y)),
+                     cv::Scalar(0, 255, 0), 3);
+        }
+
+        // Draw corner circles
+        for (int j = 0; j < 4; ++j) {
+            cv::Scalar cornerColor = (j == 0) ? cv::Scalar(255, 0, 0) : cv::Scalar(0, 0, 255);
+            cv::circle(color, 
+                       cv::Point(static_cast<int>(markerCorners[j].x), static_cast<int>(markerCorners[j].y)),
+                       6, cornerColor, -1);
+        }
+
+        // Draw marker ID
+        cv::Point textPos(static_cast<int>(markerCorners[0].x), static_cast<int>(markerCorners[0].y) - 10);
+        std::string idText = "ID: " + std::to_string(detection.markerId);
+        cv::putText(color, idText, textPos, cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 255, 0), 2);
+    };
+
+    // Draw left detections (no offset)
+    if (leftDetections != nil) {
+        for (ArucoDetectionResult *detection in leftDetections) {
+            drawMarker(detection, 0);
+        }
+    }
+
+    // Draw right detections (offset by halfWidth)
+    if (rightDetections != nil) {
+        for (ArucoDetectionResult *detection in rightDetections) {
+            drawMarker(detection, halfWidth);
+        }
+    }
+
+    // Encode as JPEG
+    std::vector<uchar> buffer;
+    std::vector<int> params = {cv::IMWRITE_JPEG_QUALITY, 85};
+    if (!cv::imencode(".jpg", color, buffer, params)) {
         return nil;
     }
 

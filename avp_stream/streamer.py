@@ -40,6 +40,341 @@ YUP2ZUP = np.array([[[1, 0, 0, 0],
 
 
 # =============================================================================
+# Tracking Data Wrapper Classes
+# =============================================================================
+
+# Joint name to index mapping for 27-joint skeleton
+# New ordering: wrist(0), thumb(1-4), index(5-9), middle(10-14), ring(15-19), little(20-24), forearm(25-26)
+JOINT_NAMES = {
+    # Wrist
+    "wrist": 0,
+    
+    # Thumb (4 joints)
+    "thumbKnuckle": 1,
+    "thumbIntermediateBase": 2,
+    "thumbIntermediateTip": 3,
+    "thumbTip": 4,
+    
+    # Index (5 joints)
+    "indexMetacarpal": 5,
+    "indexKnuckle": 6,
+    "indexIntermediateBase": 7,
+    "indexIntermediateTip": 8,
+    "indexTip": 9,
+    
+    # Middle (5 joints)
+    "middleMetacarpal": 10,
+    "middleKnuckle": 11,
+    "middleIntermediateBase": 12,
+    "middleIntermediateTip": 13,
+    "middleTip": 14,
+    
+    # Ring (5 joints)
+    "ringMetacarpal": 15,
+    "ringKnuckle": 16,
+    "ringIntermediateBase": 17,
+    "ringIntermediateTip": 18,
+    "ringTip": 19,
+    
+    # Little (5 joints)
+    "littleMetacarpal": 20,
+    "littleKnuckle": 21,
+    "littleIntermediateBase": 22,
+    "littleIntermediateTip": 23,
+    "littleTip": 24,
+    
+    # Forearm (2 joints, may not be present in older apps)
+    "forearmWrist": 25,
+    "forearmArm": 26,
+}
+
+
+class HandData(np.ndarray):
+    """Hand tracking data as a numpy array with named joint access.
+    
+    This is a numpy ndarray subclass of shape (N, 4, 4) representing joint transforms
+    in world frame. It can be used directly as a 27x4x4 array while also supporting
+    attribute access to individual joints by name.
+    
+    Usage::
+    
+        tracking = TrackingData(streamer.get_latest())
+        
+        # Direct array access (27 x 4 x 4)
+        joints = tracking.right  # Returns the full skeleton array
+        joints.shape  # (27, 4, 4)
+        
+        # Indexing works as expected
+        index_tip = tracking.right[9]  # 4x4 matrix
+        
+        # Named attribute access
+        index_tip = tracking.right.indexTip  # Same as tracking.right[9]
+        thumb_tip = tracking.right.thumbTip
+        wrist = tracking.right.wrist  # Same as tracking.right[0]
+        
+        # Additional properties
+        pinch = tracking.right.pinch_distance
+        roll = tracking.right.wrist_roll
+    
+    Joint names (index):
+        wrist(0), thumbKnuckle(1), thumbIntermediateBase(2), thumbIntermediateTip(3), thumbTip(4),
+        indexMetacarpal(5), indexKnuckle(6), indexIntermediateBase(7), indexIntermediateTip(8), indexTip(9),
+        middleMetacarpal(10), ..., littleTip(24), forearmWrist(25), forearmArm(26)
+    """
+    
+    # These are stored in the array's metadata dict
+    _metadata_attrs = ('pinch_distance', 'wrist_roll', 'has_forearm', '_wrist_mat')
+    
+    def __new__(cls, wrist: np.ndarray, fingers: np.ndarray, arm: np.ndarray,
+                pinch_distance: float, wrist_roll: float):
+        """Create HandData array from raw tracking values.
+        
+        Args:
+            wrist: Wrist transform (1, 4, 4) or (4, 4)
+            fingers: Finger joints in wrist-local frame (25, 4, 4)
+            arm: Full arm skeleton in wrist-local frame (N, 4, 4) where N is 25 or 27
+            pinch_distance: Distance between thumb and index tips
+            wrist_roll: Axial wrist rotation in radians
+        """
+        # Ensure wrist is (4, 4)
+        wrist_mat = wrist[0] if wrist.ndim == 3 else wrist
+        
+        # Compute world-frame skeleton (wrist @ local_joint for each joint)
+        world_joints = wrist_mat @ arm  # Broadcast: (4,4) @ (N,4,4) -> (N,4,4)
+        
+        # Create the ndarray instance
+        obj = np.asarray(world_joints).view(cls)
+        
+        # Store additional metadata
+        obj.pinch_distance = pinch_distance
+        obj.wrist_roll = wrist_roll
+        obj.has_forearm = arm.shape[0] >= 27
+        obj._wrist_mat = wrist_mat
+        
+        return obj
+    
+    def __array_finalize__(self, obj):
+        """Called when the array is created or viewed."""
+        if obj is None:
+            return
+        # Copy metadata from source object
+        self.pinch_distance = getattr(obj, 'pinch_distance', 0.0)
+        self.wrist_roll = getattr(obj, 'wrist_roll', 0.0)
+        self.has_forearm = getattr(obj, 'has_forearm', False)
+        self._wrist_mat = getattr(obj, '_wrist_mat', None)
+    
+    def __reduce__(self):
+        """Support pickling by returning constructor info."""
+        # Get the standard ndarray reduce tuple
+        pickled_state = super().__reduce__()
+        # Add our custom attributes
+        new_state = pickled_state[2] + (
+            self.pinch_distance, self.wrist_roll, self.has_forearm, self._wrist_mat
+        )
+        return (pickled_state[0], pickled_state[1], new_state)
+    
+    def __setstate__(self, state):
+        """Restore from pickle."""
+        # Extract our custom state
+        self.pinch_distance = state[-4]
+        self.wrist_roll = state[-3]
+        self.has_forearm = state[-2]
+        self._wrist_mat = state[-1]
+        # Restore ndarray state
+        super().__setstate__(state[:-4])
+    
+    def __getattr__(self, name: str) -> np.ndarray:
+        """Access joint by name (e.g., hand.indexTip)."""
+        # Don't intercept special numpy attributes
+        if name.startswith('_') or name in ('T', 'dtype', 'shape', 'ndim', 'size', 'flat',
+                                               'real', 'imag', 'data', 'strides', 'base',
+                                               'flags', 'itemsize', 'nbytes', 'ctypes'):
+            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+        
+        if name in JOINT_NAMES:
+            idx = JOINT_NAMES[name]
+            if idx < self.shape[0]:
+                return self[idx]
+            else:
+                raise AttributeError(f"Joint '{name}' not available (requires forearm tracking)")
+        
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+    
+    def __repr__(self) -> str:
+        n_joints = self.shape[0] if self.ndim >= 1 else 0
+        return f"<HandData: {n_joints}x4x4 joints, has_forearm={self.has_forearm}>"
+
+
+class TrackingData:
+    """Wrapper for Vision Pro tracking data with both dict and attribute access.
+    
+    This class is fully backward compatible with the old dictionary API while
+    providing convenient attribute access for the new API.
+    
+    Backward compatible dictionary access::
+    
+        data = streamer.get_latest()
+        data["head"]           # (1, 4, 4) head pose
+        data["right_wrist"]    # (1, 4, 4) wrist pose  
+        data["right_fingers"]  # (25, 4, 4) finger joints
+        data["right_arm"]      # (27, 4, 4) full arm skeleton
+        data.keys()            # dict_keys([...])
+    
+    New attribute access::
+    
+        data.head             # (4, 4) head pose (squeezed)
+        data.right            # (27, 4, 4) HandData array
+        data.right.indexTip   # (4, 4) single joint
+        data.right[9]         # Same as above
+    
+    Examples::
+    
+        # Old API (still works)
+        pos = data["right_wrist"][0, :3, 3]
+        
+        # New API
+        pos = data.right.wrist[:3, 3]
+        index_tip = data.right.indexTip
+    """
+    
+    # Keys supported for backward compatibility
+    _DICT_KEYS = {
+        "head", "left_wrist", "right_wrist", 
+        "left_fingers", "right_fingers",
+        "left_arm", "right_arm",
+        "left_pinch_distance", "right_pinch_distance",
+        "left_wrist_roll", "right_wrist_roll",
+    }
+    
+    def __init__(self, data: Optional[Dict[str, Any]] = None):
+        """Initialize TrackingData from a tracking dictionary.
+        
+        Args:
+            data: Dictionary or TrackingData from VisionProStreamer.get_latest(), or None
+        """
+        # Handle TrackingData input (e.g., from from_streamer after get_latest returns TrackingData)
+        if isinstance(data, TrackingData):
+            data = data._raw
+        
+        self._raw = data
+        
+        if data is None:
+            self._head = None
+            self._left = None
+            self._right = None
+            return
+        
+        # Extract head (1, 4, 4) -> (4, 4)
+        head = data.get("head")
+        self._head = head[0] if head is not None and head.ndim == 3 else head
+        
+        # Create HandData for left hand
+        self._left = HandData(
+            wrist=data.get("left_wrist", np.eye(4)),
+            fingers=data.get("left_fingers", np.eye(4)[np.newaxis].repeat(25, axis=0)),
+            arm=data.get("left_arm", np.eye(4)[np.newaxis].repeat(25, axis=0)),
+            pinch_distance=data.get("left_pinch_distance", 0.0),
+            wrist_roll=data.get("left_wrist_roll", 0.0),
+        )
+        
+        # Create HandData for right hand
+        self._right = HandData(
+            wrist=data.get("right_wrist", np.eye(4)),
+            fingers=data.get("right_fingers", np.eye(4)[np.newaxis].repeat(25, axis=0)),
+            arm=data.get("right_arm", np.eye(4)[np.newaxis].repeat(25, axis=0)),
+            pinch_distance=data.get("right_pinch_distance", 0.0),
+            wrist_roll=data.get("right_wrist_roll", 0.0),
+        )
+    
+    @classmethod
+    def from_streamer(cls, streamer: "VisionProStreamer") -> "TrackingData":
+        """Create TrackingData from a VisionProStreamer's latest data."""
+        # Get latest returns TrackingData now, so just return it directly
+        return streamer.get_latest()
+    
+    # -------------------------------------------------------------------------
+    # New attribute-style API
+    # -------------------------------------------------------------------------
+    
+    @property
+    def head(self) -> Optional[np.ndarray]:
+        """Head pose in world frame, shape (4, 4)."""
+        return self._head
+    
+    @property
+    def left(self) -> Optional[HandData]:
+        """Left hand tracking data as (N, 4, 4) HandData array."""
+        return self._left
+    
+    @property
+    def right(self) -> Optional[HandData]:
+        """Right hand tracking data as (N, 4, 4) HandData array."""
+        return self._right
+    
+    @property
+    def raw(self) -> Optional[Dict[str, Any]]:
+        """Original raw dictionary for full backward compatibility."""
+        return self._raw
+    
+    # -------------------------------------------------------------------------
+    # Backward compatible dict-style API
+    # -------------------------------------------------------------------------
+    
+    def __getitem__(self, key: str) -> Any:
+        """Dict-style access for backward compatibility."""
+        if self._raw is None:
+            raise KeyError(key)
+        if key not in self._raw:
+            raise KeyError(key)
+        return self._raw[key]
+    
+    def __contains__(self, key: str) -> bool:
+        """Support 'in' operator."""
+        return self._raw is not None and key in self._raw
+    
+    def get(self, key: str, default: Any = None) -> Any:
+        """Dict-style get() method."""
+        if self._raw is None:
+            return default
+        return self._raw.get(key, default)
+    
+    def keys(self):
+        """Return dict keys."""
+        return self._raw.keys() if self._raw else {}.keys()
+    
+    def values(self):
+        """Return dict values."""
+        return self._raw.values() if self._raw else {}.values()
+    
+    def items(self):
+        """Return dict items."""
+        return self._raw.items() if self._raw else {}.items()
+    
+    def __iter__(self):
+        """Iterate over keys."""
+        return iter(self._raw) if self._raw else iter({})
+    
+    def __len__(self) -> int:
+        """Number of keys in the raw dict."""
+        return len(self._raw) if self._raw else 0
+    
+    # -------------------------------------------------------------------------
+    # Utilities
+    # -------------------------------------------------------------------------
+    
+    def __bool__(self) -> bool:
+        """Returns True if tracking data is available."""
+        return self._raw is not None
+    
+    def __repr__(self) -> str:
+        if self._raw is None:
+            return "<TrackingData: no data>"
+        left_joints = self._left.shape[0] if self._left is not None else 0
+        right_joints = self._right.shape[0] if self._right is not None else 0
+        return f"<TrackingData: head + L({left_joints}j) + R({right_joints}j)>"
+
+
+# =============================================================================
 # Media Clock for A/V Synchronization
 # =============================================================================
 
@@ -553,6 +888,11 @@ class VisionProStreamer:
         # Sim benchmark state
         self._sim_benchmark_enabled = False
         self._sim_benchmark_seq = 0
+        
+        # Marker detection state
+        self._detected_markers: Dict[int, Dict[str, Any]] = {}  # marker_id -> {"dict": int, "pose": np.ndarray}
+        self._tracked_images: Dict[str, Dict[str, Any]] = {}  # image_id -> unified tracked image dict
+        self._markers_lock = Lock()
 
         self._start_info_server()  # Start HTTP endpoint immediately
         self._start_hand_tracking()  # Start hand tracking stream
@@ -594,13 +934,15 @@ class VisionProStreamer:
             right_fingers_full = process_matrices(hand_update.right_hand.skeleton.jointMatrices)
             
             # Check if we have the new 27-joint format or old 25-joint format
+            # New ordering: [0-24] standard 25 joints, [25-26] forearm joints
+            # This means left_arm[:25] == left_fingers for both formats
             has_forearm = left_fingers_full.shape[0] >= 27
             
             if has_forearm:
-                # New 27-joint format: [forearmArm, forearmWrist, wrist, ...]
-                # For backward compatibility, slice to 25 joints (skip first 2)
-                left_fingers_compat = left_fingers_full[2:]
-                right_fingers_compat = right_fingers_full[2:]
+                # New 27-joint format: [wrist, thumb, index, ..., little, forearmWrist, forearmArm]
+                # First 25 joints are the standard hand joints
+                left_fingers_compat = left_fingers_full[:25]
+                right_fingers_compat = right_fingers_full[:25]
             else:
                 # Old 25-joint format: no forearm joints, use as-is
                 left_fingers_compat = left_fingers_full
@@ -620,6 +962,83 @@ class VisionProStreamer:
 
             transformations["right_wrist_roll"] = get_wrist_roll(transformations["right_wrist"])
             transformations["left_wrist_roll"] = get_wrist_roll(transformations["left_wrist"])
+            
+            # Parse marker detection data from right hand skeleton
+            # Format: After 27 joints, header matrix (m00=666.0, m01=count), then image pose matrices
+            # Images can be ArUco markers (m30=0) or custom images (m30=1)
+            right_joints = list(hand_update.right_hand.skeleton.jointMatrices)
+            if len(right_joints) > 27:
+                # Check for marker header
+                header = right_joints[27]
+                if abs(getattr(header, "m00", 0.0) - 666.0) < 0.1:
+                    image_count = int(getattr(header, "m01", 0))
+                    if image_count > 0 and len(right_joints) >= 28 + image_count:
+                        new_markers = {}
+                        new_tracked_images = {}
+                        for i in range(image_count):
+                            img_mat = right_joints[28 + i]
+                            encoded = getattr(img_mat, "m33", 1.0)
+                            image_type = getattr(img_mat, "m30", 0.0)  # 0=ArUco, 1=custom
+                            
+                            # Decode is_fixed flag from m32 (1.0 = fixed, 0.0 = not fixed)
+                            is_fixed = getattr(img_mat, "m32", 0.0) > 0.5
+                            # Decode is_tracked flag from m31 (1.0 = tracked, 0.0 = lost)
+                            is_tracked = getattr(img_mat, "m31", 0.0) > 0.5
+                            
+                            # Apply YUP2ZUP transform (same as hand tracking)
+                            pose = self.axis_transform @ process_matrix(img_mat)
+                            # If origin="sim", also transform to simulation's attach_to frame
+                            if self.origin == "sim":
+                                inv_attach = np.linalg.inv(self._attach_to_mat)[np.newaxis, :, :]
+                                pose = inv_attach @ pose
+                            
+                            if image_type < 0.5:  # ArUco marker
+                                # Decode: m33 = 1000 + id + dict*100
+                                if encoded > 900 and encoded < 2000:
+                                    marker_id = int(encoded - 1000) % 100
+                                    dict_type = int((encoded - 1000) // 100)
+                                    new_markers[marker_id] = {
+                                        "dict": dict_type,
+                                        "pose": pose[0],  # (4,4) array
+                                        "is_fixed": is_fixed,
+                                        "is_tracked": is_tracked,
+                                    }
+                                    # Also add to tracked_images with unified format
+                                    new_tracked_images[f"aruco_{dict_type}_{marker_id}"] = {
+                                        "image_type": "aruco",
+                                        "name": f"ArUco {dict_type}x{dict_type} #{marker_id}",
+                                        "pose": pose[0],
+                                        "is_fixed": is_fixed,
+                                        "is_tracked": is_tracked,
+                                        "aruco_id": marker_id,
+                                        "aruco_dict": dict_type,
+                                    }
+                            else:  # Custom image
+                                # Decode: m33 = 2000 + sequential_index
+                                if encoded >= 2000:
+                                    custom_index = int(encoded - 2000)
+                                    image_id = f"custom_{custom_index}"
+                                    new_tracked_images[image_id] = {
+                                        "image_type": "custom",
+                                        "name": f"Custom Image {custom_index}",
+                                        "pose": pose[0],
+                                        "is_fixed": is_fixed,
+                                        "is_tracked": is_tracked,
+                                    }
+                        
+                        with self._markers_lock:
+                            self._detected_markers = new_markers
+                            self._tracked_images = new_tracked_images
+                    else:
+                        with self._markers_lock:
+                            self._detected_markers = {}
+                            self._tracked_images = {}
+            else:
+                # No marker data in this update
+                with self._markers_lock:
+                    if self._detected_markers:
+                        self._detected_markers = {}
+                        self._tracked_images = {}
         except Exception as exc:
             self._log(f"[HAND-TRACKING] Failed to process hand update from {source}: {exc}", force=True)
             return
@@ -880,58 +1299,69 @@ class VisionProStreamer:
                 else:
                     break 
 
-    def get_latest(self, use_cache=False, cache_ms=10): 
-        """Return the most recent tracking sample.
+    def get_latest(self, use_cache=False, cache_ms=10) -> Optional[TrackingData]: 
+        """Return the most recent tracking sample as a TrackingData object.
 
-        Keys in the returned dict:
-          - head (1,4,4 ndarray): Head pose (Z-up)
-          - left_wrist / right_wrist (1,4,4 ndarray): Wrist poses
-          - left_fingers / right_fingers (25,4,4 ndarray): Finger joints in wrist frame (always 25)
-          - left_arm / right_arm (N,4,4 ndarray): Full skeleton (27 joints if new app, 25 if old app)
-          - left_pinch_distance / right_pinch_distance (float): Thumb–index pinch distance (m)
-          - left_wrist_roll / right_wrist_roll (float): Axial wrist rotation (rad)
-
-        The 27-joint skeleton order (new VisionOS app with forearm tracking):
-          [0] forearmArm, [1] forearmWrist, [2] wrist,
-          [3-6] thumb (knuckle, intermediateBase, intermediateTip, tip),
-          [7-11] index (metacarpal, knuckle, intermediateBase, intermediateTip, tip),
-          [12-16] middle, [17-21] ring, [22-26] little
-
-        The 25-joint skeleton order (old VisionOS app without forearm):
-          [0] wrist, [1-4] thumb, [5-9] index, [10-14] middle, [15-19] ring, [20-24] little
-
-        For backward compatibility, left_fingers/right_fingers always return 25 joints
-        (skipping forearm joints if present). Use left_arm/right_arm for full skeleton.
+        The returned TrackingData is fully backward compatible with dict access:
+        
+        Dict-style access (backward compatible)::
+        
+            data["head"]           # (1, 4, 4) head pose
+            data["right_wrist"]    # (1, 4, 4) wrist pose  
+            data["right_fingers"]  # (25, 4, 4) finger joints
+            data["right_arm"]      # (27, 4, 4) full arm skeleton
+            data.keys()            # Works like a dict
+        
+        New attribute access::
+        
+            data.head             # (4, 4) head pose (squeezed from 1,4,4)
+            data.right            # (27, 4, 4) HandData array
+            data.right.indexTip   # (4, 4) single joint by name
+            data.right[9]         # Same as indexTip by index
+            data.right.pinch_distance  # Pinch distance
+        
+        Joint names for attribute access:
+            wrist(0), thumbKnuckle(1), thumbIntermediateBase(2), thumbIntermediateTip(3), thumbTip(4),
+            indexMetacarpal(5), indexKnuckle(6), indexIntermediateBase(7), indexIntermediateTip(8), indexTip(9),
+            middleMetacarpal(10), ..., littleTip(24), forearmWrist(25), forearmArm(26)
 
         :param use_cache: If True, return cached data if recent enough (reduces lock contention)
         :param cache_ms: Cache validity in milliseconds (default: 10ms)
-        :return: Tracking dictionary or None if not yet available.
-        :rtype: dict | None
+        :return: TrackingData object or None if not yet available.
+        :rtype: TrackingData | None
 
         Example::
+        
             streamer = VisionProStreamer(ip=avp_ip)
-            sample = streamer.get_latest()
-            if sample:
-                left_pos = sample["left_wrist"][0, :3, 3]
-                # Full skeleton (27 joints if available):
-                if sample["left_arm"].shape[0] == 27:
-                    forearm_arm = sample["left_arm"][0]  # forearmArm joint
-                    forearm_wrist = sample["left_arm"][1]  # forearmWrist joint
+            data = streamer.get_latest()
+            if data:
+                # Old API (still works)
+                left_pos = data["left_wrist"][0, :3, 3]
+                
+                # New API
+                left_pos = data.left.wrist[:3, 3]
+                index_tip = data.right.indexTip  # 4x4 matrix
+                pinch = data.right.pinch_distance
         """
+        raw_data = None
         if use_cache:
             current_time = time.perf_counter()
             if (self._latest_cached is not None and 
                 (current_time - self._latest_cache_time) < (cache_ms / 1000.0)):
-                return self._latest_cached
-            
-            # Cache expired, update it
-            with self._latest_lock:
-                self._latest_cached = self.latest
-                self._latest_cache_time = current_time
-                return self._latest_cached
+                raw_data = self._latest_cached
+            else:
+                # Cache expired, update it
+                with self._latest_lock:
+                    self._latest_cached = self.latest
+                    self._latest_cache_time = current_time
+                    raw_data = self._latest_cached
         else:
             with self._latest_lock:
-                return self.latest
+                raw_data = self.latest
+        
+        if raw_data is None:
+            return None
+        return TrackingData(raw_data)
         
     def get_recording(self): 
         """Return a copy of all recorded tracking samples (requires `record=True`).
@@ -949,6 +1379,75 @@ class VisionProStreamer:
         """
         with self._latest_lock:
             return list(self.recording)
+    
+    def get_markers(self) -> Dict[int, Dict[str, Any]]:
+        """Get currently detected ArUco markers.
+        
+        Returns a dict mapping marker_id to marker info. Each marker includes:
+        - ``dict``: ArUco dictionary type (int, e.g., 0 = DICT_4X4_50)
+        - ``pose``: 4x4 homogeneous transformation matrix (np.ndarray)
+        - ``is_fixed``: Whether the marker pose is frozen (bool). When True,
+          the pose won't update from tracking - useful for calibration.
+        - ``is_tracked``: Whether ARKit is actively tracking this marker (bool).
+          A marker can be fixed but not tracked (using saved pose), or
+          tracked but not fixed (live updates).
+        
+        The pose is in the same coordinate frame as hand tracking data
+        (affected by `set_origin()` setting).
+        
+        Marker detection must be enabled on the VisionOS app for this to return data.
+        
+        Returns:
+            Dict mapping marker_id to {"dict": int, "pose": np.ndarray(4,4), 
+                                        "is_fixed": bool, "is_tracked": bool}
+            Empty dict if no markers detected or detection disabled.
+        
+        Example::
+        
+            markers = streamer.get_markers()
+            if markers:
+                for marker_id, info in markers.items():
+                    pose = info["pose"]  # 4x4 transform
+                    position = pose[:3, 3]  # XYZ position
+                    is_fixed = info["is_fixed"]  # Whether pose is frozen
+                    is_tracked = info["is_tracked"]  # Whether actively tracked
+                    print(f"Marker {marker_id}: fixed={is_fixed}, tracked={is_tracked}")
+        """
+        with self._markers_lock:
+            return dict(self._detected_markers)
+    
+    def get_tracked_images(self) -> Dict[str, Dict[str, Any]]:
+        """Get all tracked images (ArUco markers + custom images).
+        
+        Returns a unified dict mapping image_id to image info. Each image includes:
+        - ``image_type``: "aruco" or "custom"
+        - ``name``: Display name (e.g., "ArUco 4x4 #5" or "Custom Image 0")
+        - ``pose``: 4x4 homogeneous transformation matrix (np.ndarray)
+        - ``is_fixed``: Whether the pose is frozen (bool)
+        - ``is_tracked``: Whether ARKit is actively tracking (bool)
+        - ``aruco_id``: Marker ID (only for ArUco markers)
+        - ``aruco_dict``: Dictionary type (only for ArUco markers)
+        
+        Image IDs are formatted as:
+        - ArUco markers: "aruco_{dict}_{id}" (e.g., "aruco_0_5")
+        - Custom images: "custom_{index}" (e.g., "custom_0")
+        
+        The pose is in the same coordinate frame as hand tracking data
+        (affected by `set_origin()` setting).
+        
+        Returns:
+            Dict mapping image_id to tracked image info.
+            Empty dict if no images detected or detection disabled.
+        
+        Example::
+        
+            images = streamer.get_tracked_images()
+            for image_id, info in images.items():
+                print(f"{info['name']}: type={info['image_type']}, tracked={info['is_tracked']}")
+                position = info["pose"][:3, 3]
+        """
+        with self._markers_lock:
+            return dict(self._tracked_images)
     
     def set_origin(self, origin: str):
         """Set the coordinate frame origin for hand tracking data.

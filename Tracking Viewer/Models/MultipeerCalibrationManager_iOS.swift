@@ -26,7 +26,9 @@ enum CalibrationCommand: Codable {
     
     // New commands for unified calibration wizard
     case showCheckerboard                    // Display checkerboard for intrinsic calibration
+    case showCharuco                         // Display ChArUco board for intrinsic calibration
     case showAruco(markerId: Int)            // Display specific ArUco marker
+    case showVerificationBoard(cols: Int, rows: Int, tagSizeMM: Float, marginMM: Float, tagIds: [Int])  // Display ArUco verification board
     case hideDisplay                         // Hide current display (return to normal)
     case intrinsicProgress(samples: Int, total: Int)  // Update intrinsic progress
     case extrinsicProgress(marker: Int, samples: Int, total: Int)  // Update extrinsic progress per marker
@@ -42,7 +44,9 @@ enum CalibrationCommand: Codable {
         case .calibrationComplete: return "Calibration complete"
         case .requestStatus: return "Request status"
         case .showCheckerboard: return "Show checkerboard pattern"
+        case .showCharuco: return "Show ChArUco board"
         case .showAruco(let id): return "Show ArUco marker \(id)"
+        case .showVerificationBoard(let cols, let rows, _, _, _): return "Show verification board \(cols)x\(rows)"
         case .hideDisplay: return "Hide calibration display"
         case .intrinsicProgress(let s, let t): return "Intrinsic progress: \(s)/\(t)"
         case .extrinsicProgress(let m, let s, let t): return "Extrinsic marker \(m): \(s)/\(t)"
@@ -290,7 +294,9 @@ class MultipeerCalibrationManager_iOS: NSObject, ObservableObject {
     enum CalibrationDisplayMode: Equatable {
         case none
         case checkerboard
+        case charuco
         case aruco(markerId: Int)
+        case verificationBoard(cols: Int, rows: Int, tagSizeMM: Float, marginMM: Float, tagIds: [Int])
     }
     
     /// What should be displayed on screen
@@ -481,6 +487,14 @@ class MultipeerCalibrationManager_iOS: NSObject, ObservableObject {
             let generator = UIImpactFeedbackGenerator(style: .medium)
             generator.impactOccurred()
             
+        case .showCharuco:
+            isInCalibrationMode = true
+            displayMode = .charuco
+            startStatusUpdates()
+            // Trigger haptic to indicate mode change
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.impactOccurred()
+            
         case .showAruco(let markerId):
             isInCalibrationMode = true
             displayMode = .aruco(markerId: markerId)
@@ -488,6 +502,14 @@ class MultipeerCalibrationManager_iOS: NSObject, ObservableObject {
             markerDetectedByARKit = false
             readyForNextPosition = false
             onMarkerSwitch?(markerId)
+            startStatusUpdates()
+            // Trigger haptic
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.impactOccurred()
+            
+        case .showVerificationBoard(let cols, let rows, let tagSizeMM, let marginMM, let tagIds):
+            isInCalibrationMode = true
+            displayMode = .verificationBoard(cols: cols, rows: rows, tagSizeMM: tagSizeMM, marginMM: marginMM, tagIds: tagIds)
             startStatusUpdates()
             // Trigger haptic
             let generator = UIImpactFeedbackGenerator(style: .medium)

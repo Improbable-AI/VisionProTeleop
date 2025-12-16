@@ -23,7 +23,9 @@ enum CalibrationCommand: Codable {
     
     // New commands for unified calibration wizard
     case showCheckerboard                    // Display checkerboard for intrinsic calibration
+    case showCharuco                         // Display ChArUco board for intrinsic calibration
     case showAruco(markerId: Int)            // Display specific ArUco marker
+    case showVerificationBoard(cols: Int, rows: Int, tagSizeMM: Float, marginMM: Float, tagIds: [Int])  // Display ArUco verification board
     case hideDisplay                         // Hide current display (return to normal)
     case intrinsicProgress(samples: Int, total: Int)  // Update intrinsic progress
     case extrinsicProgress(marker: Int, samples: Int, total: Int)  // Update extrinsic progress per marker
@@ -39,7 +41,9 @@ enum CalibrationCommand: Codable {
         case .calibrationComplete: return "Calibration complete"
         case .requestStatus: return "Request status"
         case .showCheckerboard: return "Show checkerboard pattern"
+        case .showCharuco: return "Show ChArUco board"
         case .showAruco(let id): return "Show ArUco marker \(id)"
+        case .showVerificationBoard(let cols, let rows, _, _, _): return "Show verification board \(cols)x\(rows)"
         case .hideDisplay: return "Hide calibration display"
         case .intrinsicProgress(let s, let t): return "Intrinsic progress: \(s)/\(t)"
         case .extrinsicProgress(let m, let s, let t): return "Extrinsic marker \(m): \(s)/\(t)"

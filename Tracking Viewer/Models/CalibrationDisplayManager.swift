@@ -32,6 +32,12 @@ class CalibrationDisplayManager: ObservableObject {
     /// Checkerboard configuration (embedded defaults matching Vision Pro app)
     @Published var checkerboardConfig: CheckerboardDisplayConfig
     
+    /// ChArUco configuration (embedded defaults matching Vision Pro app)
+    @Published var charucoConfig: CharucoDisplayConfig
+    
+    /// ArUco 2x2 verification board configuration for calibration verification
+    @Published var verificationBoardConfig: ArucoVerificationBoardConfig
+    
     /// Current calibration session state
     @Published var sessionState: CalibrationSessionState = CalibrationSessionState()
     
@@ -61,11 +67,13 @@ class CalibrationDisplayManager: ObservableObject {
     enum DisplayMode: String, CaseIterable {
         case arucoMarker = "ArUco Marker"
         case checkerboard = "Checkerboard"
+        case charuco = "ChArUco"
         
         var icon: String {
             switch self {
             case .arucoMarker: return "qrcode"
             case .checkerboard: return "checkerboard.rectangle"
+            case .charuco: return "checkerboard.shield"
             }
         }
     }
@@ -119,6 +127,53 @@ class CalibrationDisplayManager: ObservableObject {
                (patternHeight <= screenWidth && patternWidth <= screenHeight)
     }
     
+    /// ChArUco board size in points
+    var charucoSizePoints: CGSize {
+        return CGSize(
+            width: mmToPoints(Double(charucoConfig.patternWidthMM)),
+            height: mmToPoints(Double(charucoConfig.patternHeightMM))
+        )
+    }
+    
+    /// Check if ChArUco fits on screen
+    var charucoFitsOnScreen: Bool {
+        let patternWidth = Double(charucoConfig.patternWidthMM)
+        let patternHeight = Double(charucoConfig.patternHeightMM)
+        let screenWidth = displaySpec.screenWidthMM
+        let screenHeight = displaySpec.screenHeightMM
+        // Check both orientations
+        return (patternWidth <= screenWidth && patternHeight <= screenHeight) ||
+               (patternHeight <= screenWidth && patternWidth <= screenHeight)
+    }
+    
+    /// Verification board size in points
+    var verificationBoardSizePoints: CGSize {
+        return CGSize(
+            width: mmToPoints(Double(verificationBoardConfig.boardWidthMM)),
+            height: mmToPoints(Double(verificationBoardConfig.boardHeightMM))
+        )
+    }
+    
+    /// Tag size in points for verification board
+    var verificationTagSizePoints: CGFloat {
+        return mmToPoints(Double(verificationBoardConfig.tagSizeMM))
+    }
+    
+    /// Margin size in points for verification board
+    var verificationMarginSizePoints: CGFloat {
+        return mmToPoints(Double(verificationBoardConfig.marginMM))
+    }
+    
+    /// Check if verification board fits on screen
+    var verificationBoardFitsOnScreen: Bool {
+        let boardWidth = Double(verificationBoardConfig.boardWidthMM)
+        let boardHeight = Double(verificationBoardConfig.boardHeightMM)
+        let screenWidth = displaySpec.screenWidthMM
+        let screenHeight = displaySpec.screenHeightMM
+        return (boardWidth <= screenWidth && boardHeight <= screenHeight) ||
+               (boardHeight <= screenWidth && boardWidth <= screenHeight)
+    }
+    
     // MARK: - Private Properties
     
     private let keychain = KeychainManager.shared
@@ -154,10 +209,21 @@ class CalibrationDisplayManager: ObservableObject {
         )
         
         checkerboardConfig = CheckerboardDisplayConfig(
-            innerCornersX: 5,   // Must match Vision Pro's default
-            innerCornersY: 4,   // Must match Vision Pro's default
+            innerCornersX: 11,  // 12 rows (vertical) - matches VisionOS default
+            innerCornersY: 5,   // 6 columns (horizontal) - matches VisionOS default
             squareSizeMM: 10.0  // 10mm squares to fit on iPhone screen
         )
+        
+        charucoConfig = CharucoDisplayConfig(
+            squaresX: 3,        // 3 columns
+            squaresY: 4,        // 4 rows
+            squareSizeMM: 20.0, // 20mm squares
+            markerSizeMM: 15.0, // 15mm markers (0.75 ratio)
+            dictionary: .dict4X4_50
+        )
+        
+        // Default to 1x3 layout which fits better on iPhone screens
+        verificationBoardConfig = .preset1x3
         
         // Now we can use self
         dlog("📱 [CalibrationDisplayManager] Detected device: \(spec.displayName)")
@@ -216,7 +282,7 @@ class CalibrationDisplayManager: ObservableObject {
             dlog("📱 [CalibrationDisplayManager] Calibration complete")
             
         case .pauseCollection, .resumeCollection, .requestStatus,
-             .showCheckerboard, .showAruco, .hideDisplay,
+             .showCheckerboard, .showCharuco, .showAruco, .showVerificationBoard, .hideDisplay,
              .intrinsicProgress, .extrinsicProgress,
              .markerDetected, .readyForNextPosition:
             // These are handled by MultipeerCalibrationManager_iOS directly
@@ -483,7 +549,7 @@ class CalibrationDisplayManager: ObservableObject {
         for row in 0..<gridSize {
             for col in 0..<gridSize {
                 let bitIndex = row * gridSize + col
-                if bits[bitIndex] == 0 {  // 0 = black, 1 = white
+                if bits[bitIndex] == 1 {  // 1 = black, 0 = white (matching OpenCV)
                     let x = CGFloat(col + 1) * cellSize  // +1 for border
                     let y = CGFloat(row + 1) * cellSize  // +1 for border
                     context.fill(CGRect(x: x, y: y, width: cellSize, height: cellSize))
@@ -505,114 +571,160 @@ class CalibrationDisplayManager: ObservableObject {
         
         guard id >= 0 && id <= dictionary.maxMarkerId else { return nil }
         
-        // ArUco DICT_4X4_50 marker data (from OpenCV - VERIFIED CORRECT)
+        // ArUco DICT_4X4_50 marker data (from OpenCV)
         // Each marker is 16 bits (4x4 grid), stored as row-major
-        // These patterns have been verified to match cv2.aruco.generateImageMarker() output
+        // 1 = black cell, 0 = white cell (matching OpenCV convention)
+        // Generated with: cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50).generateImageMarker()
         let dict4x4_50: [[Int]] = [
-            // ID 0 - CORRECTED
-            [1,0,1,1, 0,1,0,1, 0,0,1,1, 0,0,1,0],
-            // ID 1 - CORRECTED
-            [0,0,0,0, 1,1,1,1, 1,0,0,1, 1,0,1,0],
-            // ID 2 - CORRECTED
-            [0,0,1,1, 0,0,1,1, 0,0,1,0, 1,1,0,1],
-            // ID 3 - CORRECTED
-            [1,0,0,1, 1,0,0,1, 0,1,0,0, 0,1,1,0],
+            // ID 0
+            [0,1,0,0, 1,0,1,0, 1,1,0,0, 1,1,0,1],
+            // ID 1
+            [1,1,1,1, 0,0,0,0, 0,1,1,0, 0,1,0,1],
+            // ID 2
+            [1,1,0,0, 1,1,0,0, 1,1,0,1, 0,0,1,0],
+            // ID 3
+            [0,1,1,0, 0,1,1,0, 1,0,1,1, 1,0,0,1],
             // ID 4
-            [0,0,1,0, 1,1,0,1, 0,0,1,0, 1,1,0,1],
+            [1,0,1,0, 1,0,1,1, 0,1,1,0, 0,0,0,1],
             // ID 5
-            [1,1,0,1, 0,0,1,0, 1,1,0,1, 0,0,1,0],
+            [1,0,0,0, 0,1,1,0, 0,0,1,1, 0,0,1,0],
             // ID 6
-            [0,0,0,1, 1,1,1,0, 0,0,0,1, 1,1,1,0],
+            [0,1,1,0, 0,0,0,1, 1,1,0,1, 0,0,0,1],
             // ID 7
-            [1,1,1,0, 0,0,0,1, 1,1,1,0, 0,0,0,1],
+            [0,0,1,1, 1,0,1,1, 0,0,0,0, 1,1,0,1],
             // ID 8
-            [1,0,0,1, 1,1,1,1, 0,1,0,1, 1,0,0,0],
+            [0,0,0,0, 0,0,0,1, 0,0,1,0, 0,1,0,1],
             // ID 9
-            [0,1,1,0, 0,0,0,0, 1,0,1,0, 0,1,1,1],
+            [0,0,1,1, 0,0,0,0, 1,0,1,0, 1,0,0,1],
             // ID 10
-            [1,0,1,1, 1,1,0,0, 0,1,1,0, 1,0,0,1],
+            [0,0,0,0, 0,1,1,0, 0,1,1,0, 1,1,1,0],
             // ID 11
-            [0,1,0,0, 0,0,1,1, 1,0,0,1, 0,1,1,0],
+            [1,1,1,0, 1,1,1,0, 0,1,0,1, 1,0,0,0],
             // ID 12
-            [0,0,1,1, 0,1,1,0, 0,0,1,1, 0,1,1,0],
+            [1,1,1,1, 0,0,0,1, 0,1,0,0, 1,0,0,0],
             // ID 13
-            [1,1,0,0, 1,0,0,1, 1,1,0,0, 1,0,0,1],
+            [1,1,0,1, 0,1,0,1, 1,1,1,1, 0,0,0,0],
             // ID 14
-            [0,0,0,0, 0,1,0,1, 1,0,1,1, 0,0,0,0],
+            [1,1,0,1, 1,0,1,1, 0,1,0,0, 1,1,1,0],
             // ID 15
-            [1,1,1,1, 1,0,1,0, 0,1,0,0, 1,1,1,1],
+            [1,1,0,1, 1,0,0,1, 1,1,0,0, 0,0,0,1],
             // ID 16
-            [0,0,1,0, 1,1,0,1, 0,0,1,0, 0,0,1,0],
+            [1,0,1,1, 1,0,0,1, 1,0,0,1, 1,0,1,0],
             // ID 17
-            [1,1,0,1, 0,0,1,0, 1,1,0,1, 1,1,0,1],
+            [1,0,0,1, 1,0,0,1, 1,1,1,1, 1,1,1,1],
             // ID 18
-            [0,0,0,1, 1,1,1,0, 0,0,0,1, 0,0,0,1],
+            [1,0,0,1, 0,0,1,1, 1,0,1,0, 0,0,0,1],
             // ID 19
-            [1,1,1,0, 0,0,0,1, 1,1,1,0, 1,1,1,0],
+            [1,0,0,0, 1,0,0,1, 0,1,0,1, 0,0,0,0],
             // ID 20
-            [1,0,0,0, 0,1,0,1, 0,0,0,0, 1,0,0,0],
+            [0,1,1,1, 1,0,0,1, 0,1,1,1, 0,1,0,0],
             // ID 21
-            [0,1,1,1, 1,0,1,0, 1,1,1,1, 0,1,1,1],
+            [0,1,0,0, 1,1,1,1, 1,1,0,1, 0,1,0,0],
             // ID 22
-            [1,0,1,0, 0,1,1,1, 0,0,1,1, 1,0,1,0],
+            [0,0,1,1, 0,0,1,1, 0,0,1,0, 1,0,1,0],
             // ID 23
-            [0,1,0,1, 1,0,0,0, 1,1,0,0, 0,1,0,1],
+            [0,0,1,0, 0,0,1,0, 0,1,1,1, 1,1,0,1],
             // ID 24
-            [1,0,0,1, 1,1,1,1, 1,1,1,0, 1,0,0,1],
+            [0,0,0,0, 0,0,0,1, 1,0,1,1, 1,0,0,0],
             // ID 25
-            [0,1,1,0, 0,0,0,0, 0,0,0,1, 0,1,1,0],
+            [0,1,1,0, 1,0,1,1, 1,0,0,0, 1,1,1,0],
             // ID 26
-            [1,0,1,1, 1,1,0,0, 1,1,0,1, 1,0,1,1],
+            [0,1,0,1, 0,0,1,1, 0,0,0,1, 1,0,1,1],
             // ID 27
-            [0,1,0,0, 0,0,1,1, 0,0,1,0, 0,1,0,0],
+            [0,1,0,1, 1,0,1,0, 1,0,1,0, 1,0,1,1],
             // ID 28
-            [0,0,1,1, 0,1,1,0, 1,0,0,0, 0,0,1,1],
+            [1,1,0,1, 1,1,1,0, 1,1,0,1, 1,1,0,0],
             // ID 29
-            [1,1,0,0, 1,0,0,1, 0,1,1,1, 1,1,0,0],
+            [1,1,0,0, 1,0,1,1, 1,0,0,1, 0,0,0,0],
             // ID 30
-            [0,0,0,0, 0,1,0,1, 0,0,0,0, 0,0,0,0],
+            [1,0,1,1, 1,0,1,1, 1,1,1,0, 1,0,1,0],
             // ID 31
-            [1,1,1,1, 1,0,1,0, 1,1,1,1, 1,1,1,1],
+            [1,0,1,0, 1,0,0,0, 0,1,0,0, 1,1,0,1],
             // ID 32
-            [0,0,1,0, 1,1,0,1, 1,0,0,1, 0,0,1,0],
+            [0,1,1,0, 0,0,0,1, 0,0,1,1, 0,0,0,0],
             // ID 33
-            [1,1,0,1, 0,0,1,0, 0,1,1,0, 1,1,0,1],
+            [0,0,0,0, 1,1,1,1, 0,0,1,1, 0,1,0,0],
             // ID 34
-            [0,0,0,1, 1,1,1,0, 1,0,1,0, 0,0,0,1],
+            [1,1,1,1, 0,1,1,1, 0,1,0,1, 0,0,0,1],
             // ID 35
-            [1,1,1,0, 0,0,0,1, 0,1,0,1, 1,1,1,0],
+            [1,1,1,1, 0,1,1,0, 1,1,0,1, 0,1,1,0],
             // ID 36
-            [1,0,0,0, 0,1,0,1, 1,0,1,1, 0,0,0,0],
+            [1,1,1,0, 0,1,1,1, 1,0,0,0, 1,0,1,0],
             // ID 37
-            [0,1,1,1, 1,0,1,0, 0,1,0,0, 1,1,1,1],
+            [1,1,1,1, 1,0,1,1, 0,0,0,0, 0,0,0,0],
             // ID 38
-            [1,0,1,0, 0,1,1,1, 1,0,0,0, 1,0,1,0],
+            [1,1,1,1, 0,0,1,0, 0,0,0,0, 1,0,0,1],
             // ID 39
-            [0,1,0,1, 1,0,0,0, 0,1,1,1, 0,1,0,1],
+            [1,1,1,0, 0,0,1,1, 1,0,1,0, 0,1,0,1],
             // ID 40
-            [1,0,0,1, 0,1,0,0, 0,1,0,0, 1,0,0,1],
+            [1,1,1,0, 1,0,0,0, 1,1,1,0, 0,1,1,1],
             // ID 41
-            [0,1,1,0, 1,0,1,1, 1,0,1,1, 0,1,1,0],
+            [1,1,0,1, 0,1,0,1, 1,1,0,1, 0,1,1,1],
             // ID 42
-            [1,0,1,1, 0,1,1,0, 0,1,1,0, 1,0,1,1],
+            [1,1,0,0, 1,1,0,1, 0,1,1,1, 0,0,1,1],
             // ID 43
-            [0,1,0,0, 1,0,0,1, 1,0,0,1, 0,1,0,0],
+            [1,1,0,0, 0,1,1,1, 0,1,0,0, 1,1,0,1],
             // ID 44
-            [0,0,1,1, 1,1,0,1, 0,0,1,1, 1,1,0,1],
+            [1,1,0,1, 1,0,1,1, 0,0,0,1, 0,1,1,1],
             // ID 45
-            [1,1,0,0, 0,0,1,0, 1,1,0,0, 0,0,1,0],
+            [1,1,0,1, 0,0,0,1, 0,0,0,1, 0,1,0,0],
             // ID 46
-            [0,0,0,0, 1,1,1,1, 0,0,0,0, 1,1,1,1],
+            [1,1,0,1, 0,0,1,0, 1,1,0,0, 0,0,0,0],
             // ID 47
-            [1,1,1,1, 0,0,0,0, 1,1,1,1, 0,0,0,0],
+            [1,0,1,1, 0,1,0,0, 1,0,0,1, 1,0,1,1],
             // ID 48
-            [0,0,1,0, 0,1,1,0, 0,0,1,0, 0,1,1,0],
+            [1,0,1,0, 1,1,1,1, 1,1,0,1, 0,0,0,1],
             // ID 49
-            [1,1,0,1, 1,0,0,1, 1,1,0,1, 1,0,0,1],
+            [1,0,1,0, 1,1,1,1, 1,1,1,0, 1,1,0,0],
         ]
         
         guard id < dict4x4_50.count else { return nil }
         return dict4x4_50[id]
+    }
+    
+    /// Generate ChArUco board image
+    func generateCharucoBoard(sizePoints: CGSize) -> UIImage? {
+        let squaresX = charucoConfig.squaresX
+        let squaresY = charucoConfig.squaresY
+        let squareSize = sizePoints.width / CGFloat(squaresX) // Assume width fits
+        let markerSize = (CGFloat(charucoConfig.markerSizeMM) / CGFloat(charucoConfig.squareSizeMM)) * squareSize
+        
+        UIGraphicsBeginImageContextWithOptions(sizePoints, true, 0)
+        defer { UIGraphicsEndImageContext() }
+        
+        guard let context = UIGraphicsGetCurrentContext() else { return nil }
+        
+        // Fill with white
+        context.setFillColor(UIColor.white.cgColor)
+        context.fill(CGRect(origin: .zero, size: sizePoints))
+        
+        var markerIdx = 0
+        
+        for y in 0..<squaresY {
+            for x in 0..<squaresX {
+                let rect = CGRect(x: CGFloat(x) * squareSize, y: CGFloat(y) * squareSize, width: squareSize, height: squareSize)
+                
+                // Checkerboard pattern matching OpenCV
+                // OpenCV: (x+y)%2 == 0 is BLACK, (x+y)%2 == 1 is WHITE with marker
+                // This means top-left (0,0) is BLACK
+                
+                if (x + y) % 2 == 0 {
+                    // Black square - no marker
+                    context.setFillColor(UIColor.black.cgColor)
+                    context.fill(rect)
+                } else {
+                    // White square - Draw marker
+                    if let markerImage = generateArucoMarker(id: markerIdx, sizePoints: markerSize) {
+                        // Center marker in square
+                        let offset = (squareSize - markerSize) / 2
+                        markerImage.draw(in: CGRect(x: rect.minX + offset, y: rect.minY + offset, width: markerSize, height: markerSize))
+                    }
+                    markerIdx += 1
+                }
+            }
+        }
+        
+        return UIGraphicsGetImageFromCurrentImageContext()
     }
     
     // MARK: - Debug Info

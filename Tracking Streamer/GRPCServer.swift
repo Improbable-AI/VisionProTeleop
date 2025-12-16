@@ -139,8 +139,24 @@ struct HandTrackingServiceImpl: Handtracking_HandTrackingService.SimpleServicePr
             // Send one response and return for info-only connections
             try await response.write(fill_handUpdate())
             return
+        } else if request.head.m00 == 778.0 {
+            // Python calibration mode signal
+            dlog("🎯 [DEBUG] Calibration mode signal detected!")
+            await MainActor.run {
+                DataManager.shared.pythonCalibrationActive = true
+                DataManager.shared.pythonCalibrationStep = Int(request.head.m01)
+                DataManager.shared.pythonCalibrationSamplesCollected = Int(request.head.m02)
+                DataManager.shared.pythonCalibrationSamplesNeeded = Int(request.head.m03)
+                DataManager.shared.pythonCalibrationTargetMarker = Int(request.head.m10)
+                DataManager.shared.pythonCalibrationMarkerDetected = request.head.m11 > 0.5
+                DataManager.shared.pythonCalibrationProgress = request.head.m12 / 100.0
+                DataManager.shared.pythonCalibrationStepStatus = Int(request.head.m13)
+            }
+            // Send response and return for calibration status messages
+            try await response.write(fill_handUpdate())
+            return
         } else {
-            dlog("⚠️ [DEBUG] Not a special message (expected m00=888.0 or 999.0, got \(request.head.m00))")
+            dlog("⚠️ [DEBUG] Not a special message (expected m00=888.0, 999.0, or 778.0, got \(request.head.m00))")
         }
         
         // Register for benchmark events
@@ -218,6 +234,7 @@ struct HandTrackingServiceImpl: Handtracking_HandTrackingService.SimpleServicePr
                 DataManager.shared.pythonLibraryVersionCode = 0  // Reset version on disconnect
                 DataManager.shared.webrtcServerInfo = nil
                 DataManager.shared.webrtcGeneration = -1
+                DataManager.shared.pythonCalibrationActive = false  // Reset calibration state
             }
         }
     }

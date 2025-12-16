@@ -5,6 +5,8 @@ import AVFoundation
 import GRPCCore
 import GRPCNIOTransportHTTP2
 import GRPCProtobuf
+import PhotosUI
+import UniformTypeIdentifiers
 
 /// Protocol for MuJoCo manager to allow StatusOverlay to display status
 @MainActor
@@ -54,8 +56,9 @@ enum ExpandedPanel: Equatable {
     case cloudStorageDebug
     case visualizations  // Hand/head visualization toggles
     case positionLayout  // Combined video view + controller position
-    case personaCapture  // Spatial Persona front camera preview
+    case handTracking  // Hand tracking configuration (prediction, etc.)
     case stereoBaseline  // Stereo IPD/baseline adjustment
+    case markerDetection  // ArUco marker detection settings
 }
 
 /// App mode: Teleop (network-based teleoperation) vs Egorecord (local UVC recording)
@@ -98,6 +101,8 @@ struct StatusOverlay: View {
     @State private var mujocoStatusUpdateTrigger: Bool = false  // Trigger for MuJoCo status updates
     @State private var showCalibrationSheet: Bool = false
     @State private var showExtrinsicCalibrationSheet: Bool = false
+    @State private var showCalibrationWizard: Bool = false
+    @State private var startCalibrationVerification: Bool = false
     @ObservedObject private var calibrationManager = CameraCalibrationManager.shared
     @ObservedObject private var extrinsicCalibrationManager = ExtrinsicCalibrationManager.shared
     @ObservedObject private var cloudStorageSettings = CloudStorageSettings.shared
@@ -163,11 +168,25 @@ struct StatusOverlay: View {
             if showCalibrationWizard {
                 CameraCalibrationWizardView(onDismiss: {
                     showCalibrationWizard = false
-                })
+                    startCalibrationVerification = false
+                }, initialStep: startCalibrationVerification ? .verification : .setup)
                 .frame(width: 520, height: 720)
                 .background(.regularMaterial)
                 .cornerRadius(20)
                 .shadow(radius: 20)
+            }
+            
+            // Python Calibration Status Overlay (from calibration_server.py)
+            if dataManager.pythonCalibrationActive {
+                PythonCalibrationStatusOverlay(
+                    step: dataManager.pythonCalibrationStep,
+                    targetMarker: dataManager.pythonCalibrationTargetMarker,
+                    samplesCollected: dataManager.pythonCalibrationSamplesCollected,
+                    samplesNeeded: dataManager.pythonCalibrationSamplesNeeded,
+                    markerDetected: dataManager.pythonCalibrationMarkerDetected,
+                    progress: dataManager.pythonCalibrationProgress,
+                    stepStatus: dataManager.pythonCalibrationStepStatus
+                )
             }
         }
         .onAppear {
@@ -1227,15 +1246,19 @@ struct StatusOverlay: View {
                 
                 let canRecord = isCalibrated && isCloudConfigured && uvcCameraManager.selectedDevice != nil
                 
-                // Requirement indicators
+                // Allow recording without full requirements (hand-tracking only mode)
+                // Users can always record hand tracking data, even without camera or calibration
+                let canRecordHandTrackingOnly = isCloudConfigured
+                
+                // Requirement indicators (warnings, not blockers)
                 if !canRecord {
                     VStack(alignment: .leading, spacing: 6) {
-                        if !isCalibrated {
+                        if !isCalibrated && uvcCameraManager.selectedDevice != nil {
                             HStack(spacing: 6) {
                                 Image(systemName: "exclamationmark.triangle.fill")
                                     .font(.caption)
                                     .foregroundColor(.orange)
-                                Text("Camera calibration required")
+                                Text("Camera calibration required for video")
                                     .font(.caption)
                                     .foregroundColor(.orange)
                             }
@@ -1294,10 +1317,10 @@ struct StatusOverlay: View {
                             HStack(spacing: 6) {
                                 Image(systemName: "video.slash.fill")
                                     .font(.caption)
-                                    .foregroundColor(.orange)
-                                Text("No USB camera connected")
+                                    .foregroundColor(.yellow)
+                                Text("No USB camera - hand tracking only")
                                     .font(.caption)
-                                    .foregroundColor(.orange)
+                                    .foregroundColor(.yellow)
                             }
                         }
                     }
@@ -1331,12 +1354,12 @@ struct StatusOverlay: View {
                     .background(
                         recordingManager.isRecording 
                             ? Color.red
-                            : (canRecord ? Color.red.opacity(0.9) : Color.gray.opacity(0.5))
+                            : (canRecordHandTrackingOnly ? Color.red.opacity(0.9) : Color.gray.opacity(0.5))
                     )
                     .cornerRadius(12)
                 }
                 .buttonStyle(.plain)
-                .disabled(!canRecord && !recordingManager.isRecording)
+                .disabled(!canRecordHandTrackingOnly && !recordingManager.isRecording)
             }
 
         }
@@ -1547,18 +1570,18 @@ struct StatusOverlay: View {
                     }
                 }
                 
-                // Persona Preview
-                let personaController = PersonaCaptureController.shared
+                // Hand Tracking Config
+                let predictionMs = Int(dataManager.handPredictionOffset * 1000)
                 menuItem(
-                    icon: personaController.isRunning ? "person.crop.circle.fill" : "person.crop.circle",
-                    title: "Persona Preview",
-                    subtitle: personaController.isRunning ? "Live" : "Off",
+                    icon: dataManager.showHandJoints ? "hand.raised.fingers.spread.fill" : "hand.raised.fingers.spread",
+                    title: "Hand Tracking",
+                    subtitle: "\(predictionMs)ms prediction",
                     isExpanded: false,
-                    accentColor: .purple,
-                    iconColor: personaController.isRunning ? .green : nil
+                    accentColor: .orange,
+                    iconColor: dataManager.showHandJoints ? .green : nil
                 ) {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                        expandedPanel = .personaCapture
+                        expandedPanel = .handTracking
                     }
                 }
             }
@@ -1578,6 +1601,23 @@ struct StatusOverlay: View {
             ) {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                     expandedPanel = .stereoBaseline
+                }
+            }
+            
+            // Marker Detection (Teleop mode only)
+            if appMode == .teleop {
+                let markerManager = MarkerDetectionManager.shared
+                menuItem(
+                    icon: markerManager.isEnabled ? "viewfinder.circle.fill" : "viewfinder.circle",
+                    title: "Marker Detection",
+                    subtitle: markerManager.isEnabled ? "\(markerManager.detectedMarkers.count) detected" : "Off",
+                    isExpanded: false,
+                    accentColor: .orange,
+                    iconColor: markerManager.isEnabled ? .green : nil
+                ) {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        expandedPanel = .markerDetection
+                    }
                 }
             }
         }
@@ -1604,10 +1644,12 @@ struct StatusOverlay: View {
                 cloudStorageDebugPanelContent
             case .visualizations:
                 visualizationsPanelContent
-            case .personaCapture:
-                personaCapturePanelContent
+            case .handTracking:
+                handTrackingPanelContent
             case .stereoBaseline:
                 stereoBaselinePanelContent
+            case .markerDetection:
+                markerDetectionPanelContent
             case .settings, .none:
                 EmptyView()
             }
@@ -1625,8 +1667,9 @@ struct StatusOverlay: View {
         case .cameraCalibration: return "Camera Calibration"
         case .cloudStorageDebug: return "Cloud Storage Debug"
         case .visualizations: return "Visualizations"
-        case .personaCapture: return "Persona Preview"
+        case .handTracking: return "Hand Tracking"
         case .stereoBaseline: return "Stereo Baseline"
+        case .markerDetection: return "Marker Detection"
         case .none: return ""
         }
     }
@@ -2855,12 +2898,12 @@ struct StatusOverlay: View {
         .padding(.vertical, 4)
     }
     
-    // MARK: - Persona Capture Panel
+    // MARK: - Hand Tracking Panel
     
-    private var personaCapturePanelContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
+    private var handTrackingPanelContent: some View {
+        VStack(alignment: .leading, spacing: 16) {
             // Description
-            Text("Preview your Spatial Persona using the front-facing camera.")
+            Text("Configure hand tracking settings. Enable skeleton overlay and adjust prediction to reduce perceived latency.")
                 .font(.caption)
                 .foregroundColor(.white.opacity(0.6))
                 .fixedSize(horizontal: false, vertical: true)
@@ -2868,8 +2911,138 @@ struct StatusOverlay: View {
             Divider()
                 .background(Color.white.opacity(0.2))
             
-            // Embed the PersonaPreviewView
-            PersonaPreviewView()
+            // Enable Skeleton Overlay toggle
+            Toggle(isOn: $dataManager.showHandJoints) {
+                HStack(spacing: 10) {
+                    Image(systemName: dataManager.showHandJoints ? "hand.raised.fingers.spread.fill" : "hand.raised.fingers.spread")
+                        .font(.system(size: 18))
+                        .foregroundColor(dataManager.showHandJoints ? .orange : .white.opacity(0.6))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Enable Skeleton Overlay")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.white)
+                        Text("Visualize 27 hand joints as spheres with bone connections")
+                            .font(.caption2)
+                            .foregroundColor(.white.opacity(0.5))
+                    }
+                }
+            }
+            .tint(.orange)
+            
+            Divider()
+                .background(Color.white.opacity(0.2))
+            
+            // Prediction offset section
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 10) {
+                    Image(systemName: "clock.arrow.2.circlepath")
+                        .font(.system(size: 18))
+                        .foregroundColor(.cyan)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Prediction Offset")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.white)
+                        Text("Query predicted hand poses ahead of time")
+                            .font(.caption2)
+                            .foregroundColor(.white.opacity(0.5))
+                    }
+                    Spacer()
+                    Text("\(Int(dataManager.handPredictionOffset * 1000)) ms")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.cyan)
+                        .monospacedDigit()
+                }
+                
+                Slider(
+                    value: $dataManager.handPredictionOffset,
+                    in: 0.0...0.1,
+                    step: 0.005
+                )
+                .tint(.cyan)
+                
+                // Explanation
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "info.circle.fill")
+                            .font(.caption)
+                            .foregroundColor(.cyan.opacity(0.8))
+                        Text("How it works")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                    
+                    Text("Uses ARKit's handAnchors(at:) API to query predicted hand poses at a future timestamp. This compensates for system latency, making the skeleton feel more responsive.")
+                        .font(.caption2)
+                        .foregroundColor(.white.opacity(0.5))
+                        .lineSpacing(2)
+                    
+                    HStack(spacing: 16) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("0 ms")
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                                .foregroundColor(.white.opacity(0.7))
+                            Text("No prediction")
+                                .font(.caption2)
+                                .foregroundColor(.white.opacity(0.4))
+                        }
+                        Spacer()
+                        VStack(alignment: .center, spacing: 2) {
+                            Text("33 ms")
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                                .foregroundColor(.cyan)
+                            Text("Recommended")
+                                .font(.caption2)
+                                .foregroundColor(.cyan.opacity(0.7))
+                        }
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("100 ms")
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                                .foregroundColor(.orange)
+                            Text("May overshoot")
+                                .font(.caption2)
+                                .foregroundColor(.white.opacity(0.4))
+                        }
+                    }
+                }
+                .padding(12)
+                .background(Color.cyan.opacity(0.1))
+                .cornerRadius(10)
+            }
+            
+            Divider()
+                .background(Color.white.opacity(0.2))
+            
+            // Opacity slider
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Image(systemName: "circle.lefthalf.filled")
+                        .font(.system(size: 16))
+                        .foregroundColor(.orange.opacity(0.8))
+                    Text("Skeleton Opacity")
+                        .font(.subheadline)
+                        .foregroundColor(.white)
+                    Spacer()
+                    Text("\(Int(dataManager.handJointsOpacity * 100))%")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.orange)
+                }
+                
+                Slider(
+                    value: $dataManager.handJointsOpacity,
+                    in: 0.1...1.0,
+                    step: 0.05
+                )
+                .tint(.orange)
+            }
         }
     }
     
@@ -2953,37 +3126,380 @@ struct StatusOverlay: View {
         }
     }
     
+    // MARK: - Marker Detection Panel
+    
+    @ObservedObject private var markerDetectionManager = MarkerDetectionManager.shared
+    
+    private var markerDetectionPanelContent: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Description
+            Text("Detect ArUco markers and stream their world poses to Python. Enable to track printed markers with your Vision Pro camera.")
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.6))
+                .fixedSize(horizontal: false, vertical: true)
+            
+            Divider()
+                .background(Color.white.opacity(0.2))
+            
+            // Enable toggle
+            Toggle(isOn: $markerDetectionManager.isEnabled) {
+                HStack(spacing: 8) {
+                    Image(systemName: markerDetectionManager.isEnabled ? "viewfinder.circle.fill" : "viewfinder.circle")
+                        .font(.system(size: 16))
+                        .foregroundColor(markerDetectionManager.isEnabled ? .green : .white.opacity(0.6))
+                    Text("Enable Detection")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                }
+            }
+            .tint(.green)
+            
+            // Status
+            if markerDetectionManager.isEnabled {
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(markerDetectionManager.detectedMarkers.isEmpty ? Color.orange : Color.green)
+                        .frame(width: 8, height: 8)
+                    Text(markerDetectionManager.statusMessage)
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.7))
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.white.opacity(0.1))
+                .cornerRadius(8)
+            }
+            
+            Divider()
+                .background(Color.white.opacity(0.2))
+            
+            // Marker size slider
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Expected Marker Size")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                    Spacer()
+                    Text(String(format: "%.0f cm", markerDetectionManager.markerSizeMeters * 100))
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                        .monospacedDigit()
+                }
+                
+                Slider(value: $markerDetectionManager.markerSizeMeters, in: 0.02...0.50, step: 0.01)
+                    .tint(.orange)
+                
+                Text("Set this to match your printed marker's physical size for best tracking accuracy.")
+                    .font(.caption2)
+                    .foregroundColor(.white.opacity(0.5))
+            }
+            
+            // Detected markers list with estimated size
+            if !markerDetectionManager.detectedMarkers.isEmpty {
+                Divider()
+                    .background(Color.white.opacity(0.2))
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Detected Markers")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white.opacity(0.7))
+                    
+                    ForEach(Array(markerDetectionManager.detectedMarkers.keys.sorted()), id: \.self) { markerId in
+                        if let marker = markerDetectionManager.detectedMarkers[markerId] {
+                            HStack(spacing: 12) {
+                                Image(systemName: "qrcode.viewfinder")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.orange)
+                                Text("ID \(markerId)")
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.white)
+                                Spacer()
+                                Text(String(format: "~%.1f cm", marker.estimatedSizeMeters * 100))
+                                    .font(.caption)
+                                    .foregroundColor(.orange)
+                                    .fontWeight(.medium)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.white.opacity(0.05))
+                            .cornerRadius(6)
+                        }
+                    }
+                }
+            }
+            
+            Divider()
+                .background(Color.white.opacity(0.2))
+            
+            // Custom Images section
+            customImagesSection
+        }
+    }
+    
+    // MARK: - Custom Images Section
+    
+    @State private var showingPhotoPicker = false
+    @State private var showingFileImporter = false
+    @State private var selectedPhotoItem: PhotosPickerItem? = nil
+    @State private var editingCustomImageId: String? = nil
+    @State private var editingCustomImageName: String = ""
+    @State private var editingCustomImageWidth: Float = 0.1
+    
+    @ViewBuilder
+    private var customImagesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header with add buttons
+            HStack {
+                Text("Custom Images")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white.opacity(0.7))
+                
+                Spacer()
+                
+                // Add from Photos
+                PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "photo.badge.plus")
+                            .font(.system(size: 12))
+                        Text("Photos")
+                            .font(.caption)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.blue.opacity(0.3))
+                    .cornerRadius(6)
+                    .foregroundColor(.blue)
+                }
+                .onChange(of: selectedPhotoItem) { oldItem, newItem in
+                    Task {
+                        if let item = newItem,
+                           let data = try? await item.loadTransferable(type: Data.self),
+                           let image = UIImage(data: data) {
+                            await MainActor.run {
+                                let name = "Image \(CustomImageStorage.shared.registrations.count + 1)"
+                                _ = CustomImageStorage.shared.registerImage(image, name: name)
+                            }
+                        }
+                        selectedPhotoItem = nil
+                    }
+                }
+                
+                // Add from Files
+                Button {
+                    showingFileImporter = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "folder.badge.plus")
+                            .font(.system(size: 12))
+                        Text("Files")
+                            .font(.caption)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.purple.opacity(0.3))
+                    .cornerRadius(6)
+                    .foregroundColor(.purple)
+                }
+            }
+            
+            // Registered images list
+            let registrations = CustomImageStorage.shared.registrations
+            if registrations.isEmpty {
+                Text("No custom images registered. Add images to track any picture in your environment.")
+                    .font(.caption2)
+                    .foregroundColor(.white.opacity(0.4))
+                    .padding(.vertical, 8)
+            } else {
+                ForEach(registrations) { registration in
+                    customImageRow(registration: registration)
+                }
+            }
+        }
+        .fileImporter(
+            isPresented: $showingFileImporter,
+            allowedContentTypes: [.image],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                if let url = urls.first,
+                   url.startAccessingSecurityScopedResource(),
+                   let data = try? Data(contentsOf: url),
+                   let image = UIImage(data: data) {
+                    let name = url.deletingPathExtension().lastPathComponent
+                    _ = CustomImageStorage.shared.registerImage(image, name: name)
+                    url.stopAccessingSecurityScopedResource()
+                }
+            case .failure(let error):
+                dlog("❌ [StatusView] File import failed: \(error)")
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func customImageRow(registration: CustomImageRegistration) -> some View {
+        let isTracked = markerDetectionManager.trackedCustomImages[registration.id] != nil ||
+                        markerDetectionManager.fixedCustomImages[registration.id] != nil
+        
+        HStack(spacing: 10) {
+            // Thumbnail
+            if let thumbnail = CustomImageStorage.shared.loadThumbnail(for: registration, size: CGSize(width: 40, height: 40)) {
+                Image(uiImage: thumbnail)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 36, height: 36)
+                    .cornerRadius(4)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 4)
+                            .stroke(isTracked ? Color.green : Color.white.opacity(0.2), lineWidth: 1)
+                    )
+            } else {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.gray.opacity(0.3))
+                    .frame(width: 36, height: 36)
+                    .overlay(
+                        Image(systemName: "photo")
+                            .font(.system(size: 14))
+                            .foregroundColor(.gray)
+                    )
+            }
+            
+            // Name and size (editable)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(registration.name)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                
+                HStack(spacing: 4) {
+                    Text(String(format: "%.0f cm", registration.physicalWidthMeters * 100))
+                        .font(.caption2)
+                        .foregroundColor(.cyan)
+                    
+                    if isTracked {
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 6, height: 6)
+                        Text("Tracking")
+                            .font(.caption2)
+                            .foregroundColor(.green)
+                    }
+                }
+            }
+            
+            Spacer()
+            
+            // Edit button
+            Button {
+                editingCustomImageId = registration.id
+                editingCustomImageName = registration.name
+                editingCustomImageWidth = registration.physicalWidthMeters
+            } label: {
+                Image(systemName: "pencil.circle")
+                    .font(.system(size: 18))
+                    .foregroundColor(.white.opacity(0.5))
+            }
+            .buttonStyle(.plain)
+            
+            // Delete button
+            Button {
+                CustomImageStorage.shared.unregisterImage(id: registration.id)
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 18))
+                    .foregroundColor(.red.opacity(0.6))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.white.opacity(0.05))
+        .cornerRadius(8)
+        .sheet(isPresented: Binding(
+            get: { editingCustomImageId == registration.id },
+            set: { if !$0 { editingCustomImageId = nil } }
+        )) {
+            customImageEditSheet(registration: registration)
+        }
+    }
+    
+    @ViewBuilder
+    private func customImageEditSheet(registration: CustomImageRegistration) -> some View {
+        NavigationView {
+            Form {
+                Section("Image Name") {
+                    TextField("Name", text: $editingCustomImageName)
+                }
+                
+                Section("Physical Width") {
+                    HStack {
+                        Slider(value: $editingCustomImageWidth, in: 0.02...0.50, step: 0.01)
+                        Text(String(format: "%.0f cm", editingCustomImageWidth * 100))
+                            .frame(width: 60)
+                            .monospacedDigit()
+                    }
+                    Text("Enter the real-world width of this image for accurate tracking.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .navigationTitle("Edit Image")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        editingCustomImageId = nil
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        CustomImageStorage.shared.updateRegistration(
+                            id: registration.id,
+                            name: editingCustomImageName,
+                            physicalWidth: editingCustomImageWidth
+                        )
+                        editingCustomImageId = nil
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+    
     // MARK: - Unified Camera Calibration Panel
     
-    @State private var showCalibrationWizard: Bool = false
+
     
     @ViewBuilder
     private var cameraCalibrationMenuItem: some View {
-        let hasIntrinsic = uvcCameraManager.selectedDevice.map { calibrationManager.hasCalibration(for: $0.id) } ?? false
-        let hasExtrinsic = uvcCameraManager.selectedDevice.map { extrinsicCalibrationManager.hasCalibration(for: $0.id) } ?? false
-        let calibrationStatus: String = {
-            if hasIntrinsic && hasExtrinsic {
-                return "Fully Calibrated"
-            } else if hasIntrinsic || hasExtrinsic {
-                return "Partially Calibrated"
-            } else {
-                return "Not Calibrated"
+        // Camera calibration is not yet supported
+        HStack(spacing: 12) {
+            Image(systemName: "camera.aperture")
+                .font(.system(size: 18, weight: .medium))
+                .foregroundColor(.white.opacity(0.3))
+                .frame(width: 28)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Camera Calibration")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white.opacity(0.4))
+                Text("Not supported yet")
+                    .font(.caption2)
+                    .foregroundColor(.white.opacity(0.3))
             }
-        }()
-        let statusColor: Color = (hasIntrinsic && hasExtrinsic) ? .green : .orange
-        
-        menuItem(
-            icon: "camera.aperture",
-            title: "Camera Calibration",
-            subtitle: calibrationStatus,
-            isExpanded: expandedPanel == .cameraCalibration,
-            accentColor: .cyan,
-            iconColor: statusColor
-        ) {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                expandedPanel = expandedPanel == .cameraCalibration ? .settings : .cameraCalibration
-            }
+            
+            Spacer()
         }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 4)
     }
     
     private var cameraCalibrationPanelContent: some View {
@@ -3104,6 +3620,31 @@ struct StatusOverlay: View {
                     .cornerRadius(12)
                 }
                 .buttonStyle(.plain)
+                
+                // Direct Verify button (if calibrated)
+                if hasExtrinsic {
+                    Button {
+                        startCalibrationVerification = true
+                        showCalibrationWizard = true
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.circle")
+                                .font(.system(size: 16, weight: .bold))
+                            Text("Verify Calibration")
+                                .font(.headline)
+                        }
+                        .foregroundColor(.green)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.green.opacity(0.15))
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.green.opacity(0.5), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
                 
                 // Delete calibration button (if calibrated)
                 if hasIntrinsic || hasExtrinsic {
@@ -3862,4 +4403,155 @@ func createStatusEntity() -> Entity {
     let statusEntity = Entity()
     statusEntity.name = "statusDisplay"
     return statusEntity
+}
+
+// MARK: - Python Calibration Status Overlay
+
+/// Overlay displayed during Python-based extrinsic calibration
+/// Shows calibration progress, marker detection, and step information
+struct PythonCalibrationStatusOverlay: View {
+    let step: Int
+    let targetMarker: Int
+    let samplesCollected: Int
+    let samplesNeeded: Int
+    let markerDetected: Bool
+    let progress: Float
+    let stepStatus: Int  // 0=collecting, 1=calibrating, 2=complete
+    
+    private var statusColor: Color {
+        if stepStatus == 2 { return .green }
+        if markerDetected { return .green }
+        return .orange
+    }
+    
+    private var stepStatusText: String {
+        switch stepStatus {
+        case 1: return "Calibrating..."
+        case 2: return "Step Complete!"
+        default: return markerDetected ? "Collecting..." : "Looking for marker..."
+        }
+    }
+    
+    private var markerIds: [Int] { [0, 2, 3] }
+    
+    var body: some View {
+        VStack(spacing: 16) {
+            // Header
+            HStack {
+                Image(systemName: "viewfinder")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(.cyan)
+                Text("Extrinsic Calibration")
+                    .font(.headline)
+                    .foregroundColor(.white)
+            }
+            
+            Divider()
+                .background(Color.white.opacity(0.3))
+            
+            // Step indicator
+            HStack(spacing: 12) {
+                ForEach(0..<3, id: \.self) { i in
+                    let isCurrentStep = i == step
+                    let isCompleted = i < step
+                    
+                    HStack(spacing: 4) {
+                        if isCompleted {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                        } else if isCurrentStep {
+                            Image(systemName: "circle.dotted")
+                                .foregroundColor(.cyan)
+                        } else {
+                            Image(systemName: "circle")
+                                .foregroundColor(.white.opacity(0.3))
+                        }
+                        Text("Marker \(markerIds[i])")
+                            .font(.caption)
+                            .foregroundColor(isCurrentStep ? .white : .white.opacity(0.5))
+                    }
+                }
+            }
+            
+            // Current step details
+            VStack(spacing: 10) {
+                // Target marker
+                HStack {
+                    Text("Target:")
+                        .foregroundColor(.white.opacity(0.6))
+                    Spacer()
+                    Text("Marker ID \(targetMarker)")
+                        .font(.system(.body, design: .monospaced))
+                        .fontWeight(.bold)
+                        .foregroundColor(.cyan)
+                }
+                
+                // Detection status
+                HStack {
+                    Text("Status:")
+                        .foregroundColor(.white.opacity(0.6))
+                    Spacer()
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(statusColor)
+                            .frame(width: 8, height: 8)
+                        Text(stepStatusText)
+                            .foregroundColor(statusColor)
+                    }
+                }
+                
+                // Sample count
+                HStack {
+                    Text("Samples:")
+                        .foregroundColor(.white.opacity(0.6))
+                    Spacer()
+                    Text("\(samplesCollected) / \(samplesNeeded)")
+                        .font(.system(.body, design: .monospaced))
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                }
+                
+                // Progress bar
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.white.opacity(0.2))
+                        .frame(height: 12)
+                    
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(statusColor)
+                        .frame(width: max(0, CGFloat(progress) * 200), height: 12)
+                        .animation(.easeInOut(duration: 0.3), value: progress)
+                }
+                .frame(width: 200)
+            }
+            
+            // Instructions
+            VStack(spacing: 4) {
+                if stepStatus == 2 {
+                    Text("✓ Step complete! Move to next marker.")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                } else if !markerDetected {
+                    Text("Hold marker \(targetMarker) in camera view")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                } else {
+                    Text("Keep marker steady while collecting samples")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.7))
+                }
+            }
+        }
+        .padding(20)
+        .frame(width: 280)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.black.opacity(0.85))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(statusColor.opacity(0.5), lineWidth: 2)
+                )
+        )
+        .shadow(color: statusColor.opacity(0.3), radius: 20)
+    }
 }

@@ -4,6 +4,32 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+/// ArUco dictionary types matching OpenCV's predefined dictionaries
+typedef NS_ENUM(NSInteger, ArucoDictionaryType) {
+    ArucoDictionaryTypeDict4X4_50 = 0,
+    ArucoDictionaryTypeDict4X4_100 = 1,
+    ArucoDictionaryTypeDict4X4_250 = 2,
+    ArucoDictionaryTypeDict4X4_1000 = 3,
+    ArucoDictionaryTypeDict5X5_50 = 4,
+    ArucoDictionaryTypeDict5X5_100 = 5,
+    ArucoDictionaryTypeDict5X5_250 = 6,
+    ArucoDictionaryTypeDict5X5_1000 = 7,
+    ArucoDictionaryTypeDict6X6_50 = 8,
+    ArucoDictionaryTypeDict6X6_100 = 9,
+    ArucoDictionaryTypeDict6X6_250 = 10,
+    ArucoDictionaryTypeDict6X6_1000 = 11,
+    ArucoDictionaryTypeDict7X7_50 = 12,
+    ArucoDictionaryTypeDict7X7_100 = 13,
+    ArucoDictionaryTypeDict7X7_250 = 14,
+    ArucoDictionaryTypeDict7X7_1000 = 15,
+    ArucoDictionaryTypeDictOriginal = 16,
+    ArucoDictionaryTypeDictAprilTag16h5 = 17,
+    ArucoDictionaryTypeDictAprilTag25h9 = 18,
+    ArucoDictionaryTypeDictAprilTag36h10 = 19,
+    ArucoDictionaryTypeDictAprilTag36h11 = 20,
+};
+
+
 /// Struct to hold stereo calibration results
 @interface StereoCalibrationResult : NSObject
 @property (nonatomic, assign) BOOL success;
@@ -35,49 +61,76 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) BOOL foundRight;
 @property (nonatomic, strong, nullable) NSArray<NSValue *> *leftCorners;   // CGPoints
 @property (nonatomic, strong, nullable) NSArray<NSValue *> *rightCorners;  // CGPoints
-@property (nonatomic, strong, nullable) NSData *visualizedImageData;  // JPEG data of visualization
+@property (nonatomic, strong, nullable) NSData *visualizedImageData;
+@end
+
+/// Struct to hold ChArUco detection result
+@interface CharucoDetection : NSObject
+@property (nonatomic, assign) BOOL foundLeft;
+@property (nonatomic, assign) BOOL foundRight;
+@property (nonatomic, strong, nullable) NSArray<NSValue *> *leftCorners;   // Interpolated corners
+@property (nonatomic, strong, nullable) NSArray<NSNumber *> *leftIds;      // IDs of corners
+@property (nonatomic, strong, nullable) NSArray<NSValue *> *rightCorners;
+@property (nonatomic, strong, nullable) NSArray<NSNumber *> *rightIds;
+@property (nonatomic, strong, nullable) NSData *visualizedImageData;
 @end
 
 /// Objective-C++ wrapper for OpenCV camera calibration operations
 @interface OpenCVCalibrator : NSObject
 
 /// Initialize with checkerboard parameters
-/// @param innerCornersX Number of inner corners horizontally (e.g., 9 for 10x7 squares)
-/// @param innerCornersY Number of inner corners vertically (e.g., 6 for 10x7 squares)
-/// @param squareSize Physical size of one square in meters (e.g., 0.024 for 24mm)
 - (instancetype)initWithCheckerboardCornersX:(int)innerCornersX
                                      cornersY:(int)innerCornersY
                                    squareSize:(float)squareSize;
 
+/// Initialize with ChArUco parameters
+/// @param squaresX Number of squares horizontally (e.g., 3 for 3x4 board)
+/// @param squaresY Number of squares vertically (e.g., 4 for 3x4 board)
+/// @param squareSize Physical size of one square in meters
+/// @param markerSize Physical size of the marker in meters
+/// @param dictionaryType ArUco dictionary type
+- (instancetype)initWithCharucoSquaresX:(int)squaresX
+                               squaresY:(int)squaresY
+                             squareSize:(float)squareSize
+                             markerSize:(float)markerSize
+                             dictionary:(ArucoDictionaryType)dictionaryType;
+
 /// Detect checkerboard in a side-by-side stereo frame
-/// @param pixelBuffer The stereo image (left|right side-by-side)
-/// @return Detection result with corners if found
 - (CheckerboardDetection * _Nullable)detectCheckerboardInStereoFrame:(CVPixelBufferRef)pixelBuffer NS_SWIFT_NAME(detectCheckerboard(stereoFrame:));
 
+/// Detect ChArUco board in a side-by-side stereo frame
+- (CharucoDetection * _Nullable)detectCharucoInStereoFrame:(CVPixelBufferRef)pixelBuffer NS_SWIFT_NAME(detectCharuco(stereoFrame:));
+
 /// Detect checkerboard in a mono frame
-/// @param pixelBuffer The mono image
-/// @return Detection result with corners if found (in leftCorners)
 - (CheckerboardDetection * _Nullable)detectCheckerboardInMonoFrame:(CVPixelBufferRef)pixelBuffer NS_SWIFT_NAME(detectCheckerboard(monoFrame:));
 
-/// Add a calibration sample (must have detected checkerboard in both views)
-/// @param leftCorners Array of CGPoint values for left image corners
-/// @param rightCorners Array of CGPoint values for right image corners
-/// @param imageWidth Width of a single image (not the combined stereo)
-/// @param imageHeight Height of the image
-/// @return Number of samples collected so far
+/// Detect ChArUco board in a mono frame
+- (CharucoDetection * _Nullable)detectCharucoInMonoFrame:(CVPixelBufferRef)pixelBuffer NS_SWIFT_NAME(detectCharuco(monoFrame:));
+
+/// Add a checkerboard calibration sample
 - (int)addCalibrationSampleWithLeftCorners:(NSArray<NSValue *> *)leftCorners
                               rightCorners:(NSArray<NSValue *> *)rightCorners
                                 imageWidth:(int)imageWidth
                                imageHeight:(int)imageHeight NS_SWIFT_NAME(addCalibrationSample(leftCorners:rightCorners:width:height:));
 
-/// Add a calibration sample for mono camera
-/// @param corners Array of CGPoint values for image corners
-/// @param imageWidth Width of the image
-/// @param imageHeight Height of the image
-/// @return Number of samples collected so far
+/// Add a ChArUco calibration sample
+- (int)addCharucoSampleWithLeftCorners:(NSArray<NSValue *> *)leftCorners
+                               leftIds:(NSArray<NSNumber *> *)leftIds
+                          rightCorners:(NSArray<NSValue *> *)rightCorners
+                              rightIds:(NSArray<NSNumber *> *)rightIds
+                            imageWidth:(int)imageWidth
+                           imageHeight:(int)imageHeight NS_SWIFT_NAME(addCharucoSample(leftCorners:leftIds:rightCorners:rightIds:width:height:));
+
+/// Add a mono checkerboard sample
 - (int)addMonoCalibrationSampleWithCorners:(NSArray<NSValue *> *)corners
                                 imageWidth:(int)imageWidth
                                imageHeight:(int)imageHeight NS_SWIFT_NAME(addMonoCalibrationSample(corners:width:height:));
+
+/// Add a mono ChArUco sample
+- (int)addMonoCharucoSampleWithCorners:(NSArray<NSValue *> *)corners
+                                   ids:(NSArray<NSNumber *> *)ids
+                            imageWidth:(int)imageWidth
+                           imageHeight:(int)imageHeight NS_SWIFT_NAME(addMonoCharucoSample(corners:ids:width:height:));
 
 /// Get the current number of calibration samples
 - (int)sampleCount;
@@ -85,31 +138,45 @@ NS_ASSUME_NONNULL_BEGIN
 /// Clear all calibration samples
 - (void)clearSamples;
 
-/// Perform stereo calibration with collected samples
-/// @param minSamples Minimum number of samples required (e.g., 20)
-/// @return Calibration result with intrinsics and stereo parameters
+/// Perform stereo calibration with collected samples (works for both Checkerboard and ChArUco)
 - (StereoCalibrationResult * _Nullable)performStereoCalibrationWithMinSamples:(int)minSamples NS_SWIFT_NAME(performStereoCalibration(minSamples:));
 
-/// Perform mono camera calibration with collected samples
-/// @param minSamples Minimum number of samples required (e.g., 20)
-/// @return Calibration result with intrinsics (only left camera values are populated)
-- (StereoCalibrationResult * _Nullable)performMonoCalibrationWithMinSamples:(int)minSamples NS_SWIFT_NAME(performMonoCalibration(minSamples:));
+/// Perform mono calibration with collected samples
+/// @param minSamples Minimum number of samples required
+/// @param outlierRejection Whether to perform iterative outlier rejection (slower but more accurate)
+- (StereoCalibrationResult * _Nullable)performMonoCalibrationWithMinSamples:(int)minSamples
+                                                          outlierRejection:(BOOL)outlierRejection NS_SWIFT_NAME(performMonoCalibration(minSamples:outlierRejection:));
 
 /// Calculate mean corner movement between two sets of corners
-/// @param cornersA First set of corners
-/// @param cornersB Second set of corners
-/// @return Mean Euclidean distance in pixels
 - (float)meanCornerMovementFrom:(NSArray<NSValue *> *)cornersA
                              to:(NSArray<NSValue *> *)cornersB NS_SWIFT_NAME(meanCornerMovement(from:to:));
 
-/// Create a visualization of the detected checkerboard (for debugging)
-/// @param pixelBuffer Original image
-/// @param corners Detected corners
-/// @param found Whether the checkerboard was found
-/// @return JPEG data of the visualization, or nil on failure
+/// Create a visualization of the detected checkerboard
 - (NSData * _Nullable)visualizeCheckerboardInPixelBuffer:(CVPixelBufferRef)pixelBuffer
                                                  corners:(NSArray<NSValue *> * _Nullable)corners
                                                    found:(BOOL)found NS_SWIFT_NAME(visualizeCheckerboard(pixelBuffer:corners:found:));
+
+/// Create a visualization of the detected ChArUco board
+- (NSData * _Nullable)visualizeCharucoInPixelBuffer:(CVPixelBufferRef)pixelBuffer
+                                            corners:(NSArray<NSValue *> * _Nullable)corners
+                                                ids:(NSArray<NSNumber *> * _Nullable)ids
+                                              found:(BOOL)found NS_SWIFT_NAME(visualizeCharuco(pixelBuffer:corners:ids:found:));
+
+/// Create a visualization of the detected checkerboard in a stereo frame
+- (NSData * _Nullable)visualizeStereoCheckerboardInPixelBuffer:(CVPixelBufferRef)pixelBuffer
+                                                   leftCorners:(NSArray<NSValue *> * _Nullable)leftCorners
+                                                  rightCorners:(NSArray<NSValue *> * _Nullable)rightCorners
+                                                     foundLeft:(BOOL)foundLeft
+                                                    foundRight:(BOOL)foundRight NS_SWIFT_NAME(visualizeStereoCheckerboard(pixelBuffer:leftCorners:rightCorners:foundLeft:foundRight:));
+
+/// Create a visualization of the detected ChArUco board in a stereo frame
+- (NSData * _Nullable)visualizeStereoCharucoInPixelBuffer:(CVPixelBufferRef)pixelBuffer
+                                              leftCorners:(NSArray<NSValue *> * _Nullable)leftCorners
+                                                  leftIds:(NSArray<NSNumber *> * _Nullable)leftIds
+                                             rightCorners:(NSArray<NSValue *> * _Nullable)rightCorners
+                                                 rightIds:(NSArray<NSNumber *> * _Nullable)rightIds
+                                                foundLeft:(BOOL)foundLeft
+                                               foundRight:(BOOL)foundRight NS_SWIFT_NAME(visualizeStereoCharuco(pixelBuffer:leftCorners:leftIds:rightCorners:rightIds:foundLeft:foundRight:));
 
 @end
 
@@ -131,30 +198,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong, nullable) NSArray<NSNumber *> *transformMatrix;
 @end
 
-/// ArUco dictionary types matching OpenCV's predefined dictionaries
-typedef NS_ENUM(NSInteger, ArucoDictionaryType) {
-    ArucoDictionary_4X4_50 = 0,
-    ArucoDictionary_4X4_100 = 1,
-    ArucoDictionary_4X4_250 = 2,
-    ArucoDictionary_4X4_1000 = 3,
-    ArucoDictionary_5X5_50 = 4,
-    ArucoDictionary_5X5_100 = 5,
-    ArucoDictionary_5X5_250 = 6,
-    ArucoDictionary_5X5_1000 = 7,
-    ArucoDictionary_6X6_50 = 8,
-    ArucoDictionary_6X6_100 = 9,
-    ArucoDictionary_6X6_250 = 10,
-    ArucoDictionary_6X6_1000 = 11,
-    ArucoDictionary_7X7_50 = 12,
-    ArucoDictionary_7X7_100 = 13,
-    ArucoDictionary_7X7_250 = 14,
-    ArucoDictionary_7X7_1000 = 15,
-    ArucoDictionary_ARUCO_ORIGINAL = 16,
-    ArucoDictionary_APRILTAG_16h5 = 17,
-    ArucoDictionary_APRILTAG_25h9 = 18,
-    ArucoDictionary_APRILTAG_36h10 = 19,
-    ArucoDictionary_APRILTAG_36h11 = 20,
-};
+
 
 /// Objective-C++ wrapper for OpenCV ArUco marker detection
 @interface OpenCVArucoDetector : NSObject
@@ -190,6 +234,30 @@ typedef NS_ENUM(NSInteger, ArucoDictionaryType) {
 + (NSData * _Nullable)generateMarkerImageWithId:(int)markerId
                                      sizePixels:(int)sizePixels
                                      dictionary:(ArucoDictionaryType)dictionaryType NS_SWIFT_NAME(generateMarkerImage(id:sizePixels:dictionary:));
+
+/// Visualize detected ArUco markers on a frame
+/// @param pixelBuffer The original image
+/// @param detections Array of ArucoDetectionResult objects to visualize
+/// @param drawAxes Whether to draw pose axes (requires valid pose)
+/// @param cameraMatrix Camera intrinsic matrix (required for axes, nil otherwise)
+/// @param distCoeffs Distortion coefficients (required for axes, nil otherwise)
+/// @param axisLength Length of axes in meters (default 0.03)
+/// @return JPEG data of the visualization, or nil on failure
+- (NSData * _Nullable)visualizeMarkersInPixelBuffer:(CVPixelBufferRef)pixelBuffer
+                                         detections:(NSArray<ArucoDetectionResult *> *)detections
+                                           drawAxes:(BOOL)drawAxes
+                                       cameraMatrix:(NSArray<NSNumber *> * _Nullable)cameraMatrix
+                                         distCoeffs:(NSArray<NSNumber *> * _Nullable)distCoeffs
+                                         axisLength:(float)axisLength NS_SWIFT_NAME(visualizeMarkers(pixelBuffer:detections:drawAxes:cameraMatrix:distCoeffs:axisLength:));
+
+/// Visualize detected ArUco markers on a stereo frame (both halves)
+/// @param pixelBuffer The original side-by-side stereo image
+/// @param leftDetections Array of ArucoDetectionResult objects from left image
+/// @param rightDetections Array of ArucoDetectionResult objects from right image (corners relative to right half)
+/// @return JPEG data of the visualization, or nil on failure
+- (NSData * _Nullable)visualizeStereoMarkersInPixelBuffer:(CVPixelBufferRef)pixelBuffer
+                                           leftDetections:(NSArray<ArucoDetectionResult *> *)leftDetections
+                                          rightDetections:(NSArray<ArucoDetectionResult *> *)rightDetections NS_SWIFT_NAME(visualizeStereoMarkers(pixelBuffer:leftDetections:rightDetections:));
 
 @end
 

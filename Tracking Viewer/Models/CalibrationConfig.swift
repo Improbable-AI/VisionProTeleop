@@ -428,10 +428,10 @@ enum ArucoDictionary: Int, Codable, CaseIterable {
 
 /// Checkerboard configuration
 struct CheckerboardDisplayConfig: Codable, Equatable {
-    /// Number of inner corners horizontally
-    var innerCornersX: Int = 5
-    /// Number of inner corners vertically
-    var innerCornersY: Int = 4
+    /// Number of inner corners horizontally (columns - 1)
+    var innerCornersX: Int = 11  // 12 rows (vertical)
+    /// Number of inner corners vertically (rows - 1)
+    var innerCornersY: Int = 5   // 6 columns (horizontal)
     /// Physical size of one square in millimeters
     var squareSizeMM: Float = 10.0
     
@@ -443,6 +443,30 @@ struct CheckerboardDisplayConfig: Codable, Equatable {
     /// Total pattern height in mm
     var patternHeightMM: Float {
         return Float(innerCornersY + 1) * squareSizeMM
+    }
+}
+
+/// ChArUco board configuration
+struct CharucoDisplayConfig: Codable, Equatable {
+    /// Number of squares horizontally
+    var squaresX: Int = 3
+    /// Number of squares vertically
+    var squaresY: Int = 4
+    /// Physical size of one square in millimeters
+    var squareSizeMM: Float = 20.0
+    /// Physical size of marker in millimeters
+    var markerSizeMM: Float = 15.0
+    /// Dictionary to use
+    var dictionary: ArucoDictionary = .dict4X4_50
+    
+    /// Total pattern width in mm
+    var patternWidthMM: Float {
+        return Float(squaresX) * squareSizeMM
+    }
+    
+    /// Total pattern height in mm
+    var patternHeightMM: Float {
+        return Float(squaresY) * squareSizeMM
     }
 }
 
@@ -458,6 +482,69 @@ struct ArucoMarkerConfig: Codable, Equatable {
     var minUniquePositions: Int = 3
     /// Samples to collect per position
     var samplesPerPosition: Int = 30
+}
+
+/// ArUco verification board configuration for intrinsic calibration verification
+/// This displays ArUco tags in a configurable grid with known spacing for measuring 3D distances
+struct ArucoVerificationBoardConfig: Codable, Equatable {
+    /// ArUco dictionary type
+    var dictionary: ArucoDictionary = .dict4X4_50
+    /// Number of columns (tags horizontally)
+    var columns: Int = 1
+    /// Number of rows (tags vertically)
+    var rows: Int = 3
+    /// Physical size of each tag in millimeters
+    var tagSizeMM: Float = 30.0
+    /// Margin/spacing between tags in millimeters
+    var marginMM: Float = 15.0
+    /// Tag IDs to display (row-major order: top-left to bottom-right)
+    var tagIds: [Int] = [0, 1, 2, 3]
+    
+    /// Total number of tags
+    var tagCount: Int {
+        return columns * rows
+    }
+    
+    /// Get valid tag IDs (padded or truncated to match grid size)
+    var effectiveTagIds: [Int] {
+        if tagIds.count >= tagCount {
+            return Array(tagIds.prefix(tagCount))
+        } else {
+            // Pad with sequential IDs
+            var ids = tagIds
+            let maxId = (tagIds.max() ?? -1) + 1
+            while ids.count < tagCount {
+                ids.append(maxId + ids.count - tagIds.count)
+            }
+            return ids
+        }
+    }
+    
+    /// Total board width in mm
+    var boardWidthMM: Float {
+        return Float(columns) * tagSizeMM + Float(columns - 1) * marginMM
+    }
+    
+    /// Total board height in mm
+    var boardHeightMM: Float {
+        return Float(rows) * tagSizeMM + Float(rows - 1) * marginMM
+    }
+    
+    /// Center-to-center distance between adjacent tags (horizontal or vertical)
+    var centerDistanceMM: Float {
+        return tagSizeMM + marginMM
+    }
+    
+    /// Center-to-center diagonal distance (only meaningful for 2+ rows and 2+ cols)
+    var diagonalDistanceMM: Float {
+        return sqrt(2) * centerDistanceMM
+    }
+    
+    /// Preset configurations
+    static let preset2x2 = ArucoVerificationBoardConfig(columns: 2, rows: 2, tagSizeMM: 30.0, marginMM: 15.0, tagIds: [0, 1, 2, 3])
+    static let preset1x3 = ArucoVerificationBoardConfig(columns: 1, rows: 3, tagSizeMM: 30.0, marginMM: 15.0, tagIds: [0, 1, 2])
+    static let preset1x4 = ArucoVerificationBoardConfig(columns: 1, rows: 4, tagSizeMM: 25.0, marginMM: 12.0, tagIds: [0, 1, 2, 3])
+    static let preset3x1 = ArucoVerificationBoardConfig(columns: 3, rows: 1, tagSizeMM: 20.0, marginMM: 10.0, tagIds: [0, 1, 2])
 }
 
 // MARK: - Shared Calibration State

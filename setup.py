@@ -16,6 +16,7 @@ setup(
     entry_points={
         'console_scripts': [
             'setup-avp-wired=avp_stream.bridge_avp:main',
+            'avp=avp_stream.cli:main',
         ],
     },
 )

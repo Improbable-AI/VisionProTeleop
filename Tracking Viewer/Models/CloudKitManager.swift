@@ -21,7 +21,7 @@ class CloudKitManager: ObservableObject {
     
     // Record type for public recordings
     // Matches "publicRecording" from CloudKit Dashboard
-    private let recordType = "publicRecording"
+    private let recordType = "newpublicRecording"
     
     // Pagination
     private let pageSize = 20
@@ -39,6 +39,13 @@ class CloudKitManager: ObservableObject {
         // This should match the iCloud container in your entitlements file
         container = CKContainer(identifier: "iCloud.com.younghyopark.VisionProTeleop")
         publicDatabase = container.publicCloudDatabase
+        
+        // Log environment info for debugging
+        #if DEBUG
+        print("⚠️ [CloudKit] Running in DEBUG mode - using DEVELOPMENT environment")
+        #else
+        print("✅ [CloudKit] Running in RELEASE mode - using PRODUCTION environment")
+        #endif
     }
     
     // MARK: - Public Recording Operations
@@ -61,6 +68,7 @@ class CloudKitManager: ObservableObject {
     ///   - thumbnailURL: Optional thumbnail URL (legacy)
     ///   - thumbnailAssetURL: Local URL to thumbnail image to upload as asset
     ///   - provider: Cloud storage provider (dropbox or googleDrive)
+    ///   - metadata: Recording metadata fields for CloudKit querying
     /// - Returns: Success status
     func makeRecordingPublic(
         recordingId: String,
@@ -69,13 +77,33 @@ class CloudKitManager: ObservableObject {
         cloudURL: String,
         thumbnailURL: String? = nil,
         thumbnailAssetURL: URL? = nil,
-        provider: CloudStorageProvider
+        provider: CloudStorageProvider,
+        // Metadata fields for CloudKit querying
+        recordingType: String? = nil,
+        duration: Double? = nil,
+        frameCount: Int? = nil,
+        hasVideo: Bool? = nil,
+        hasLeftHand: Bool? = nil,
+        hasRightHand: Bool? = nil,
+        hasSimulationData: Bool? = nil,
+        hasUSDZ: Bool? = nil,
+        videoSource: String? = nil,
+        averageFPS: Double? = nil
     ) async -> Bool {
-        // Create a record with the recording ID as the record name for easy lookup
+        // First, try to delete any existing record with the OLD record type
+        // This handles migration from "publicRecording" to "newpublicRecording"
         let recordID = CKRecord.ID(recordName: recordingId)
+        do {
+            try await publicDatabase.deleteRecord(withID: recordID)
+            dlog("🔄 [CloudKit] Deleted existing record for migration: \(recordingId)")
+        } catch {
+            // Ignore errors - record might not exist or might already be the new type
+        }
+        
+        // Create a record with the recording ID as the record name for easy lookup
         let record = CKRecord(recordType: recordType, recordID: recordID)
         
-        // Set fields - MUST MATCH CLOUDKIT DASHBOARD EXACTLY
+        // Set core fields - MUST MATCH CLOUDKIT DASHBOARD EXACTLY
         record["recordingID"] = recordingId as CKRecordValue
         record["title"] = title as CKRecordValue
         record["cloudURL"] = cloudURL as CKRecordValue
@@ -94,9 +122,44 @@ class CloudKitManager: ObservableObject {
             record["thumbnailAsset"] = CKAsset(fileURL: assetURL)
         }
         
+        // Set metadata fields for querying/filtering
+        if let recordingType = recordingType {
+            record["recordingType"] = recordingType as CKRecordValue
+        }
+        if let duration = duration {
+            record["duration"] = duration as CKRecordValue
+        }
+        if let frameCount = frameCount {
+            record["frameCount"] = frameCount as CKRecordValue
+        }
+        if let hasVideo = hasVideo {
+            record["hasVideo"] = (hasVideo ? 1 : 0) as CKRecordValue
+        }
+        if let hasLeftHand = hasLeftHand {
+            record["hasLeftHand"] = (hasLeftHand ? 1 : 0) as CKRecordValue
+        }
+        if let hasRightHand = hasRightHand {
+            record["hasRightHand"] = (hasRightHand ? 1 : 0) as CKRecordValue
+        }
+        if let hasSimulationData = hasSimulationData {
+            record["hasSimulationData"] = (hasSimulationData ? 1 : 0) as CKRecordValue
+        }
+        if let hasUSDZ = hasUSDZ {
+            record["hasUSDZ"] = (hasUSDZ ? 1 : 0) as CKRecordValue
+        }
+        if let videoSource = videoSource {
+            record["videoSource"] = videoSource as CKRecordValue
+        }
+        if let averageFPS = averageFPS {
+            record["averageFPS"] = averageFPS as CKRecordValue
+        }
+        
         do {
             let savedRecord = try await publicDatabase.save(record)
-            dlog("✅ [CloudKit] Made recording public: \(title)")
+            print("✅ [CloudKit] Made recording public: \(title)")
+            print("   Record Type: \(savedRecord.recordType)")
+            print("   Record Name: \(savedRecord.recordID.recordName)")
+            print("   Zone: \(savedRecord.recordID.zoneID.zoneName)")
             
             // Optimistically update local list
             if let newRecording = PublicRecording(from: savedRecord) {

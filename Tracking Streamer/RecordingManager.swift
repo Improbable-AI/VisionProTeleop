@@ -36,54 +36,64 @@ struct SimulationFrame: Codable {
 
 /// Hand joint positions for all 27 joints tracked by ARKit HandSkeleton
 /// Joint order matches 🥽AppModel.swift jointTypes array:
-///   0: forearmArm
-///   1: forearmWrist
-///   2: wrist
-///   3-6: thumb (knuckle, intermediateBase, intermediateTip, tip)
-///   7-11: index (metacarpal, knuckle, intermediateBase, intermediateTip, tip)
-///   12-16: middle (metacarpal, knuckle, intermediateBase, intermediateTip, tip)
-///   17-21: ring (metacarpal, knuckle, intermediateBase, intermediateTip, tip)
-///   22-26: little (metacarpal, knuckle, intermediateBase, intermediateTip, tip)
+///   0: wrist
+///   1-4: thumb (knuckle, intermediateBase, intermediateTip, tip)
+///   5-9: index (metacarpal, knuckle, intermediateBase, intermediateTip, tip)
+///   10-14: middle (metacarpal, knuckle, intermediateBase, intermediateTip, tip)
+///   15-19: ring (metacarpal, knuckle, intermediateBase, intermediateTip, tip)
+///   20-24: little (metacarpal, knuckle, intermediateBase, intermediateTip, tip)
+///   25: forearmWrist
+///   26: forearmArm
+/// Note: Indices 0-24 are identical between 25-joint and 27-joint formats
 struct HandJointData: Codable {
-    // Forearm joints (indices 0-1)
-    let forearmArm: [Float]?    // 4x4 matrix flattened (index 0) - optional, may not be tracked
-    let forearmWrist: [Float]?  // 4x4 matrix flattened (index 1) - optional, may not be tracked
+    // Wrist (index 0)
+    let wrist: [Float]  // 4x4 matrix flattened
     
-    let wrist: [Float]  // 4x4 matrix flattened (index 2)
-    
-    // Thumb (4 joints, indices 3-6) - no metacarpal for thumb
+    // Thumb (4 joints, indices 1-4) - no metacarpal for thumb
     let thumbKnuckle: [Float]          // thumbCMC equivalent
     let thumbIntermediateBase: [Float] // thumbMP equivalent  
     let thumbIntermediateTip: [Float]  // thumbIP equivalent
     let thumbTip: [Float]
     
-    // Index finger (5 joints, indices 7-11)
+    // Index finger (5 joints, indices 5-9)
     let indexMetacarpal: [Float]
     let indexKnuckle: [Float]          // indexMCP equivalent
     let indexIntermediateBase: [Float] // indexPIP equivalent
     let indexIntermediateTip: [Float]  // indexDIP equivalent
     let indexTip: [Float]
     
-    // Middle finger (5 joints, indices 12-16)
+    // Middle finger (5 joints, indices 10-14)
     let middleMetacarpal: [Float]
     let middleKnuckle: [Float]
     let middleIntermediateBase: [Float]
     let middleIntermediateTip: [Float]
     let middleTip: [Float]
     
-    // Ring finger (5 joints, indices 17-21)
+    // Ring finger (5 joints, indices 15-19)
     let ringMetacarpal: [Float]
     let ringKnuckle: [Float]
     let ringIntermediateBase: [Float]
     let ringIntermediateTip: [Float]
     let ringTip: [Float]
     
-    // Little finger (5 joints, indices 22-26)
+    // Little finger (5 joints, indices 20-24)
     let littleMetacarpal: [Float]
     let littleKnuckle: [Float]
     let littleIntermediateBase: [Float]
     let littleIntermediateTip: [Float]
     let littleTip: [Float]
+    
+    // Forearm joints (indices 25-26) - optional, may not be tracked
+    let forearmWrist: [Float]?  // 4x4 matrix flattened (index 25)
+    let forearmArm: [Float]?    // 4x4 matrix flattened (index 26)
+}
+
+/// Recording type for categorizing recordings
+enum RecordingType: String, Codable {
+    case egorecord = "egorecord"
+    case teleopVideo = "teleoperation-video"
+    case teleopMujoco = "teleoperation-mujoco"
+    case teleopIsaac = "teleoperation-isaac"
 }
 
 /// Metadata for the entire recording session
@@ -95,8 +105,8 @@ struct RecordingMetadata: Codable {
     let hasVideo: Bool
     let hasLeftHand: Bool
     let hasRightHand: Bool
-    let hasHead: Bool
     let hasSimulationData: Bool
+    let recordingType: RecordingType
     let hasUSDZ: Bool
     let videoSource: String  // "network" or "uvc"
     let averageFPS: Double
@@ -107,8 +117,8 @@ struct RecordingMetadata: Codable {
     
     enum CodingKeys: String, CodingKey {
         case version, createdAt, duration, frameCount, hasVideo
-        case hasLeftHand, hasRightHand, hasHead, hasSimulationData, hasUSDZ, videoSource, averageFPS, deviceInfo
-        case intrinsicCalibration, extrinsicCalibration
+        case hasLeftHand, hasRightHand, hasSimulationData, hasUSDZ, videoSource, averageFPS, deviceInfo
+        case intrinsicCalibration, extrinsicCalibration, recordingType
     }
     
     func encode(to encoder: Encoder) throws {
@@ -120,8 +130,8 @@ struct RecordingMetadata: Codable {
         try container.encode(hasVideo, forKey: .hasVideo)
         try container.encode(hasLeftHand, forKey: .hasLeftHand)
         try container.encode(hasRightHand, forKey: .hasRightHand)
-        try container.encode(hasHead, forKey: .hasHead)
         try container.encode(hasSimulationData, forKey: .hasSimulationData)
+        try container.encode(recordingType, forKey: .recordingType)
         try container.encode(hasUSDZ, forKey: .hasUSDZ)
         try container.encode(videoSource, forKey: .videoSource)
         try container.encode(averageFPS, forKey: .averageFPS)
@@ -149,8 +159,8 @@ struct RecordingMetadata: Codable {
         hasVideo = try container.decode(Bool.self, forKey: .hasVideo)
         hasLeftHand = try container.decode(Bool.self, forKey: .hasLeftHand)
         hasRightHand = try container.decode(Bool.self, forKey: .hasRightHand)
-        hasHead = try container.decode(Bool.self, forKey: .hasHead)
         hasSimulationData = try container.decodeIfPresent(Bool.self, forKey: .hasSimulationData) ?? false
+        recordingType = try container.decodeIfPresent(RecordingType.self, forKey: .recordingType) ?? .teleopVideo
         hasUSDZ = try container.decodeIfPresent(Bool.self, forKey: .hasUSDZ) ?? false
         videoSource = try container.decode(String.self, forKey: .videoSource)
         averageFPS = try container.decode(Double.self, forKey: .averageFPS)
@@ -174,20 +184,20 @@ struct RecordingMetadata: Codable {
     }
     
     init(createdAt: Date, duration: Double, frameCount: Int, hasVideo: Bool, hasLeftHand: Bool,
-         hasRightHand: Bool, hasHead: Bool, hasSimulationData: Bool, hasUSDZ: Bool, videoSource: String, averageFPS: Double,
-         deviceInfo: DeviceInfo, intrinsicCalibration: [String: Any]? = nil, extrinsicCalibration: [String: Any]? = nil) {
+         hasRightHand: Bool, hasSimulationData: Bool, hasUSDZ: Bool, videoSource: String, averageFPS: Double,
+         deviceInfo: DeviceInfo, recordingType: RecordingType, intrinsicCalibration: [String: Any]? = nil, extrinsicCalibration: [String: Any]? = nil) {
         self.createdAt = createdAt
         self.duration = duration
         self.frameCount = frameCount
         self.hasVideo = hasVideo
         self.hasLeftHand = hasLeftHand
         self.hasRightHand = hasRightHand
-        self.hasHead = hasHead
         self.hasSimulationData = hasSimulationData
         self.hasUSDZ = hasUSDZ
         self.videoSource = videoSource
         self.averageFPS = averageFPS
         self.deviceInfo = deviceInfo
+        self.recordingType = recordingType
         self.intrinsicCalibration = intrinsicCalibration
         self.extrinsicCalibration = extrinsicCalibration
     }
@@ -265,6 +275,10 @@ class RecordingManager: ObservableObject {
     }
     @Published var isAutoRecording: Bool = false  // True if current recording was auto-started
     private var userManuallyStopped: Bool = false // Prevent auto-restart after manual stop
+    
+    // Hand-tracking-only recording timer
+    private var handTrackingRecordingTimer: Timer?
+    private let handTrackingRecordingHz: Double = 60.0  // Record at 60Hz when no video/sim
     
     // MARK: - Private Properties
     private var recordingStartTime: Date?
@@ -406,11 +420,17 @@ class RecordingManager: ObservableObject {
         isRecording = true
         
         // Start duration timer - also updates frame count periodically
+        // Also checks if we should fall back to hand-tracking-only mode
         durationTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 guard let self = self, let startTime = self.recordingStartTime else { return }
                 self.recordingDuration = Date().timeIntervalSince(startTime)
                 self.frameCount = max(self.pendingFrameCount, self.simulationFrameCount)
+                
+                // After 0.5 seconds, if no video/sim data has arrived, start hand-tracking-only mode
+                if self.recordingDuration > 0.5 {
+                    self.checkAndStartHandTrackingOnlyMode()
+                }
             }
         }
         
@@ -548,6 +568,10 @@ class RecordingManager: ObservableObject {
         durationTimer?.invalidate()
         durationTimer = nil
         
+        // Stop hand-tracking-only timer if running
+        handTrackingRecordingTimer?.invalidate()
+        handTrackingRecordingTimer = nil
+        
         // Sync final count
         frameCount = pendingFrameCount
         
@@ -680,6 +704,94 @@ class RecordingManager: ObservableObject {
         }
     }
     
+    // MARK: - Hand Tracking Only Recording
+    
+    /// Start recording hand tracking data only (no video/simulation required).
+    /// This starts a timer that samples hand tracking at the configured Hz.
+    /// Call this when you want to record hand tracking without video or simulation.
+    func startHandTrackingOnlyRecording() {
+        guard isRecording else {
+            dlog("⚠️ [RecordingManager] Cannot start hand tracking recording - recording not active")
+            return
+        }
+        
+        // Don't start if already have a timer
+        guard handTrackingRecordingTimer == nil else { return }
+        
+        dlog("🔴 [RecordingManager] Starting hand tracking only recording at \(handTrackingRecordingHz) Hz")
+        
+        let interval = 1.0 / handTrackingRecordingHz
+        handTrackingRecordingTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.recordHandTrackingFrame()
+            }
+        }
+    }
+    
+    /// Record a single hand tracking frame (used by timer-based recording)
+    private func recordHandTrackingFrame() {
+        guard isRecording, let startTime = recordingStartTime else { return }
+        
+        let captureTime = Date()
+        let timestamp = max(0, captureTime.timeIntervalSince(startTime))
+        let systemTime = captureTime.timeIntervalSince1970
+        
+        // Capture the latest tracking data
+        let trackingData = DataManager.shared.latestHandTrackingData
+        
+        recordingQueue.async { [weak self] in
+            guard let self = self else { return }
+            
+            let frameIndex = self.pendingFrameCount
+            
+            // Create recording folder if needed (first frame)
+            if self.recordingFolderURL == nil {
+                do {
+                    let baseURL = try self.getStorageURLSync()
+                    let recordingFolder = baseURL.appendingPathComponent(self.sessionID)
+                    try FileManager.default.createDirectory(at: recordingFolder, withIntermediateDirectories: true)
+                    self.recordingFolderURL = recordingFolder
+                    dlog("📁 [RecordingManager] Created recording folder for hand tracking only: \(recordingFolder.lastPathComponent)")
+                } catch {
+                    dlog("❌ [RecordingManager] Failed to create recording folder: \(error)")
+                    return
+                }
+            }
+            
+            // Convert tracking data
+            let headMatrixArray: [Float] = self.matrixToArray(trackingData.Head)
+            let leftHand = self.extractHandJointData(wrist: trackingData.leftWrist, skeleton: trackingData.leftSkeleton)
+            let rightHand = self.extractHandJointData(wrist: trackingData.rightWrist, skeleton: trackingData.rightSkeleton)
+            
+            // Create recorded frame (no video data)
+            let recordedFrame = RecordedFrame(
+                timestamp: timestamp,
+                systemTime: systemTime,
+                headMatrix: headMatrixArray,
+                leftHand: leftHand,
+                rightHand: rightHand,
+                videoFrameIndex: -1,  // No video frame
+                videoWidth: 0,
+                videoHeight: 0
+            )
+            
+            self.recordedFrames.append(recordedFrame)
+            self.pendingFrameCount += 1
+        }
+    }
+    
+    /// Check if we should use hand-tracking-only mode (no video/sim data source)
+    /// Called periodically to detect when to start hand-tracking-only recording
+    func checkAndStartHandTrackingOnlyMode() {
+        guard isRecording else { return }
+        guard handTrackingRecordingTimer == nil else { return }  // Already running
+        guard !isWriterSessionStarted else { return }  // Video is active
+        guard simulationFrameCount == 0 else { return }  // Simulation is active
+        
+        // No video or simulation - start hand tracking only mode
+        startHandTrackingOnlyRecording()
+    }
+    
     // MARK: - Simulation Data Recording
     
     /// Record simulation data (poses, qpos, ctrl) along with tracking data (hands, head)
@@ -772,65 +884,65 @@ class RecordingManager: ObservableObject {
         let joints = skeleton.joints
         guard joints.count >= 27 else { return nil }
         
-        // Joint order from 🥽AppModel.swift:
-        //   0: forearmArm
-        //   1: forearmWrist
-        //   2: wrist
-        //   3-6: thumb (knuckle, intermediateBase, intermediateTip, tip)
-        //   7-11: index (metacarpal, knuckle, intermediateBase, intermediateTip, tip)
-        //   12-16: middle (metacarpal, knuckle, intermediateBase, intermediateTip, tip)
-        //   17-21: ring (metacarpal, knuckle, intermediateBase, intermediateTip, tip)
-        //   22-26: little (metacarpal, knuckle, intermediateBase, intermediateTip, tip)
+        // Joint order from 🥽AppModel.swift (indices 0-24 shared with 25-joint format):
+        //   0: wrist
+        //   1-4: thumb (knuckle, intermediateBase, intermediateTip, tip)
+        //   5-9: index (metacarpal, knuckle, intermediateBase, intermediateTip, tip)
+        //   10-14: middle (metacarpal, knuckle, intermediateBase, intermediateTip, tip)
+        //   15-19: ring (metacarpal, knuckle, intermediateBase, intermediateTip, tip)
+        //   20-24: little (metacarpal, knuckle, intermediateBase, intermediateTip, tip)
+        //   25: forearmWrist
+        //   26: forearmArm
         
         // Check if forearm joints are valid (not identity matrix = tracked)
         // Forearm joints may not always be tracked, so we make them optional
-        let forearmArmMatrix = joints[0]
-        let forearmWristMatrix = joints[1]
+        let forearmWristMatrix = joints[25]
+        let forearmArmMatrix = joints[26]
         
-        // Check if forearmArm is at origin (identity matrix indicates not tracked)
-        let isForearmmArmTracked = forearmArmMatrix.columns.3.x != 0 || forearmArmMatrix.columns.3.y != 0 || forearmArmMatrix.columns.3.z != 0
+        // Check if forearm is at origin (identity matrix indicates not tracked)
         let isForearmWristTracked = forearmWristMatrix.columns.3.x != 0 || forearmWristMatrix.columns.3.y != 0 || forearmWristMatrix.columns.3.z != 0
+        let isForearmArmTracked = forearmArmMatrix.columns.3.x != 0 || forearmArmMatrix.columns.3.y != 0 || forearmArmMatrix.columns.3.z != 0
         
         return HandJointData(
-            // Forearm joints (optional - may not be tracked)
-            forearmArm: isForearmmArmTracked ? matrixToArray(forearmArmMatrix) : nil,
-            forearmWrist: isForearmWristTracked ? matrixToArray(forearmWristMatrix) : nil,
-            
             wrist: matrixToArray(wrist),
             
-            // Thumb (indices 3-6)
-            thumbKnuckle: matrixToArray(joints[3]),
-            thumbIntermediateBase: matrixToArray(joints[4]),
-            thumbIntermediateTip: matrixToArray(joints[5]),
-            thumbTip: matrixToArray(joints[6]),
+            // Thumb (indices 1-4)
+            thumbKnuckle: matrixToArray(joints[1]),
+            thumbIntermediateBase: matrixToArray(joints[2]),
+            thumbIntermediateTip: matrixToArray(joints[3]),
+            thumbTip: matrixToArray(joints[4]),
             
-            // Index (indices 7-11)
-            indexMetacarpal: matrixToArray(joints[7]),
-            indexKnuckle: matrixToArray(joints[8]),
-            indexIntermediateBase: matrixToArray(joints[9]),
-            indexIntermediateTip: matrixToArray(joints[10]),
-            indexTip: matrixToArray(joints[11]),
+            // Index (indices 5-9)
+            indexMetacarpal: matrixToArray(joints[5]),
+            indexKnuckle: matrixToArray(joints[6]),
+            indexIntermediateBase: matrixToArray(joints[7]),
+            indexIntermediateTip: matrixToArray(joints[8]),
+            indexTip: matrixToArray(joints[9]),
             
-            // Middle (indices 12-16)
-            middleMetacarpal: matrixToArray(joints[12]),
-            middleKnuckle: matrixToArray(joints[13]),
-            middleIntermediateBase: matrixToArray(joints[14]),
-            middleIntermediateTip: matrixToArray(joints[15]),
-            middleTip: matrixToArray(joints[16]),
+            // Middle (indices 10-14)
+            middleMetacarpal: matrixToArray(joints[10]),
+            middleKnuckle: matrixToArray(joints[11]),
+            middleIntermediateBase: matrixToArray(joints[12]),
+            middleIntermediateTip: matrixToArray(joints[13]),
+            middleTip: matrixToArray(joints[14]),
             
-            // Ring (indices 17-21)
-            ringMetacarpal: matrixToArray(joints[17]),
-            ringKnuckle: matrixToArray(joints[18]),
-            ringIntermediateBase: matrixToArray(joints[19]),
-            ringIntermediateTip: matrixToArray(joints[20]),
-            ringTip: matrixToArray(joints[21]),
+            // Ring (indices 15-19)
+            ringMetacarpal: matrixToArray(joints[15]),
+            ringKnuckle: matrixToArray(joints[16]),
+            ringIntermediateBase: matrixToArray(joints[17]),
+            ringIntermediateTip: matrixToArray(joints[18]),
+            ringTip: matrixToArray(joints[19]),
             
-            // Little (indices 22-26)
-            littleMetacarpal: matrixToArray(joints[22]),
-            littleKnuckle: matrixToArray(joints[23]),
-            littleIntermediateBase: matrixToArray(joints[24]),
-            littleIntermediateTip: matrixToArray(joints[25]),
-            littleTip: matrixToArray(joints[26])
+            // Little (indices 20-24)
+            littleMetacarpal: matrixToArray(joints[20]),
+            littleKnuckle: matrixToArray(joints[21]),
+            littleIntermediateBase: matrixToArray(joints[22]),
+            littleIntermediateTip: matrixToArray(joints[23]),
+            littleTip: matrixToArray(joints[24]),
+            
+            // Forearm joints (indices 25-26, optional - may not be tracked)
+            forearmWrist: isForearmWristTracked ? matrixToArray(forearmWristMatrix) : nil,
+            forearmArm: isForearmArmTracked ? matrixToArray(forearmArmMatrix) : nil
         )
     }
     
@@ -918,24 +1030,49 @@ class RecordingManager: ObservableObject {
                 intrinsicCalibrationDict = nil
             }
             
+            // Determine actual frame count (use max of video and simulation frames)
+            let actualFrameCount = max(recordedFrames.count, simulationFrames.count)
+            
+            // Check if video file was actually written
+            let videoURL = recordingFolder.appendingPathComponent("video.mp4")
+            let hasActualVideo = FileManager.default.fileExists(atPath: videoURL.path) &&
+                ((try? FileManager.default.attributesOfItem(atPath: videoURL.path)[.size] as? Int64) ?? 0) > 0
+            
+            // Determine recording type based on app mode and data present
+            let recordingType: RecordingType
+            let appMode = UserDefaults.standard.string(forKey: "appMode") ?? "teleop"
+            
+            if appMode == "egorecord" {
+                recordingType = .egorecord
+            } else if let url = usdzURL {
+                // Check if USDZ filename contains "isaac" to distinguish simulation types
+                if url.lastPathComponent.lowercased().contains("isaac") {
+                    recordingType = .teleopIsaac
+                } else {
+                    recordingType = .teleopMujoco
+                }
+            } else {
+                recordingType = .teleopVideo
+            }
+            
             // Save metadata
             let metadata = RecordingMetadata(
                 createdAt: recordingStartTime ?? Date(),
                 duration: recordingDuration,
-                frameCount: frameCount,
-                hasVideo: !recordedFrames.isEmpty,
+                frameCount: actualFrameCount,
+                hasVideo: hasActualVideo,
                 hasLeftHand: recordedFrames.contains { $0.leftHand != nil },
                 hasRightHand: recordedFrames.contains { $0.rightHand != nil },
-                hasHead: recordedFrames.contains { $0.headMatrix != nil },
                 hasSimulationData: !simulationFrames.isEmpty,
                 hasUSDZ: usdzURL != nil,
                 videoSource: DataManager.shared.videoSource.rawValue,
-                averageFPS: recordingDuration > 0 ? Double(frameCount) / recordingDuration : 0,
+                averageFPS: recordingDuration > 0 ? Double(actualFrameCount) / recordingDuration : 0,
                 deviceInfo: DeviceInfo(
                     model: "Apple Vision Pro",
                     systemVersion: UIDevice.current.systemVersion,
                     appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
                 ),
+                recordingType: recordingType,
                 intrinsicCalibration: intrinsicCalibrationDict,
                 extrinsicCalibration: extrinsicCalibrationDict
             )
@@ -1001,12 +1138,12 @@ class RecordingManager: ObservableObject {
                 hasVideo: metadata.hasVideo,
                 hasLeftHand: metadata.hasLeftHand,
                 hasRightHand: metadata.hasRightHand,
-                hasHead: metadata.hasHead,
                 hasSimulationData: !simulationFrames.isEmpty,
                 hasUSDZ: usdzURL != nil,
                 videoSource: metadata.videoSource,
                 averageFPS: metadata.averageFPS,
                 deviceInfo: metadata.deviceInfo,
+                recordingType: metadata.recordingType,
                 intrinsicCalibration: metadata.intrinsicCalibration,
                 extrinsicCalibration: metadata.extrinsicCalibration
             )

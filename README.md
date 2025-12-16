@@ -471,9 +471,12 @@ r = s.get_latest()
 ![](assets/hand_skeleton_convention.png)
 
 The 27-joint skeleton order (with forearm tracking):
-- `[0]` forearmArm, `[1]` forearmWrist, `[2]` wrist
-- `[3-6]` thumb (knuckle, intermediateBase, intermediateTip, tip)
-- `[7-11]` index, `[12-16]` middle, `[17-21]` ring, `[22-26]` little
+- `[0]` wrist
+- `[1-4]` thumb (knuckle, intermediateBase, intermediateTip, tip)
+- `[5-9]` index, `[10-14]` middle, `[15-19]` ring, `[20-24]` little
+- `[25]` forearmWrist, `[26]` forearmArm
+
+Indices 0-24 are identical between the 27-joint and legacy 25-joint formats.
 
 
 ---

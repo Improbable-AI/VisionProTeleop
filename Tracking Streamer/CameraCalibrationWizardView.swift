@@ -9,6 +9,20 @@
 import SwiftUI
 import simd
 import AVFoundation
+import UIKit
+
+// MARK: - ShareSheet Helper
+
+/// UIActivityViewController wrapper for SwiftUI
+struct ShareSheet: UIViewControllerRepresentable {
+    let activityItems: [Any]
+    
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+    }
+    
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
 
 // MARK: - Calibration Wizard State
 
@@ -18,9 +32,11 @@ enum CalibrationWizardStep: Equatable {
     case waitingForPhone           // Waiting for iPhone to connect via MPC
     case intrinsicCalibration      // Collecting checkerboard samples
     case intrinsicProcessing       // Computing intrinsic calibration
-    case intrinsicComplete         // Intrinsic done, ready for extrinsic
+    case intrinsicComplete         // Intrinsic done, ready for verification
+    case intrinsicVerification     // Verifying intrinsics with ArUco board distance measurement
     case extrinsicCalibration      // Collecting ArUco samples for each marker
     case extrinsicProcessing       // Computing extrinsic calibration
+    case verification              // Verifying calibration in AR
     case complete                  // All done!
     case error(String)            // Something went wrong
 }
@@ -37,11 +53,15 @@ enum ExtrinsicSubStep: Equatable {
 /// Main calibration wizard view that handles the entire calibration flow
 struct CameraCalibrationWizardView: View {
     let onDismiss: () -> Void
+    var initialStep: CalibrationWizardStep = .setup
     
     @StateObject private var calibrationManager = CameraCalibrationManager.shared
     @StateObject private var extrinsicManager = ExtrinsicCalibrationManager.shared
     @StateObject private var uvcManager = UVCCameraManager.shared
     @StateObject private var multipeerManager = MultipeerCalibrationManager.shared
+    @StateObject private var debugRecorder = CalibrationDebugRecorder.shared
+    
+
     
     @State private var currentStep: CalibrationWizardStep = .setup
     @State private var extrinsicSubStep: ExtrinsicSubStep = .waitingForARKit
@@ -52,11 +72,27 @@ struct CameraCalibrationWizardView: View {
     @State private var baselineMM: Float = 65.0
     @State private var enforceBaseline: Bool = false
     
+    // Intrinsic Configuration
+    @State private var intrinsicPattern: CalibrationMode = .charuco
+    
     // Progress tracking
     @State private var intrinsicSamples: Int = 0
+    @State private var leftIntrinsicSamples: Int = 0
+    @State private var rightIntrinsicSamples: Int = 0
     @State private var extrinsicSamplesForCurrentMarker: Int = 0
     @State private var currentMarkerIndex: Int = 0
     @State private var totalMarkers: Int = 3
+    
+    // Verification state
+    @State private var hasVerifiedLeft: Bool = false
+    @State private var hasVerifiedRight: Bool = false
+    
+    // Intrinsic verification state
+    @State private var verificationPassed: Bool = false
+    @State private var verificationAverageError: Double = 0.0
+    @State private var verificationMaxError: Double = 0.0
+    @State private var verificationDistances: [(pair: String, measured: Double, expected: Double, error: Double)] = []
+    @State private var detectedTagCount: Int = 0
     
     // Animation states
     @State private var pulseAnimation: Bool = false
@@ -65,8 +101,20 @@ struct CameraCalibrationWizardView: View {
     // Timer for periodic updates
     @State private var updateTimer: Timer?
     
+    // Debug recording
+    @State private var enableDebugRecording: Bool = false
+    @State private var showShareSheet: Bool = false
+    @State private var shareURL: URL?
+    
     private let targetIntrinsicSamples = 30
     private let targetExtrinsicSamplesPerMarker = 30
+    
+    // Verification board configuration (3x1 grid, 40mm tags, 6mm margin)
+    private let verificationCols = 1
+    private let verificationRows = 3
+    private let verificationTagSizeMM: Float = 40.0
+    private let verificationMarginMM: Float = 6.0
+    private var verificationTagIds: [Int] { Array(0..<(verificationCols * verificationRows)) }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -89,10 +137,14 @@ struct CameraCalibrationWizardView: View {
                         processingView(title: "Computing Intrinsics", subtitle: "Optimizing camera parameters...")
                     case .intrinsicComplete:
                         intrinsicCompleteView
+                    case .intrinsicVerification:
+                        intrinsicVerificationView
                     case .extrinsicCalibration:
                         extrinsicCalibrationView
                     case .extrinsicProcessing:
                         processingView(title: "Computing Extrinsics", subtitle: "Calculating head-to-camera transform...")
+                    case .verification:
+                        verificationView
                     case .complete:
                         completeView
                     case .error(let message):
@@ -103,12 +155,20 @@ struct CameraCalibrationWizardView: View {
             }
             
             // Footer with action buttons
-            footerView
+            if currentStep != .verification {
+                footerView
+            }
         }
         .onAppear {
-            startUpdateTimer()
+            if initialStep == .verification {
+                verifyExistingCalibration()
+            } else {
+                startUpdateTimer()
+            }
             // Start MPC browsing
             multipeerManager.startBrowsing()
+            // Mark wizard as active so status view minimizes
+            DataManager.shared.isCalibrationWizardActive = true
         }
         .onDisappear {
             updateTimer?.invalidate()
@@ -117,6 +177,8 @@ struct CameraCalibrationWizardView: View {
             uvcManager.onPixelBufferReceived = nil
             // Tell iPhone to hide calibration display
             multipeerManager.sendCommand(.hideDisplay)
+            // Mark wizard as inactive
+            DataManager.shared.isCalibrationWizardActive = false
             // Clean up if calibration was in progress
             if calibrationManager.isCalibrating {
                 calibrationManager.cancelCalibration()
@@ -149,7 +211,8 @@ struct CameraCalibrationWizardView: View {
             HStack(spacing: 16) {
                 stepIndicator(step: 1, label: "Setup", isActive: currentStep == .setup, isComplete: currentStep != .setup)
                 stepIndicator(step: 2, label: "Intrinsic", isActive: isIntrinsicStep, isComplete: isIntrinsicComplete)
-                stepIndicator(step: 3, label: "Extrinsic", isActive: isExtrinsicStep, isComplete: currentStep == .complete)
+                stepIndicator(step: 3, label: "Verify", isActive: currentStep == .intrinsicVerification, isComplete: isVerificationComplete)
+                stepIndicator(step: 4, label: "Extrinsic", isActive: isExtrinsicStep, isComplete: currentStep == .complete)
             }
             
             Spacer()
@@ -179,7 +242,16 @@ struct CameraCalibrationWizardView: View {
     
     private var isIntrinsicComplete: Bool {
         switch currentStep {
-        case .intrinsicComplete, .extrinsicCalibration, .extrinsicProcessing, .complete:
+        case .intrinsicComplete, .intrinsicVerification, .extrinsicCalibration, .extrinsicProcessing, .complete:
+            return true
+        default:
+            return false
+        }
+    }
+    
+    private var isVerificationComplete: Bool {
+        switch currentStep {
+        case .extrinsicCalibration, .extrinsicProcessing, .complete:
             return true
         default:
             return false
@@ -239,6 +311,22 @@ struct CameraCalibrationWizardView: View {
                 }
             }
             
+            // Intrinsic Pattern selection
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Calibration Pattern")
+                    .font(.headline)
+                
+                Picker("Pattern", selection: $intrinsicPattern) {
+                    Text("ChArUco Board").tag(CalibrationMode.charuco)
+                    Text("Checkerboard").tag(CalibrationMode.checkerboard)
+                }
+                .pickerStyle(.segmented)
+                
+                Text(intrinsicPattern == .charuco ? "ChArUco provides better accuracy and detection even with partial occlusion." : "Standard checkerboard pattern.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
             // Stereo baseline (only for stereo)
             if isStereoCamera {
                 VStack(alignment: .leading, spacing: 12) {
@@ -278,6 +366,81 @@ struct CameraCalibrationWizardView: View {
                 ],
                 color: .blue
             )
+            
+            // Debug recording toggle
+            VStack(alignment: .leading, spacing: 8) {
+                Toggle("Record Debug Data", isOn: $enableDebugRecording)
+                    .toggleStyle(SwitchToggleStyle(tint: .orange))
+                
+                if enableDebugRecording {
+                    Text("Saves camera frames and pose matrices for Python analysis")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(12)
+            .background(Color.orange.opacity(0.1))
+            .cornerRadius(10)
+            
+            // Allow verifying existing calibration if available
+            if let currentCal = extrinsicManager.currentCalibration {
+                Button(action: verifyExistingCalibration) {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                        Text("Verify Existing Calibration")
+                            .fontWeight(.medium)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color.green.opacity(0.15))
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.green.opacity(0.5), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+    
+    private func verifyExistingCalibration() {
+        guard let calibration = extrinsicManager.currentCalibration else { return }
+        guard let device = uvcManager.selectedDevice,
+              let intrinsicData = calibrationManager.allCalibrations[device.id] else {
+            dlog("❌ [CalibrationWizard] No intrinsic calibration for verification!")
+            return
+        }
+        
+        // Setup internal state for verification
+        extrinsicManager.proposedCalibration = calibration
+        extrinsicManager.isStereoCalibration = calibration.isStereo
+        extrinsicManager.verificationSide = .left
+        
+        // Setup UVC frame callback for verification (CRITICAL!)
+        let extrinsicManagerRef = extrinsicManager
+        uvcManager.onPixelBufferReceived = { [weak extrinsicManagerRef] pixelBuffer in
+            guard let manager = extrinsicManagerRef else { return }
+            guard manager.isCalibrating else { return }
+            
+            manager.processCameraFrame(
+                pixelBuffer,
+                intrinsics: intrinsicData.leftIntrinsics,
+                rightIntrinsics: intrinsicData.rightIntrinsics
+            )
+        }
+        
+        // Ensure camera is capturing
+        if !uvcManager.isCapturing {
+            uvcManager.startCapture()
+        }
+        
+        // Start AR session and transition
+        Task {
+            await extrinsicManager.startVerificationSession(isStereo: calibration.isStereo)
+            await MainActor.run {
+                currentStep = .verification
+            }
         }
     }
     
@@ -381,8 +544,12 @@ struct CameraCalibrationWizardView: View {
         }
         .onChange(of: multipeerManager.isConnected) { _, connected in
             if connected {
-                // iPhone connected! Send command to show checkerboard
-                multipeerManager.sendCommand(.showCheckerboard)
+                // iPhone connected! Send command to show chosen pattern
+                if intrinsicPattern == .charuco {
+                    multipeerManager.sendCommand(.showCharuco)
+                } else {
+                    multipeerManager.sendCommand(.showCheckerboard)
+                }
                 
                 // Start intrinsic calibration
                 startIntrinsicCalibration()
@@ -393,35 +560,147 @@ struct CameraCalibrationWizardView: View {
     // MARK: - Intrinsic Calibration View
     
     private var intrinsicCalibrationView: some View {
-        VStack(spacing: 24) {
-            // Big progress indicator
-            ZStack {
-                Circle()
-                    .stroke(Color.white.opacity(0.2), lineWidth: 12)
-                    .frame(width: 160, height: 160)
+        VStack(spacing: 20) {
+            // UVC camera preview with visualization overlay
+            ZStack(alignment: .bottom) {
+                if let frame = calibrationManager.previewWithVisualization ?? calibrationManager.previewFrame {
+                    Image(uiImage: frame)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxHeight: 200)
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(calibrationManager.detectionFeedback.isDetected ? Color.green.opacity(0.7) : Color.cyan.opacity(0.5), lineWidth: 2)
+                        )
+                }
                 
-                Circle()
-                    .trim(from: 0, to: CGFloat(intrinsicSamples) / CGFloat(targetIntrinsicSamples))
-                    .stroke(Color.cyan, style: StrokeStyle(lineWidth: 12, lineCap: .round))
-                    .frame(width: 160, height: 160)
-                    .rotationEffect(.degrees(-90))
-                    .animation(.spring(response: 0.3), value: intrinsicSamples)
-                
+                // Guidance text overlay
+                let feedback = calibrationManager.detectionFeedback
+                HStack(spacing: 6) {
+                    Image(systemName: feedback.isDetected ? (feedback.isTooFar ? "exclamationmark.triangle.fill" : "checkmark.circle.fill") : "eye.fill")
+                        .foregroundColor(feedback.isDetected ? (feedback.isTooFar ? .orange : .green) : .white)
+                    Text(feedback.guidanceMessage)
+                        .fontWeight(.medium)
+                        .foregroundColor(feedback.isDetected ? (feedback.isTooFar ? .orange : .green) : .white)
+                }
+                .font(.subheadline)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color.black.opacity(0.7))
+                .cornerRadius(8)
+                .padding(.bottom, 8)
+            }
+            
+            // Progress indicator(s) - showing stability % with linear bars
+            if isStereoCamera {
+                // Stereo: show left and right stability with horizontal bars
+                VStack(spacing: 12) {
+                    // Left camera stability bar
+                    HStack(spacing: 8) {
+                        Text("L")
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .foregroundColor(calibrationManager.leftReady ? .green : .cyan)
+                            .frame(width: 20)
+                        
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                // Background
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(Color.white.opacity(0.2))
+                                
+                                // Progress fill
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(calibrationManager.leftReady ? Color.green : Color.cyan)
+                                    .frame(width: geo.size.width * CGFloat(calibrationManager.leftStability) / 100.0)
+                                    .animation(.spring(response: 0.3), value: calibrationManager.leftStability)
+                            }
+                        }
+                        .frame(height: 8)
+                        
+                        Text("\(Int(calibrationManager.leftStability))%")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundColor(calibrationManager.leftReady ? .green : .white)
+                            .frame(width: 40, alignment: .trailing)
+                        
+                        Text("n=\(leftIntrinsicSamples)")
+                            .font(.system(size: 10, design: .rounded))
+                            .foregroundColor(.secondary)
+                            .frame(width: 45, alignment: .trailing)
+                    }
+                    
+                    // Right camera stability bar
+                    HStack(spacing: 8) {
+                        Text("R")
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .foregroundColor(calibrationManager.rightReady ? .green : .purple)
+                            .frame(width: 20)
+                        
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                // Background
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(Color.white.opacity(0.2))
+                                
+                                // Progress fill
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(calibrationManager.rightReady ? Color.green : Color.purple)
+                                    .frame(width: geo.size.width * CGFloat(calibrationManager.rightStability) / 100.0)
+                                    .animation(.spring(response: 0.3), value: calibrationManager.rightStability)
+                            }
+                        }
+                        .frame(height: 8)
+                        
+                        Text("\(Int(calibrationManager.rightStability))%")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundColor(calibrationManager.rightReady ? .green : .white)
+                            .frame(width: 40, alignment: .trailing)
+                        
+                        Text("n=\(rightIntrinsicSamples)")
+                            .font(.system(size: 10, design: .rounded))
+                            .foregroundColor(.secondary)
+                            .frame(width: 45, alignment: .trailing)
+                    }
+                }
+                .padding(.horizontal, 20)
+            } else {
+                // Mono: single stability bar
                 VStack(spacing: 4) {
-                    Text("\(intrinsicSamples)")
-                        .font(.system(size: 48, weight: .bold, design: .rounded))
-                    Text("/ \(targetIntrinsicSamples)")
-                        .font(.subheadline)
+                    HStack(spacing: 8) {
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                // Background
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(Color.white.opacity(0.2))
+                                
+                                // Progress fill
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(calibrationManager.leftReady ? Color.green : Color.cyan)
+                                    .frame(width: geo.size.width * CGFloat(calibrationManager.leftStability) / 100.0)
+                                    .animation(.spring(response: 0.3), value: calibrationManager.leftStability)
+                            }
+                        }
+                        .frame(height: 12)
+                        
+                        Text("\(Int(calibrationManager.leftStability))%")
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .foregroundColor(calibrationManager.leftReady ? .green : .white)
+                            .frame(width: 50, alignment: .trailing)
+                    }
+                    
+                    Text("n=\(intrinsicSamples) samples")
+                        .font(.system(size: 11, design: .rounded))
                         .foregroundColor(.secondary)
                 }
+                .padding(.horizontal, 30)
             }
             
             VStack(spacing: 8) {
                 Text("Intrinsic Calibration")
-                    .font(.title2)
+                    .font(.title3)
                     .fontWeight(.semibold)
                 
-                Text("Move the camera around to capture the checkerboard pattern from different angles")
+                Text(isStereoCamera ? "Collect checkerboard samples from each lens independently" : "Move the camera to capture the checkerboard from different angles")
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -440,18 +719,64 @@ struct CameraCalibrationWizardView: View {
             .background(Color.white.opacity(0.1))
             .cornerRadius(20)
             
-            // Tips
-            infoCard(
-                icon: "lightbulb.fill",
-                title: "Tips for good calibration",
-                points: [
-                    "Move slowly and steadily",
-                    "Capture from different angles",
-                    "Keep the pattern fully visible",
-                    "Avoid motion blur"
-                ],
-                color: .yellow
-            )
+            // Live intrinsic parameters display
+            if isStereoCamera {
+                // Stereo: show left and right intrinsics
+                VStack(spacing: 8) {
+                    liveIntrinsicsRow(label: "L", intrinsics: calibrationManager.liveLeftIntrinsics, stability: calibrationManager.leftStability, ready: calibrationManager.leftReady)
+                    liveIntrinsicsRow(label: "R", intrinsics: calibrationManager.liveRightIntrinsics, stability: calibrationManager.rightStability, ready: calibrationManager.rightReady)
+                    
+                    // Update timestamp
+                    if let updateTime = calibrationManager.lastIntrinsicsUpdateTime {
+                        let secondsAgo = Int(-updateTime.timeIntervalSinceNow)
+                        Text("updated \(secondsAgo)s ago • \(calibrationManager.lastIntrinsicsSampleCount) samples")
+                            .font(.caption2)
+                            .foregroundColor(.gray)
+                    }
+                }
+                .padding(12)
+                .background(Color.black.opacity(0.3))
+                .cornerRadius(12)
+            } else if let intr = calibrationManager.liveLeftIntrinsics {
+                // Mono: show single intrinsics
+                VStack(spacing: 4) {
+                    liveIntrinsicsRow(label: "", intrinsics: intr, stability: calibrationManager.leftStability, ready: calibrationManager.leftReady)
+                    
+                    // Update timestamp
+                    if let updateTime = calibrationManager.lastIntrinsicsUpdateTime {
+                        let secondsAgo = Int(-updateTime.timeIntervalSinceNow)
+                        Text("updated \(secondsAgo)s ago • \(calibrationManager.lastIntrinsicsSampleCount) samples")
+                            .font(.caption2)
+                            .foregroundColor(.gray)
+                    }
+                }
+                .padding(12)
+                .background(Color.black.opacity(0.3))
+                .cornerRadius(12)
+            }
+            
+            // Stability/Ready indicator
+            if calibrationManager.leftStability > 0 || calibrationManager.rightStability > 0 {
+                HStack(spacing: 12) {
+                    if isStereoCamera {
+                        stabilityIndicator(label: "L", stability: calibrationManager.leftStability, ready: calibrationManager.leftReady)
+                        stabilityIndicator(label: "R", stability: calibrationManager.rightStability, ready: calibrationManager.rightReady)
+                    } else {
+                        stabilityIndicator(label: "", stability: calibrationManager.leftStability, ready: calibrationManager.leftReady)
+                    }
+                    
+                    if (isStereoCamera && calibrationManager.leftReady && calibrationManager.rightReady) ||
+                       (!isStereoCamera && calibrationManager.leftReady) {
+                        Text("READY")
+                            .font(.caption.bold())
+                            .foregroundColor(.green)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.green.opacity(0.2))
+                            .cornerRadius(8)
+                    }
+                }
+            }
         }
     }
     
@@ -479,28 +804,145 @@ struct CameraCalibrationWizardView: View {
                     .font(.title2)
                     .fontWeight(.semibold)
                 
-                // Show reprojection error
+                // Show reprojection error and calibration values
                 if let calibration = calibrationManager.currentCalibration {
-                    Text("Reprojection Error: \(String(format: "%.4f", calibration.leftIntrinsics.reprojectionError)) px")
-                        .font(.subheadline)
-                        .foregroundColor(calibration.leftIntrinsics.reprojectionError < 0.5 ? .green : .orange)
+                    if calibration.isStereo, let rightIntr = calibration.rightIntrinsics {
+                        // Stereo: show both left and right
+                        HStack(spacing: 16) {
+                            calibrationResultCard(label: "Left", intrinsics: calibration.leftIntrinsics)
+                            calibrationResultCard(label: "Right", intrinsics: rightIntr)
+                        }
+                    } else {
+                        // Mono: show single result
+                        calibrationResultCard(label: "", intrinsics: calibration.leftIntrinsics)
+                    }
                 }
             }
             
             // Next steps
             infoCard(
-                icon: "arrow.right.circle.fill",
-                title: "Next: Extrinsic Calibration",
+                icon: "checkmark.seal.fill",
+                title: "Next: Verify Intrinsics",
                 points: [
-                    "The iPhone will now show ArUco markers",
-                    "Look at the marker with Vision Pro",
-                    "Point the camera at the marker",
-                    "Repeat for 3 different marker positions"
+                    "iPhone will show ArUco verification board",
+                    "Point camera at the board",
+                    "Verify 3D distance measurements match expected values",
+                    "Green = good calibration, Red = needs recalibration"
                 ],
                 color: .purple
             )
         }
     }
+    
+    // MARK: - Intrinsic Verification View
+    
+    private var intrinsicVerificationView: some View {
+        VStack(spacing: 20) {
+            // UVC camera preview with ArUco visualization overlay
+            ZStack(alignment: .bottom) {
+                if let frame = verificationPreviewFrame {
+                    Image(uiImage: frame)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxHeight: 300)
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                        )
+                } else {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.black)
+                        .frame(height: 200)
+                        .overlay(
+                            ProgressView()
+                                .scaleEffect(1.2)
+                        )
+                }
+                
+                // Detection status
+                HStack(spacing: 6) {
+                    Image(systemName: detectedTagCount >= verificationRows * verificationCols ? "checkmark.circle.fill" : "eye.fill")
+                        .foregroundColor(detectedTagCount >= verificationRows * verificationCols ? .green : .white)
+                    Text("Detected \(detectedTagCount)/\(verificationRows * verificationCols) tags")
+                        .font(.caption)
+                        .foregroundColor(.white)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color.black.opacity(0.7))
+                .cornerRadius(8)
+                .padding(.bottom, 8)
+            }
+            
+            // Verification status
+            VStack(spacing: 8) {
+                Text("Intrinsic Verification")
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                
+                Text("Measuring 3D distances between ArUco tags")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            
+            // Distance measurements table
+            if !verificationDistances.isEmpty {
+                VStack(spacing: 8) {
+                    ForEach(verificationDistances, id: \.pair) { item in
+                        HStack {
+                            Text(item.pair)
+                                .font(.system(size: 13, design: .monospaced))
+                                .foregroundColor(.secondary)
+                            
+                            Spacer()
+                            
+                            Text("\(String(format: "%.1f", item.measured))mm")
+                                .font(.system(size: 13, weight: .medium, design: .monospaced))
+                            
+                            Text("(\(String(format: "%+.1f", item.error))mm)")
+                                .font(.system(size: 12, design: .monospaced))
+                                .foregroundColor(abs(item.error) < 2.0 ? .green : (abs(item.error) < 5.0 ? .orange : .red))
+                        }
+                    }
+                }
+                .padding(12)
+                .background(Color.black.opacity(0.3))
+                .cornerRadius(10)
+            }
+            
+            // Overall result
+            if verificationDistances.count > 0 {
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(verificationPassed ? Color.green.opacity(0.2) : Color.orange.opacity(0.2))
+                            .frame(width: 48, height: 48)
+                        
+                        Image(systemName: verificationPassed ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(verificationPassed ? .green : .orange)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(verificationPassed ? "Calibration Verified" : "High Error Detected")
+                            .font(.headline)
+                            .foregroundColor(verificationPassed ? .green : .orange)
+                        
+                        Text("Avg error: \(String(format: "%.2f", verificationAverageError))mm, Max: \(String(format: "%.2f", verificationMaxError))mm")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding(12)
+                .background(Color.white.opacity(0.1))
+                .cornerRadius(12)
+            }
+        }
+    }
+    
+    @State private var verificationPreviewFrame: UIImage? = nil
     
     // MARK: - Extrinsic Calibration View
     
@@ -566,56 +1008,221 @@ struct CameraCalibrationWizardView: View {
     
     private var waitingForARKitView: some View {
         VStack(spacing: 20) {
-            // Animated look icon
-            Image(systemName: "eye.fill")
-                .font(.system(size: 48))
-                .foregroundColor(.purple)
-                .symbolEffect(.pulse, options: .repeating)
-            
-            VStack(spacing: 8) {
-                Text("Look at the Marker")
-                    .font(.title3)
-                    .fontWeight(.semibold)
+            // UVC camera preview with ArUco visualization overlay
+            ZStack(alignment: .bottom) {
+                if let frame = extrinsicManager.previewWithVisualization ?? extrinsicManager.previewFrame {
+                    Image(uiImage: frame)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxHeight: 200)
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(extrinsicManager.arucoDetectionFeedback.isDetected ? Color.green.opacity(0.7) : Color.purple.opacity(0.5), lineWidth: 2)
+                        )
+                }
                 
-                Text("Move closer to the iPhone so ARKit can detect the ArUco marker")
-                    .font(.body)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
+                // Guidance text overlay for ArUco detection
+                let feedback = extrinsicManager.arucoDetectionFeedback
+                HStack(spacing: 6) {
+                    Image(systemName: feedback.isDetected ? (feedback.isTooFar ? "exclamationmark.triangle.fill" : "checkmark.circle.fill") : "eye.fill")
+                        .foregroundColor(feedback.isDetected ? (feedback.isTooFar ? .orange : .green) : .white)
+                    Text(feedback.guidanceMessage)
+                        .fontWeight(.medium)
+                        .foregroundColor(feedback.isDetected ? (feedback.isTooFar ? .orange : .green) : .white)
+                }
+                .font(.subheadline)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color.black.opacity(0.7))
+                .cornerRadius(8)
+                .padding(.bottom, 8)
             }
             
-            // Status
-            HStack(spacing: 8) {
-                ProgressView()
-                    .scaleEffect(0.8)
-                Text("Waiting for ARKit detection...")
-                    .foregroundColor(.secondary)
+            // Check if both ARKit and camera have detected the marker
+            let currentMarkerId = extrinsicManager.currentMarkerId
+            let hasARKitDetection = extrinsicManager.rememberedMarkerPositions[currentMarkerId] != nil || 
+                                    extrinsicManager.arkitTrackedMarkers[currentMarkerId] != nil
+            let hasCameraDetection = extrinsicManager.cameraDetectedMarkers[currentMarkerId] != nil
+            let bothDetected = hasARKitDetection && hasCameraDetection
+            
+            if !bothDetected {
+                // Still waiting for detection
+                Image(systemName: "eye.fill")
+                    .font(.system(size: 48))
+                    .foregroundColor(.purple)
+                    .symbolEffect(.pulse, options: .repeating)
+                
+                VStack(spacing: 8) {
+                    Text("Look at the Marker")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                    
+                    Text("Move closer to the iPhone so ARKit can detect the ArUco marker")
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                
+                // Detection status
+                HStack(spacing: 16) {
+                    HStack(spacing: 4) {
+                        Image(systemName: hasARKitDetection ? "checkmark.circle.fill" : "circle")
+                            .foregroundColor(hasARKitDetection ? .green : .secondary)
+                        Text("ARKit")
+                            .font(.caption)
+                    }
+                    HStack(spacing: 4) {
+                        Image(systemName: hasCameraDetection ? "checkmark.circle.fill" : "circle")
+                            .foregroundColor(hasCameraDetection ? .green : .secondary)
+                        Text("Camera")
+                            .font(.caption)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(Color.white.opacity(0.1))
+                .cornerRadius(20)
+            } else {
+                // Both detected - check freeze state
+                let isFrozen = extrinsicManager.isMarkerVisualizationFrozen
+                
+                if isFrozen {
+                    // Ready to collect samples
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 48))
+                        .foregroundColor(.green)
+                    
+                    VStack(spacing: 8) {
+                        Text("Position Locked!")
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.green)
+                        
+                        Text("Collecting samples will begin automatically...")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                } else {
+                    // Detected but not frozen - prompt user to freeze
+                    Image(systemName: "snowflake")
+                        .font(.system(size: 48))
+                        .foregroundColor(.blue)
+                    
+                    VStack(spacing: 8) {
+                        Text("Marker Detected!")
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.green)
+                        
+                        Text("Toggle **Freeze** on the marker visualization to lock the position and start sample collection")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    
+                    // Status badge
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.circle")
+                            .foregroundColor(.orange)
+                        Text("Enable Freeze toggle on marker label")
+                            .foregroundColor(.orange)
+                    }
+                    .font(.subheadline)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Color.orange.opacity(0.2))
+                    .cornerRadius(20)
+                }
             }
-            .font(.subheadline)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(Color.white.opacity(0.1))
-            .cornerRadius(20)
         }
     }
     
     private var collectingSamplesView: some View {
         VStack(spacing: 20) {
-            // Big progress
+            // UVC camera preview with ArUco visualization overlay
+            ZStack(alignment: .bottom) {
+                if let frame = extrinsicManager.previewWithVisualization ?? extrinsicManager.previewFrame {
+                    Image(uiImage: frame)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxHeight: 180)
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(extrinsicManager.arucoDetectionFeedback.isDetected ? Color.green.opacity(0.7) : Color.purple.opacity(0.5), lineWidth: 2)
+                        )
+                }
+                
+                // Guidance text overlay for ArUco detection
+                let feedback = extrinsicManager.arucoDetectionFeedback
+                if feedback.isTooFar {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.orange)
+                        Text(feedback.guidanceMessage)
+                            .fontWeight(.medium)
+                            .foregroundColor(.orange)
+                    }
+                    .font(.subheadline)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.black.opacity(0.7))
+                    .cornerRadius(8)
+                    .padding(.bottom, 8)
+                }
+            }
+            
+            // DEBUG: Real-time pose values (placed here for visibility)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("DEBUG - Transform Chain (Identity H2C)")
+                    .font(.caption2.bold())
+                    .foregroundColor(.orange)
+                
+                let hp = extrinsicManager.debugHeadPos
+                let cp = extrinsicManager.debugCamMarkerPos
+                let wp = extrinsicManager.debugWorldMarkerPos
+                let ap = extrinsicManager.debugARKitMarkerPos
+                
+                HStack(spacing: 8) {
+                    Text("Head: (\(String(format: "%.2f", hp.x)), \(String(format: "%.2f", hp.y)), \(String(format: "%.2f", hp.z)))")
+                    Text("Cam: (\(String(format: "%.2f", cp.x)), \(String(format: "%.2f", cp.y)), \(String(format: "%.2f", cp.z)))")
+                }
+                .font(.system(size: 9, design: .monospaced))
+                
+                Text("WORLD: (\(String(format: "%.3f", wp.x)), \(String(format: "%.3f", wp.y)), \(String(format: "%.3f", wp.z)))")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(.green)
+                
+                Text("ARKit: (\(String(format: "%.3f", ap.x)), \(String(format: "%.3f", ap.y)), \(String(format: "%.3f", ap.z)))")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(.cyan)
+                
+                Text("Intrinsics: \(extrinsicManager.debugIntrinsics)")
+                    .font(.system(size: 8, design: .monospaced))
+                    .foregroundColor(.yellow)
+            }
+            .padding(6)
+            .background(Color.black.opacity(0.7))
+            .cornerRadius(6)
+            
+            // Progress indicator
             ZStack {
                 Circle()
                     .stroke(Color.white.opacity(0.2), lineWidth: 8)
-                    .frame(width: 120, height: 120)
+                    .frame(width: 100, height: 100)
                 
                 Circle()
                     .trim(from: 0, to: CGFloat(extrinsicSamplesForCurrentMarker) / CGFloat(targetExtrinsicSamplesPerMarker))
                     .stroke(Color.purple, style: StrokeStyle(lineWidth: 8, lineCap: .round))
-                    .frame(width: 120, height: 120)
+                    .frame(width: 100, height: 100)
                     .rotationEffect(.degrees(-90))
                     .animation(.spring(response: 0.3), value: extrinsicSamplesForCurrentMarker)
                 
                 VStack(spacing: 2) {
                     Text("\(extrinsicSamplesForCurrentMarker)")
-                        .font(.system(size: 36, weight: .bold, design: .rounded))
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
                     Text("/ \(targetExtrinsicSamplesPerMarker)")
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -627,7 +1234,7 @@ struct CameraCalibrationWizardView: View {
                     .font(.title3)
                     .fontWeight(.semibold)
                 
-                Text("Move your head slightly while keeping the marker visible to both ARKit and the camera")
+                Text("Move your head slightly while keeping the marker visible")
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -755,6 +1362,34 @@ struct CameraCalibrationWizardView: View {
                 .background(Color.white.opacity(0.1))
                 .cornerRadius(12)
             }
+            
+            // Export debug data button (if recording was enabled)
+            if debugRecorder.extrinsicSampleCount > 0 {
+                Button {
+                    // End the session and share the folder directly
+                    debugRecorder.endSession()
+                    if let folderURL = debugRecorder.getSessionURL() {
+                        shareURL = folderURL
+                        showShareSheet = true
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "square.and.arrow.up")
+                        Text("Export Debug Data (\(debugRecorder.extrinsicSampleCount) samples)")
+                    }
+                    .foregroundColor(.orange)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Color.orange.opacity(0.15))
+                    .cornerRadius(8)
+                }
+                .buttonStyle(.plain)
+                .sheet(isPresented: $showShareSheet) {
+                    if let url = shareURL {
+                        ShareSheet(activityItems: [url])
+                    }
+                }
+            }
         }
     }
     
@@ -855,7 +1490,9 @@ struct CameraCalibrationWizardView: View {
         case .intrinsicProcessing:
             return "Processing..."
         case .intrinsicComplete:
-            return "Continue to Extrinsic"
+            return "Verify Intrinsics"
+        case .intrinsicVerification:
+            return verificationPassed ? "Continue to Extrinsic" : "Skip Verification"
         case .extrinsicCalibration:
             if extrinsicSubStep == .readyForNextMarker {
                 return currentMarkerIndex < totalMarkers - 1 ? "Next Position" : "Finish Calibration"
@@ -867,6 +1504,8 @@ struct CameraCalibrationWizardView: View {
             return "Done"
         case .error:
             return "Retry"
+        case .verification:
+            return ""
         }
     }
     
@@ -877,11 +1516,18 @@ struct CameraCalibrationWizardView: View {
         case .waitingForPhone:
             return false
         case .intrinsicCalibration:
-            return intrinsicSamples >= targetIntrinsicSamples
+            if isStereoCamera {
+                // Stereo: require both sides to be ready (stability > 90%)
+                return calibrationManager.leftReady && calibrationManager.rightReady
+            } else {
+                return calibrationManager.leftReady
+            }
         case .intrinsicProcessing:
             return false
         case .intrinsicComplete:
             return true
+        case .intrinsicVerification:
+            return true  // Can always skip or continue
         case .extrinsicCalibration:
             if extrinsicSubStep == .readyForNextMarker {
                 return true
@@ -893,6 +1539,8 @@ struct CameraCalibrationWizardView: View {
             return true
         case .error:
             return true
+        case .verification:
+            return false
         }
     }
     
@@ -903,6 +1551,10 @@ struct CameraCalibrationWizardView: View {
         case .intrinsicCalibration:
             finishIntrinsicCalibration()
         case .intrinsicComplete:
+            startIntrinsicVerification()
+        case .intrinsicVerification:
+            // Skip or continue to extrinsic
+            stopIntrinsicVerification()
             startExtrinsicCalibration()
         case .extrinsicCalibration:
             if extrinsicSubStep == .readyForNextMarker {
@@ -963,30 +1615,30 @@ struct CameraCalibrationWizardView: View {
     }
     
     private func updateProgress() {
-        // Update intrinsic samples
+        // Update intrinsic samples (including left/right for stereo)
         intrinsicSamples = calibrationManager.samplesCollected
+        leftIntrinsicSamples = calibrationManager.leftSamplesCollected
+        rightIntrinsicSamples = calibrationManager.rightSamplesCollected
         
         // Update extrinsic samples
         extrinsicSamplesForCurrentMarker = extrinsicManager.samplesForCurrentMarker
         currentMarkerIndex = extrinsicManager.currentMarkerIndex
         
-        // Check for step transitions - auto-advance when intrinsic is complete
-        if currentStep == .intrinsicCalibration && intrinsicSamples >= targetIntrinsicSamples {
-            // Auto-finish intrinsic calibration
-            finishIntrinsicCalibration()
-        }
-        
+        // NOTE: Auto-advance removed - user now decides when to finish based on stability %
+        // The "Next" button is enabled when stability > 90%
         if currentStep == .extrinsicCalibration {
-            // Check ARKit detection FOR THE CURRENT MARKER specifically
+            // Check marker detection for current marker
             let currentMarkerId = extrinsicManager.currentMarkerId
-            let hasARKitDetectionForCurrentMarker = extrinsicManager.rememberedMarkerPositions[currentMarkerId] != nil || 
-                                                     extrinsicManager.arkitTrackedMarkers[currentMarkerId] != nil
-            let hasCameraDetectionForCurrentMarker = extrinsicManager.cameraDetectedMarkers[currentMarkerId] != nil
+            let hasARKitDetection = extrinsicManager.rememberedMarkerPositions[currentMarkerId] != nil || 
+                                    extrinsicManager.arkitTrackedMarkers[currentMarkerId] != nil
+            let hasCameraDetection = extrinsicManager.cameraDetectedMarkers[currentMarkerId] != nil
+            let bothDetected = hasARKitDetection && hasCameraDetection
             
-            if extrinsicSubStep == .waitingForARKit && hasARKitDetectionForCurrentMarker && hasCameraDetectionForCurrentMarker {
-                // ARKit detected the current marker! Start collecting
+            // Only transition to collecting samples when marker is detected AND freeze toggle is ON
+            let isFrozen = extrinsicManager.isMarkerVisualizationFrozen
+            if extrinsicSubStep == .waitingForARKit && bothDetected && isFrozen {
+                // User has frozen the position - start collecting samples
                 extrinsicSubStep = .collectingSamples
-                // Play sound
                 playDetectionSound()
             }
             
@@ -1002,7 +1654,11 @@ struct CameraCalibrationWizardView: View {
     private func checkPhoneConnection() {
         // If already connected, proceed
         if multipeerManager.isConnected {
-            multipeerManager.sendCommand(.showCheckerboard)
+            if intrinsicPattern == .charuco {
+                multipeerManager.sendCommand(.showCharuco)
+            } else {
+                multipeerManager.sendCommand(.showCheckerboard)
+            }
             startIntrinsicCalibration()
         }
     }
@@ -1010,16 +1666,20 @@ struct CameraCalibrationWizardView: View {
     private func setupIntrinsicFrameCallback() {
         dlog("🔧 [CalibrationWizard] Setting up INTRINSIC frame callback...")
         
+        let debugRecorderRef = debugRecorder
+        
         uvcManager.onPixelBufferReceived = { [weak calibrationManager] pixelBuffer in
             guard let manager = calibrationManager else { return }
             guard manager.isCalibrating else { return }
             
-            Task { @MainActor in
+            // Run detection on background thread to avoid blocking video
+            Task.detached(priority: .userInitiated) {
                 // Process frame based on stereo/mono mode
-                if self.isStereoCamera {
-                    _ = manager.processStereoFrame(pixelBuffer)
+                // Detection runs on background thread
+                if await MainActor.run(body: { self.isStereoCamera }) {
+                    _ = await MainActor.run { manager.processStereoFrame(pixelBuffer) }
                 } else {
-                    _ = manager.processMonoFrame(pixelBuffer)
+                    _ = await MainActor.run { manager.processMonoFrame(pixelBuffer) }
                 }
             }
         }
@@ -1036,10 +1696,14 @@ struct CameraCalibrationWizardView: View {
             return
         }
         
-        uvcManager.onPixelBufferReceived = { [weak extrinsicManager] pixelBuffer in
-            guard let manager = extrinsicManager else { return }
+        // Capture weak references for the closure
+        let extrinsicManagerRef = extrinsicManager
+        
+        uvcManager.onPixelBufferReceived = { [weak extrinsicManagerRef] pixelBuffer in
+            guard let manager = extrinsicManagerRef else { return }
             guard manager.isCalibrating else { return }
             
+            // Process for marker detection (preview frame is generated inside processCameraFrame)
             manager.processCameraFrame(
                 pixelBuffer,
                 intrinsics: intrinsicData.leftIntrinsics,
@@ -1052,6 +1716,19 @@ struct CameraCalibrationWizardView: View {
     
     private func startIntrinsicCalibration() {
         guard let device = uvcManager.selectedDevice else { return }
+        
+        // Update manager mode
+        calibrationManager.calibrationMode = intrinsicPattern
+        
+        // Start debug recording if enabled
+        if enableDebugRecording {
+            debugRecorder.startSession(
+                deviceId: device.id,
+                deviceName: device.name,
+                isStereo: isStereoCamera,
+                markerSizeMeters: extrinsicManager.markerSizeMeters
+            )
+        }
         
         // Ensure camera is capturing
         if !uvcManager.isCapturing {
@@ -1084,13 +1761,205 @@ struct CameraCalibrationWizardView: View {
             )
             
             await MainActor.run {
-                if result != nil {
+                if let calibration = result {
                     currentStep = .intrinsicComplete
                     showSuccessCheckmark = false // Reset for animation
+                    
+                    // Save intrinsic result to debug folder
+                    if debugRecorder.isRecording {
+                        debugRecorder.saveIntrinsicCalibration(
+                            leftIntrinsics: calibration.leftIntrinsics,
+                            rightIntrinsics: calibration.rightIntrinsics,
+                            imageWidth: calibration.leftIntrinsics.imageWidth,
+                            imageHeight: calibration.leftIntrinsics.imageHeight
+                        )
+                    }
                 } else {
                     currentStep = .error(calibrationManager.lastError ?? "Unknown error")
                 }
             }
+        }
+    }
+    
+    // MARK: - Intrinsic Verification Functions
+    
+    private func startIntrinsicVerification() {
+        guard let device = uvcManager.selectedDevice,
+              let intrinsicData = calibrationManager.allCalibrations[device.id] else {
+            dlog("❌ [CalibrationWizard] No intrinsic calibration for verification!")
+            // Skip verification if no calibration
+            startExtrinsicCalibration()
+            return
+        }
+        
+        // Reset verification state
+        verificationPassed = false
+        verificationAverageError = 0.0
+        verificationMaxError = 0.0
+        verificationDistances = []
+        detectedTagCount = 0
+        verificationPreviewFrame = nil
+        
+        // Tell iPhone to show verification board
+        multipeerManager.sendCommand(.showVerificationBoard(
+            cols: verificationCols,
+            rows: verificationRows,
+            tagSizeMM: verificationTagSizeMM,
+            marginMM: verificationMarginMM,
+            tagIds: verificationTagIds
+        ))
+        
+        // Set up frame callback for ArUco detection and distance measurement
+        setupVerificationFrameCallback(intrinsicData: intrinsicData)
+        
+        // Ensure camera is capturing
+        if !uvcManager.isCapturing {
+            uvcManager.startCapture()
+        }
+        
+        currentStep = .intrinsicVerification
+    }
+    
+    private func stopIntrinsicVerification() {
+        // Clean up frame callback (will be replaced by extrinsic callback)
+        uvcManager.onPixelBufferReceived = nil
+        
+        // Tell iPhone to hide the verification board
+        multipeerManager.sendCommand(.hideDisplay)
+    }
+    
+    private func setupVerificationFrameCallback(intrinsicData: CameraCalibrationData) {
+        dlog("🔧 [CalibrationWizard] Setting up VERIFICATION frame callback...")
+        
+        // Create ArUco detector
+        let arucoDetector = OpenCVArucoDetector(dictionary: .dict4X4_50)
+        
+        // Expected center-to-center distance
+        let expectedCenterDistM = Double(verificationTagSizeMM + verificationMarginMM) / 1000.0
+        
+        // Get camera intrinsics
+        let leftIntrinsics = intrinsicData.leftIntrinsics
+        let cameraMatrix: [NSNumber] = [
+            NSNumber(value: leftIntrinsics.fx), 0, NSNumber(value: leftIntrinsics.cx),
+            0, NSNumber(value: leftIntrinsics.fy), NSNumber(value: leftIntrinsics.cy),
+            0, 0, 1
+        ]
+        let distCoeffs: [NSNumber] = leftIntrinsics.distortionCoeffs.map { NSNumber(value: $0) }
+        let markerLength = Float(verificationTagSizeMM) / 1000.0
+        
+        uvcManager.onPixelBufferReceived = { [weak arucoDetector] pixelBuffer in
+            guard let detector = arucoDetector else { return }
+            
+            // Detect markers with pose
+            guard let detections = detector.detectMarkers(
+                in: pixelBuffer,
+                cameraMatrix: cameraMatrix,
+                distCoeffs: distCoeffs,
+                markerLength: markerLength
+            ) else { return }
+            
+            // Process on main thread
+            Task { @MainActor in
+                self.processVerificationDetections(
+                    detections: detections,
+                    pixelBuffer: pixelBuffer,
+                    detector: detector,
+                    cameraMatrix: cameraMatrix,
+                    distCoeffs: distCoeffs,
+                    expectedCenterDistM: expectedCenterDistM
+                )
+            }
+        }
+        
+        dlog("✅ [CalibrationWizard] VERIFICATION frame callback set up")
+    }
+    
+    private func processVerificationDetections(
+        detections: [ArucoDetectionResult],
+        pixelBuffer: CVPixelBuffer,
+        detector: OpenCVArucoDetector,
+        cameraMatrix: [NSNumber],
+        distCoeffs: [NSNumber],
+        expectedCenterDistM: Double
+    ) {
+        // Update detected tag count
+        let validTagIds = Set(verificationTagIds)
+        let relevantDetections = detections.filter { validTagIds.contains(Int($0.markerId)) }
+        detectedTagCount = relevantDetections.count
+        
+        // Generate visualization
+        if let vizData = detector.visualizeMarkers(
+            pixelBuffer: pixelBuffer,
+            detections: detections,
+            drawAxes: true,
+            cameraMatrix: cameraMatrix,
+            distCoeffs: distCoeffs,
+            axisLength: Float(verificationTagSizeMM) / 2000.0
+        ), let uiImage = UIImage(data: vizData) {
+            verificationPreviewFrame = uiImage
+        }
+        
+        // Compute distances if we have at least 2 relevant tags
+        guard relevantDetections.count >= 2 else { return }
+        
+        // Build tag center positions (from tvec)
+        var tagCenters: [Int: simd_float3] = [:]
+        for detection in relevantDetections {
+            if detection.poseValid, let tvec = detection.tvec, tvec.count >= 3 {
+                tagCenters[Int(detection.markerId)] = simd_float3(
+                    tvec[0].floatValue,
+                    tvec[1].floatValue,
+                    tvec[2].floatValue
+                )
+            }
+        }
+        
+        // Compute pairwise distances
+        var distances: [(pair: String, measured: Double, expected: Double, error: Double)] = []
+        let tagList = Array(tagCenters.keys).sorted()
+        
+        for i in 0..<tagList.count {
+            for j in (i+1)..<tagList.count {
+                let id1 = tagList[i]
+                let id2 = tagList[j]
+                
+                guard let pos1 = tagCenters[id1], let pos2 = tagCenters[id2] else { continue }
+                
+                let measured = Double(simd_distance(pos1, pos2))
+                
+                // Compute expected distance based on grid positions
+                let idx1 = verificationTagIds.firstIndex(of: id1) ?? 0
+                let idx2 = verificationTagIds.firstIndex(of: id2) ?? 0
+                let col1 = idx1 % verificationCols
+                let row1 = idx1 / verificationCols
+                let col2 = idx2 % verificationCols
+                let row2 = idx2 / verificationCols
+                
+                let dx = Double(abs(col1 - col2))
+                let dy = Double(abs(row1 - row2))
+                let expected = expectedCenterDistM * sqrt(dx*dx + dy*dy)
+                
+                let error = (measured - expected) * 1000.0  // Convert to mm
+                
+                distances.append((
+                    pair: "\(id1)-\(id2)",
+                    measured: measured * 1000.0,
+                    expected: expected * 1000.0,
+                    error: error
+                ))
+            }
+        }
+        
+        // Update state
+        verificationDistances = distances
+        
+        if !distances.isEmpty {
+            let errors = distances.map { abs($0.error) }
+            verificationAverageError = errors.reduce(0, +) / Double(errors.count)
+            verificationMaxError = errors.max() ?? 0.0
+            
+            // Pass if average error < 3mm and max error < 5mm
+            verificationPassed = verificationAverageError < 3.0 && verificationMaxError < 5.0
         }
     }
     
@@ -1102,6 +1971,16 @@ struct CameraCalibrationWizardView: View {
             extrinsicManager.knownStereoBaseline = baselineMM / 1000.0
         } else {
             extrinsicManager.knownStereoBaseline = nil
+        }
+        
+        // Start debug recording if enabled and not already recording (may have started during intrinsic)
+        if enableDebugRecording && !debugRecorder.isRecording {
+            debugRecorder.startSession(
+                deviceId: device.id,
+                deviceName: device.name,
+                isStereo: isStereoCamera,
+                markerSizeMeters: extrinsicManager.markerSizeMeters
+            )
         }
         
         // Tell iPhone to show ArUco marker
@@ -1135,6 +2014,9 @@ struct CameraCalibrationWizardView: View {
         
         extrinsicSubStep = .waitingForARKit
         extrinsicSamplesForCurrentMarker = 0
+        
+        // Reset freeze toggle - user must freeze again for new marker position
+        extrinsicManager.isMarkerVisualizationFrozen = false
     }
     
     private func finishExtrinsicCalibration() {
@@ -1144,21 +2026,185 @@ struct CameraCalibrationWizardView: View {
         
         // Compute calibration
         Task {
-            let result = extrinsicManager.finishCalibration(
+            // Use computeCalibration to verify first
+            let result = extrinsicManager.computeCalibration(
                 deviceId: device.id,
                 deviceName: device.name,
                 isStereo: isStereoCamera
             )
             
             await MainActor.run {
-                if result != nil {
-                    // Tell iPhone calibration is complete
-                    multipeerManager.sendCommand(.calibrationComplete)
-                    currentStep = .complete
+                if let result = result {
+                    // Set proposal and move to verification
+                    extrinsicManager.proposedCalibration = result
+                    
+                    // Reset verification tracking
+                    hasVerifiedLeft = false
+                    hasVerifiedRight = false
+                    // Auto-mark as verified if not stereo
+                    if !isStereoCamera {
+                        hasVerifiedLeft = true
+                        hasVerifiedRight = true // N/A
+                        extrinsicManager.verificationSide = .left
+                    } else {
+                        // Default to left
+                        extrinsicManager.verificationSide = .left
+                        hasVerifiedLeft = true 
+                    }
+                    
+                    withAnimation {
+                        currentStep = .verification
+                    }
                 } else {
-                    currentStep = .error(extrinsicManager.lastError ?? "Unknown error")
+                    currentStep = .error(extrinsicManager.lastError ?? "Calibration computation failed")
                 }
             }
+        }
+    }
+    
+    // MARK: - Verification View
+    
+    private var verificationView: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "checkmark.magnifyingglass")
+                .font(.system(size: 48))
+                .foregroundColor(.blue)
+            
+            Text("Verify Calibration")
+                .font(.title2)
+                .fontWeight(.bold)
+            
+            Text("Look at the marker in AR. A green overlay should appear securely attached to the physical marker. Moving your head should not cause the overlay to drift.")
+                .multilineTextAlignment(.center)
+                .foregroundColor(.secondary)
+            
+            // Camera Preview and Controls
+            VStack(spacing: 16) {
+                // Preview
+                if let frame = extrinsicManager.previewFrame {
+                    Image(uiImage: frame)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(height: 200)
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                        )
+                } else {
+                    ZStack {
+                        Color.black.opacity(0.8)
+                        ProgressView()
+                    }
+                    .frame(height: 200)
+                    .cornerRadius(12)
+                }
+                
+                // Stereo Toggle
+                if isStereoCamera {
+                    HStack(spacing: 20) {
+                        Text("Verify Eye:")
+                            .fontWeight(.medium)
+                        
+                        Picker("Eye", selection: $extrinsicManager.verificationSide) {
+                            Text("Left").tag(CameraSide.left)
+                            Text("Right").tag(CameraSide.right)
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(width: 150)
+                        .onChange(of: extrinsicManager.verificationSide) { newSide in
+                            if newSide == .left { hasVerifiedLeft = true }
+                            if newSide == .right { hasVerifiedRight = true }
+                        }
+                    }
+                    .padding(.horizontal)
+                    .background(Color.black.opacity(0.3))
+                    .cornerRadius(8)
+                }
+                
+                // DEBUG: Real-time pose values
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("DEBUG - Transform Chain (Identity H2C)")
+                        .font(.caption.bold())
+                        .foregroundColor(.orange)
+                    
+                    let hp = extrinsicManager.debugHeadPos
+                    let cp = extrinsicManager.debugCamMarkerPos
+                    let wp = extrinsicManager.debugWorldMarkerPos
+                    
+                    Text("Head: (\(String(format: "%.3f", hp.x)), \(String(format: "%.3f", hp.y)), \(String(format: "%.3f", hp.z)))")
+                        .font(.system(size: 10, design: .monospaced))
+                    Text("CamMarker: (\(String(format: "%.3f", cp.x)), \(String(format: "%.3f", cp.y)), \(String(format: "%.3f", cp.z)))")
+                        .font(.system(size: 10, design: .monospaced))
+                    Text("WorldMarker: (\(String(format: "%.3f", wp.x)), \(String(format: "%.3f", wp.y)), \(String(format: "%.3f", wp.z)))")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(simd_length(wp) > 0.01 ? .green : .gray)
+                }
+                .padding(8)
+                .background(Color.black.opacity(0.5))
+                .cornerRadius(8)
+            }
+            
+            Spacer()
+            
+            // Buttons
+            HStack(spacing: 20) {
+                Button(action: {
+                    // Recalibrate
+                    extrinsicManager.discardProposedCalibration()
+                    // Restart extrinsic flow (reset to first marker)
+                    currentMarkerIndex = 0
+                    extrinsicSamplesForCurrentMarker = 0
+                    extrinsicSubStep = .waitingForARKit
+                    // Clear all samples in manager?
+                    extrinsicManager.discardProposedCalibration()
+                    // Restart extrinsic flow
+                    cancelCalibration() // Stop current just in case (though we are paused)
+                    startExtrinsicCalibration()
+                    withAnimation {
+                        currentStep = .extrinsicCalibration
+                    }
+                }) {
+                    HStack {
+                        Image(systemName: "arrow.counterclockwise")
+                        Text("Recalibrate")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.red.opacity(0.2))
+                    .foregroundColor(.red)
+                    .cornerRadius(12)
+                }
+                
+                Button(action: {
+                    extrinsicManager.saveProposedCalibration()
+                    // Tell iPhone calibration is complete
+                    multipeerManager.sendCommand(.calibrationComplete)
+                    withAnimation {
+                        showSuccessCheckmark = true
+                        currentStep = .complete
+                    }
+                }) {
+                    HStack {
+                        Image(systemName: "square.and.arrow.down")
+                        Text("Save Calibration")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(canSave ? Color.blue : Color.gray.opacity(0.3))
+                    .foregroundColor(canSave ? .white : .gray)
+                    .cornerRadius(12)
+                }
+                .disabled(!canSave)
+            }
+        }
+    }
+    
+    private var canSave: Bool {
+        if isStereoCamera {
+            return hasVerifiedLeft && hasVerifiedRight
+        } else {
+            return true
         }
     }
     
@@ -1175,6 +2221,125 @@ struct CameraCalibrationWizardView: View {
     private func playCompletionSound() {
         // System sound for marker completion
         AudioServicesPlaySystemSound(1025) // Success sound
+    }
+    
+    // MARK: - Live Intrinsics Helpers
+    
+    /// Row showing live intrinsic parameters for one camera
+    @ViewBuilder
+    private func liveIntrinsicsRow(label: String, intrinsics: CameraIntrinsics?, stability: Float, ready: Bool) -> some View {
+        if let intr = intrinsics {
+            VStack(alignment: .leading, spacing: 2) {
+                // First line: fx, fy, cx, cy, error
+                HStack(spacing: 4) {
+                    if !label.isEmpty {
+                        Text("\(label):")
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .foregroundColor(.white)
+                    }
+                    Text("fx=\(String(format: "%.1f", intr.fx)) fy=\(String(format: "%.1f", intr.fy))")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(.cyan)
+                    Text("cx=\(String(format: "%.1f", intr.cx)) cy=\(String(format: "%.1f", intr.cy))")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(.orange)
+                    Text("err=\(String(format: "%.3f", intr.reprojectionError))")
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .foregroundColor(reprojectionErrorColor(intr.reprojectionError))
+                }
+                
+                // Second line: distortion coefficients
+                if intr.distortionCoeffs.count >= 5 {
+                    HStack(spacing: 4) {
+                        if !label.isEmpty {
+                            Text("   ")
+                                .font(.system(size: 11, design: .monospaced))
+                        }
+                        Text("k1=\(String(format: "%.4f", intr.distortionCoeffs[0])) k2=\(String(format: "%.4f", intr.distortionCoeffs[1])) k3=\(String(format: "%.4f", intr.distortionCoeffs[4]))")
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundColor(.gray)
+                    }
+                }
+            }
+        } else {
+            HStack {
+                if !label.isEmpty {
+                    Text("\(label):")
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .foregroundColor(.white)
+                }
+                Text("collecting...")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundColor(.gray)
+            }
+        }
+    }
+    
+    /// Color for reprojection error (green < 0.5, yellow < 1.0, orange < 2.0, red >= 2.0)
+    private func reprojectionErrorColor(_ error: Double) -> Color {
+        if error < 0.5 { return .green }
+        if error < 1.0 { return .yellow }
+        if error < 2.0 { return .orange }
+        return .red
+    }
+    
+    /// Stability indicator showing percentage
+    @ViewBuilder
+    private func stabilityIndicator(label: String, stability: Float, ready: Bool) -> some View {
+        HStack(spacing: 4) {
+            if !label.isEmpty {
+                Text("\(label):")
+                    .font(.caption2.bold())
+                    .foregroundColor(.white)
+            }
+            Text("Stability: \(Int(stability))%")
+                .font(.caption2)
+                .foregroundColor(ready ? .green : (stability > 50 ? .yellow : .gray))
+            
+            if ready {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.caption2)
+                    .foregroundColor(.green)
+            }
+        }
+    }
+    
+    /// Card showing calibration result for one camera
+    @ViewBuilder
+    private func calibrationResultCard(label: String, intrinsics: CameraIntrinsics) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if !label.isEmpty {
+                Text(label)
+                    .font(.caption.bold())
+                    .foregroundColor(.white)
+            }
+            
+            Text("err: \(String(format: "%.4f", intrinsics.reprojectionError)) px")
+                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                .foregroundColor(intrinsics.reprojectionError < 0.5 ? .green : .orange)
+            
+            VStack(alignment: .leading, spacing: 1) {
+                Text("fx=\(String(format: "%.1f", intrinsics.fx))")
+                Text("fy=\(String(format: "%.1f", intrinsics.fy))")
+                Text("cx=\(String(format: "%.1f", intrinsics.cx))")
+                Text("cy=\(String(format: "%.1f", intrinsics.cy))")
+            }
+            .font(.system(size: 10, design: .monospaced))
+            .foregroundColor(.cyan)
+            
+            if intrinsics.distortionCoeffs.count >= 5 {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("k1=\(String(format: "%.4f", intrinsics.distortionCoeffs[0]))")
+                    Text("k2=\(String(format: "%.4f", intrinsics.distortionCoeffs[1]))")
+                    Text("k3=\(String(format: "%.4f", intrinsics.distortionCoeffs[4]))")
+                }
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundColor(.gray)
+            }
+        }
+        .padding(10)
+        .background(Color.black.opacity(0.3))
+        .cornerRadius(8)
     }
 }
 

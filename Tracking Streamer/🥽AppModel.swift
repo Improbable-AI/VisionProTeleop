@@ -10,7 +10,8 @@ struct Skeleton {
     var joints: [simd_float4x4]
 
     init() {
-        // Initialize the joints array with 27 matrices (forearmArm, forearmWrist, wrist + 24 finger joints)
+        // Initialize the joints array with 27 matrices
+        // Ordering: [0-24] standard 25 joints (wrist + fingers), [25-26] forearm joints
         self.joints = Array(repeating: simd_float4x4(1), count: 27)
     }
 }
@@ -241,6 +242,16 @@ class DataManager: ObservableObject {
         }
     }
     
+    // Hand tracking prediction offset in seconds (persistent via UserDefaults)
+    // A positive value queries predicted future hand poses for lower perceived latency
+    // Range: 0 (no prediction) to 0.5 (500ms ahead - maximum)
+    @Published var handPredictionOffset: Float {
+        didSet {
+            UserDefaults.standard.set(handPredictionOffset, forKey: "handPredictionOffset")
+            syncSettingToiCloud("visionos.handPredictionOffset", value: Double(handPredictionOffset))
+        }
+    }
+    
     // Video plane scale factor (persistent via UserDefaults)
     @Published var videoPlaneScale: Float {
         didSet {
@@ -259,6 +270,20 @@ class DataManager: ObservableObject {
     }
     
     @Published var showExitConfirmation: Bool = false
+    
+    // Flag to indicate calibration wizard is active (status view should minimize)
+    @Published var isCalibrationWizardActive: Bool = false
+    
+    // MARK: - Python Calibration Mode State
+    // These are updated via gRPC when Python calibration server sends status (m00=778.0)
+    @Published var pythonCalibrationActive: Bool = false
+    @Published var pythonCalibrationStep: Int = 0  // 0, 1, 2 for extrinsic steps
+    @Published var pythonCalibrationSamplesCollected: Int = 0
+    @Published var pythonCalibrationSamplesNeeded: Int = 20
+    @Published var pythonCalibrationTargetMarker: Int = 0  // 0, 2, or 3
+    @Published var pythonCalibrationMarkerDetected: Bool = false
+    @Published var pythonCalibrationProgress: Float = 0.0
+    @Published var pythonCalibrationStepStatus: Int = 0  // 0=collecting, 1=calibrating, 2=complete
     
     // MARK: - iCloud Sync Helper
     
@@ -310,6 +335,8 @@ class DataManager: ObservableObject {
         
         // Load saved hand joints opacity or default to 0.9 (90%)
         self.handJointsOpacity = UserDefaults.standard.object(forKey: "handJointsOpacity") as? Float ?? 0.9
+        // Load saved hand prediction offset or default to 0.033 (33ms)
+        self.handPredictionOffset = UserDefaults.standard.object(forKey: "handPredictionOffset") as? Float ?? 0.033
         // Load saved video plane scale or default to 1.0 (100%)
         self.videoPlaneScale = UserDefaults.standard.object(forKey: "videoPlaneScale") as? Float ?? 1.0
         // Load saved stereo baseline offset or default to 0.0 (no adjustment)
@@ -329,13 +356,18 @@ class 🥽AppModel: ObservableObject {
     private let sceneReconstruction = SceneReconstructionProvider()
     
     // Pre-computed joint types array (static to avoid recreation on each update)
+    // Ordering: [0-24] standard 25 joints (wrist + 4 fingers), [25-26] forearm joints
+    // This ensures indices 0-24 are identical between 25-joint and 27-joint formats
     private static let jointTypes: [HandSkeleton.JointName] = [
-        .forearmArm, .forearmWrist, .wrist,
+        // Standard 25 joints (indices 0-24)
+        .wrist,
         .thumbKnuckle, .thumbIntermediateBase, .thumbIntermediateTip, .thumbTip,
         .indexFingerMetacarpal, .indexFingerKnuckle, .indexFingerIntermediateBase, .indexFingerIntermediateTip, .indexFingerTip,
         .middleFingerMetacarpal, .middleFingerKnuckle, .middleFingerIntermediateBase, .middleFingerIntermediateTip, .middleFingerTip,
         .ringFingerMetacarpal, .ringFingerKnuckle, .ringFingerIntermediateBase, .ringFingerIntermediateTip, .ringFingerTip,
         .littleFingerMetacarpal, .littleFingerKnuckle, .littleFingerIntermediateBase, .littleFingerIntermediateTip, .littleFingerTip,
+        // Forearm joints (indices 25-26) - appended at end for backward compatibility
+        .forearmWrist, .forearmArm,
     ]
 }
 
@@ -350,7 +382,9 @@ extension 🥽AppModel {
             @MainActor in
             do {
                 try await self.session.run([self.handTracking, self.worldTracking, self.sceneReconstruction])
-                await self.processHandUpdates();
+                // Use predictive hand tracking with handAnchors(at:) for lower latency
+                // This polls at 120Hz and queries predicted poses at a future timestamp
+                await self.processHandTrackingPredictive()
             } catch {
                 dlog("\(error)")
             }
@@ -415,6 +449,57 @@ extension 🥽AppModel {
         DataManager.shared.latestHandTrackingData.Head = deviceAnchor.originFromAnchorTransform
             }
 
+    /// Process hand updates using predictive handAnchors(at:) polling instead of anchorUpdates stream.
+    /// This allows querying predicted hand poses at future timestamps for lower perceived latency.
+    /// The prediction offset is configurable via DataManager.shared.handPredictionOffset (0 to 0.5 seconds).
+    private func processHandUpdatesPredictive() async {
+        guard handTracking.state == .running else { return }
+        
+        // Use pre-computed static joint types array for better performance
+        let jointTypes = Self.jointTypes
+        
+        // Query hand anchors at a slightly future timestamp for prediction
+        // Use configurable prediction offset from DataManager
+        let predictionOffset = TimeInterval(DataManager.shared.handPredictionOffset)
+        let targetTimestamp = CACurrentMediaTime() + predictionOffset
+        let anchors = handTracking.handAnchors(at: targetTimestamp)
+        
+        // Process left hand
+        if let leftAnchor = anchors.leftHand {
+            if leftAnchor.isTracked {
+                DataManager.shared.latestHandTrackingData.leftWrist = leftAnchor.originFromAnchorTransform
+            }
+            
+            if let skeleton = leftAnchor.handSkeleton {
+                for (index, jointType) in jointTypes.enumerated() {
+                    let joint = skeleton.joint(jointType)
+                    DataManager.shared.latestHandTrackingData.leftSkeleton.joints[index] = joint.anchorFromJointTransform
+                }
+            }
+        }
+        
+        // Process right hand
+        if let rightAnchor = anchors.rightHand {
+            if rightAnchor.isTracked {
+                DataManager.shared.latestHandTrackingData.rightWrist = rightAnchor.originFromAnchorTransform
+            }
+            
+            if let skeleton = rightAnchor.handSkeleton {
+                for (index, jointType) in jointTypes.enumerated() {
+                    let joint = skeleton.joint(jointType)
+                    DataManager.shared.latestHandTrackingData.rightSkeleton.joints[index] = joint.anchorFromJointTransform
+                }
+            }
+        }
+    }
+    
+    /// Run predictive hand tracking at high frequency (replaces processHandUpdates)
+    @MainActor
+    func processHandTrackingPredictive() async {
+        await run_device_tracking(function: self.processHandUpdatesPredictive, withFrequency: 120)
+    }
+    
+    /// Legacy: Process hand updates using anchorUpdates stream (event-driven, non-predictive)
     private func processHandUpdates() async {
         for await update in self.handTracking.anchorUpdates {
             let handAnchor = update.anchor
@@ -509,7 +594,79 @@ func fill_handUpdate() -> Handtracking_HandUpdate {
         }
     }
     
+    // MARKER DETECTION: Append detected markers as additional matrices in right hand skeleton
+    // Format: After normal 27 joints, append:
+    //   - Header matrix: m00=666.0 (marker data signal), m01=marker_count
+    //   - For each marker: pose matrix with marker_id encoded in m33 (normally 1.0) as 1000+id+dict*100
+    if let markerData = getMarkerMatrices() {
+        for matrix in markerData {
+            handUpdate.rightHand.skeleton.jointMatrices.append(matrix)
+        }
+    }
+    
     return handUpdate
+}
+
+/// Get marker detection matrices to append to the hand update
+/// Returns nil if marker detection is disabled or no images detected
+/// Includes both ArUco markers and custom user images
+func getMarkerMatrices() -> [Handtracking_Matrix4x4]? {
+    let manager = MarkerDetectionManager.shared
+    // Use thread-safe snapshot properties for non-MainActor access
+    guard manager.snapshotEnabled else { return nil }
+    let markers = manager.snapshotMarkers
+    let fixedMarkerIds = manager.snapshotFixedMarkers
+    let customImages = manager.snapshotCustomImages
+    let fixedCustomIds = manager.snapshotFixedCustomImages
+    
+    let totalCount = markers.count + customImages.count
+    guard totalCount > 0 else { return nil }
+    
+    var matrices: [Handtracking_Matrix4x4] = []
+    
+    // Header matrix: signals marker data presence
+    var header = Handtracking_Matrix4x4()
+    header.m00 = 666.0  // Marker data signal
+    header.m01 = Float(totalCount)  // Number of images following
+    matrices.append(header)
+    
+    // Append each ArUco marker's pose matrix
+    for (_, marker) in markers {
+        var matrix = createMatrix4x4(from: marker.poseInWorld)
+        // Encode marker info in m33 (normally 1.0 for homogeneous coordinates)
+        // Format: 1000 + marker_id + (dict_type * 100)
+        // This allows decoding: id = (value-1000) % 100, dict = (value-1000) / 100
+        matrix.m33 = 1000.0 + Float(marker.id) + Float(marker.dictionaryType) * 100.0
+        // Encode image type in m30: 0.0 = ArUco marker
+        matrix.m30 = 0.0
+        // Encode isFixed flag in m32 (normally 0.0 in a homogeneous matrix)
+        // 1.0 = fixed, 0.0 = not fixed
+        matrix.m32 = fixedMarkerIds.contains(marker.id) ? 1.0 : 0.0
+        // Encode isTracked flag in m31 (normally 0.0 in a homogeneous matrix)
+        // 1.0 = currently tracked by ARKit, 0.0 = tracking lost
+        matrix.m31 = marker.isTracked ? 1.0 : 0.0
+        matrices.append(matrix)
+    }
+    
+    // Append each custom image's pose matrix
+    // Custom images use a sequential index for encoding
+    var customIndex = 0
+    for (imageId, customImage) in customImages {
+        var matrix = createMatrix4x4(from: customImage.poseInWorld)
+        // Encode custom image info in m33: 2000 + sequential_index
+        // Python will decode via m30 to determine image type
+        matrix.m33 = 2000.0 + Float(customIndex)
+        // Encode image type in m30: 1.0 = custom image
+        matrix.m30 = 1.0
+        // Encode isFixed flag in m32
+        matrix.m32 = fixedCustomIds.contains(imageId) ? 1.0 : 0.0
+        // Encode isTracked flag in m31
+        matrix.m31 = customImage.isTracked ? 1.0 : 0.0
+        matrices.append(matrix)
+        customIndex += 1
+    }
+    
+    return matrices
 }
 
 

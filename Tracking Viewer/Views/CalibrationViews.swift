@@ -374,6 +374,7 @@ struct CheckerboardDisplayView: View {
     @Environment(\.dismiss) private var dismiss
     
     @State private var showControls = true
+    @State private var showConfig = false
     @State private var hideControlsTimer: Timer?
     @State private var brightness: CGFloat = UIScreen.main.brightness
     
@@ -384,15 +385,33 @@ struct CheckerboardDisplayView: View {
                 Color.white
                     .ignoresSafeArea()
                 
-                // Checkerboard pattern - rotated 90° to fit better on portrait screen
+                // Checkerboard pattern - no rotation needed for tall patterns like 12×6
                 CheckerboardPatternView(
                     innerCornersX: manager.checkerboardConfig.innerCornersX,
                     innerCornersY: manager.checkerboardConfig.innerCornersY,
                     squareSizePoints: manager.mmToPoints(Double(manager.checkerboardConfig.squareSizeMM))
                 )
-                .rotationEffect(.degrees(90))
                 .frame(maxWidth: geometry.size.width, maxHeight: geometry.size.height)
                 .clipped()
+                
+                // Screen overflow warning
+                if !manager.checkerboardFitsOnScreen {
+                    VStack {
+                        HStack {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                            Text("Pattern exceeds screen size")
+                        }
+                        .font(.caption.bold())
+                        .foregroundColor(.black)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.yellow)
+                        .cornerRadius(8)
+                        .padding(.top, 60)
+                        
+                        Spacer()
+                    }
+                }
                 
                 // Elegant controls overlay
                 if showControls {
@@ -465,9 +484,15 @@ struct CheckerboardDisplayView: View {
                             
                             Spacer()
                             
-                            // Placeholder for symmetry
-                            Color.clear
-                                .frame(width: 36, height: 36)
+                            // Config button
+                            Button(action: { showConfig = true }) {
+                                Image(systemName: "gearshape.fill")
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .frame(width: 36, height: 36)
+                                    .background(Color.black.opacity(0.5))
+                                    .clipShape(Circle())
+                            }
                         }
                         .padding(.horizontal, 20)
                         .padding(.top, 8)
@@ -500,11 +525,13 @@ struct CheckerboardDisplayView: View {
                 }
             }
             .onTapGesture {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    showControls.toggle()
-                }
-                if showControls {
-                    resetHideTimer()
+                if !showConfig {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showControls.toggle()
+                    }
+                    if showControls {
+                        resetHideTimer()
+                    }
                 }
             }
         }
@@ -520,6 +547,88 @@ struct CheckerboardDisplayView: View {
             UIScreen.main.brightness = brightness
             hideControlsTimer?.invalidate()
         }
+        .sheet(isPresented: $showConfig) {
+            checkerboardConfigSheet
+        }
+    }
+    
+    private var checkerboardConfigSheet: some View {
+        NavigationView {
+            Form {
+                Section("Grid Size (Squares)") {
+                    Stepper("Columns: \(manager.checkerboardConfig.innerCornersX + 1)", 
+                            value: Binding(
+                                get: { manager.checkerboardConfig.innerCornersX },
+                                set: { manager.checkerboardConfig.innerCornersX = $0 }
+                            ), in: 3...12)
+                    
+                    Stepper("Rows: \(manager.checkerboardConfig.innerCornersY + 1)", 
+                            value: Binding(
+                                get: { manager.checkerboardConfig.innerCornersY },
+                                set: { manager.checkerboardConfig.innerCornersY = $0 }
+                            ), in: 3...12)
+                    
+                    Text("Inner corners: \(manager.checkerboardConfig.innerCornersX)×\(manager.checkerboardConfig.innerCornersY)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                Section("Square Size") {
+                    VStack(alignment: .leading) {
+                        HStack {
+                            Text("Size:")
+                            Spacer()
+                            Text("\(Int(manager.checkerboardConfig.squareSizeMM))mm")
+                                .monospacedDigit()
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Slider(
+                            value: Binding(
+                                get: { Double(manager.checkerboardConfig.squareSizeMM) },
+                                set: { manager.checkerboardConfig.squareSizeMM = Float($0) }
+                            ),
+                            in: 5...30,
+                            step: 1
+                        )
+                    }
+                }
+                
+                Section("Board Info") {
+                    HStack {
+                        Text("Board Size")
+                        Spacer()
+                        Text("\(Int(manager.checkerboardConfig.patternWidthMM))×\(Int(manager.checkerboardConfig.patternHeightMM))mm")
+                            .foregroundColor(manager.checkerboardFitsOnScreen ? .green : .red)
+                    }
+                    
+                    HStack {
+                        Text("Screen Size")
+                        Spacer()
+                        Text("\(Int(manager.displaySpec.screenWidthMM))×\(Int(manager.displaySpec.screenHeightMM))mm")
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    if !manager.checkerboardFitsOnScreen {
+                        HStack {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.yellow)
+                            Text("Pattern too large for screen!")
+                                .foregroundColor(.red)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Checkerboard Settings")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        showConfig = false
+                    }
+                }
+            }
+        }
     }
     
     private func resetHideTimer() {
@@ -531,6 +640,789 @@ struct CheckerboardDisplayView: View {
         }
     }
 }
+
+// MARK: - ChArUco Display View
+
+/// Full-screen ChArUco pattern display for intrinsic calibration
+struct CharucoDisplayView: View {
+    @StateObject private var manager = CalibrationDisplayManager.shared
+    @Environment(\.dismiss) private var dismiss
+    
+    @State private var showControls = true
+    @State private var showConfig = false
+    @State private var hideControlsTimer: Timer?
+    @State private var brightness: CGFloat = UIScreen.main.brightness
+    @State private var generatedImage: UIImage?
+    
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                // White background
+                Color.white
+                    .ignoresSafeArea()
+                
+                // ChArUco pattern
+                if let image = generatedImage {
+                    Image(uiImage: image)
+                        .interpolation(.none)
+                        .frame(width: image.size.width, height: image.size.height)
+                        .background(Color.white) // Ensure background is white
+                }
+                
+                // Screen overflow warning
+                if !manager.charucoFitsOnScreen {
+                    VStack {
+                        HStack {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                            Text("Pattern exceeds screen size")
+                        }
+                        .font(.caption.bold())
+                        .foregroundColor(.black)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.yellow)
+                        .cornerRadius(8)
+                        .padding(.top, 60)
+                        
+                        Spacer()
+                    }
+                }
+                
+                // Elegant controls overlay
+                if showControls {
+                    // Gradient overlays
+                    VStack(spacing: 0) {
+                        // Top gradient
+                        LinearGradient(
+                            colors: [Color.black.opacity(0.4), Color.clear],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 140)
+                        
+                        Spacer()
+                        
+                        // Bottom gradient
+                        LinearGradient(
+                            colors: [Color.clear, Color.black.opacity(0.6)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 220)
+                    }
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+                    
+                    VStack {
+                        // Top bar
+                        HStack(alignment: .top) {
+                            // Close button
+                            Button(action: { dismiss() }) {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .frame(width: 36, height: 36)
+                                    .background(Color.black.opacity(0.5))
+                                    .clipShape(Circle())
+                            }
+                            
+                            Spacer()
+                            
+                            // Center info pill
+                            HStack(spacing: 16) {
+                                VStack(spacing: 2) {
+                                    Text("GRID")
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.7))
+                                    Text("\(manager.charucoConfig.squaresX)×\(manager.charucoConfig.squaresY)")
+                                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                                        .foregroundColor(.white)
+                                }
+                                
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.3))
+                                    .frame(width: 1, height: 30)
+                                
+                                VStack(spacing: 2) {
+                                    Text("SQUARE")
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.7))
+                                    Text("\(Int(manager.charucoConfig.squareSizeMM))mm")
+                                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                                        .foregroundColor(.white)
+                                }
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                            .background(Color.black.opacity(0.5))
+                            .clipShape(Capsule())
+                            
+                            Spacer()
+                            
+                            // Config button
+                            Button(action: { showConfig = true }) {
+                                Image(systemName: "gearshape.fill")
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .frame(width: 36, height: 36)
+                                    .background(Color.black.opacity(0.5))
+                                    .clipShape(Circle())
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 8)
+                        
+                        Spacer()
+                        
+                        // Bottom info
+                        VStack(spacing: 12) {
+                            // Instruction banner
+                            HStack(spacing: 10) {
+                                Image(systemName: "move.3d")
+                                    .font(.system(size: 16))
+                                Text("Move pattern around in front of camera")
+                                    .font(.system(size: 13, weight: .medium))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(Color.purple.opacity(0.9))
+                            .clipShape(Capsule())
+                            
+                            // Tap hint
+                            Text("Tap anywhere to hide controls")
+                                .font(.system(size: 11))
+                                .foregroundColor(.white.opacity(0.5))
+                        }
+                        .padding(.bottom, 40)
+                    }
+                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                }
+            }
+            .onTapGesture {
+                if !showConfig {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showControls.toggle()
+                    }
+                    if showControls {
+                        resetHideTimer()
+                    }
+                }
+            }
+        }
+        .statusBarHidden(true)
+        .onAppear {
+            // Max brightness for best pattern detection
+            brightness = UIScreen.main.brightness
+            UIScreen.main.brightness = 1.0
+            
+            // Generate board
+            regenerateBoard()
+            
+            resetHideTimer()
+        }
+        .onDisappear {
+            // Restore brightness
+            UIScreen.main.brightness = brightness
+            hideControlsTimer?.invalidate()
+        }
+        .onChange(of: manager.charucoConfig) { _, _ in
+            regenerateBoard()
+        }
+        .sheet(isPresented: $showConfig) {
+            charucoConfigSheet
+        }
+    }
+    
+    private func regenerateBoard() {
+        generatedImage = manager.generateCharucoBoard(sizePoints: manager.charucoSizePoints)
+    }
+    
+    private var charucoConfigSheet: some View {
+        NavigationView {
+            Form {
+                Section("Grid Size") {
+                    Stepper("Columns: \(manager.charucoConfig.squaresX)", 
+                            value: Binding(
+                                get: { manager.charucoConfig.squaresX },
+                                set: { manager.charucoConfig.squaresX = $0 }
+                            ), in: 2...10)
+                    
+                    Stepper("Rows: \(manager.charucoConfig.squaresY)", 
+                            value: Binding(
+                                get: { manager.charucoConfig.squaresY },
+                                set: { manager.charucoConfig.squaresY = $0 }
+                            ), in: 2...10)
+                }
+                
+                Section("Square Size") {
+                    VStack(alignment: .leading) {
+                        HStack {
+                            Text("Size:")
+                            Spacer()
+                            Text("\(Int(manager.charucoConfig.squareSizeMM))mm")
+                                .monospacedDigit()
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Slider(
+                            value: Binding(
+                                get: { Double(manager.charucoConfig.squareSizeMM) },
+                                set: { manager.charucoConfig.squareSizeMM = Float($0) }
+                            ),
+                            in: 10...40,
+                            step: 1
+                        )
+                    }
+                }
+                
+                Section("Marker Size") {
+                    VStack(alignment: .leading) {
+                        HStack {
+                            Text("Size:")
+                            Spacer()
+                            Text("\(Int(manager.charucoConfig.markerSizeMM))mm")
+                                .monospacedDigit()
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Slider(
+                            value: Binding(
+                                get: { Double(manager.charucoConfig.markerSizeMM) },
+                                set: { manager.charucoConfig.markerSizeMM = Float($0) }
+                            ),
+                            in: 5...max(5, Double(manager.charucoConfig.squareSizeMM) - 2),
+                            step: 1
+                        )
+                        
+                        Text("Marker must be smaller than square")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Section("Board Info") {
+                    HStack {
+                        Text("Board Size")
+                        Spacer()
+                        Text("\(Int(manager.charucoConfig.patternWidthMM))×\(Int(manager.charucoConfig.patternHeightMM))mm")
+                            .foregroundColor(manager.charucoFitsOnScreen ? .green : .red)
+                    }
+                    
+                    HStack {
+                        Text("Screen Size")
+                        Spacer()
+                        Text("\(Int(manager.displaySpec.screenWidthMM))×\(Int(manager.displaySpec.screenHeightMM))mm")
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    if !manager.charucoFitsOnScreen {
+                        HStack {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.yellow)
+                            Text("Pattern too large for screen!")
+                                .foregroundColor(.red)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("ChArUco Settings")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        showConfig = false
+                    }
+                }
+            }
+        }
+    }
+    
+    private func resetHideTimer() {
+        hideControlsTimer?.invalidate()
+        hideControlsTimer = Timer.scheduledTimer(withTimeInterval: 4.0, repeats: false) { _ in
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showControls = false
+            }
+        }
+    }
+}
+
+// MARK: - ArUco Verification Board Display View
+
+/// Full-screen 2x2 ArUco verification board for intrinsic calibration verification
+/// Displays 4 ArUco tags with known spacing to verify 3D distance measurements
+struct ArucoVerificationBoardDisplayView: View {
+    @StateObject private var manager = CalibrationDisplayManager.shared
+    @Environment(\.dismiss) private var dismiss
+    
+    @State private var showControls = true
+    @State private var showConfig = false
+    @State private var hideControlsTimer: Timer?
+    @State private var brightness: CGFloat = UIScreen.main.brightness
+    
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                // White background
+                Color.white
+                    .ignoresSafeArea()
+                
+                // Dynamic ArUco tag grid
+                ArucoVerificationBoardPatternView(
+                    columns: manager.verificationBoardConfig.columns,
+                    rows: manager.verificationBoardConfig.rows,
+                    tagSizePoints: manager.verificationTagSizePoints,
+                    marginPoints: manager.verificationMarginSizePoints,
+                    tagIds: manager.verificationBoardConfig.effectiveTagIds,
+                    generateMarker: { id, size in
+                        manager.generateArucoMarker(id: id, sizePoints: size)
+                    }
+                )
+                .frame(maxWidth: geometry.size.width, maxHeight: geometry.size.height)
+                
+                // Screen overflow warning
+                if !manager.verificationBoardFitsOnScreen {
+                    VStack {
+                        Spacer()
+                        HStack(spacing: 6) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.red)
+                            Text("Board too large for screen")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.red)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.white.opacity(0.9))
+                        .clipShape(Capsule())
+                        .padding(.bottom, 100)
+                    }
+                }
+                
+                // Elegant controls overlay
+                if showControls {
+                    // Gradient overlays
+                    VStack(spacing: 0) {
+                        LinearGradient(
+                            colors: [Color.black.opacity(0.6), Color.clear],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 120)
+                        
+                        Spacer()
+                        
+                        LinearGradient(
+                            colors: [Color.clear, Color.black.opacity(0.6)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 180)
+                    }
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+                    
+                    VStack {
+                        // Top bar
+                        HStack(alignment: .top) {
+                            // Close button
+                            Button(action: { dismiss() }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 32))
+                                    .foregroundStyle(.white.opacity(0.9), .white.opacity(0.2))
+                            }
+                            
+                            Spacer()
+                            
+                            // Title and info
+                            VStack(alignment: .trailing, spacing: 4) {
+                                Text("Verification Board")
+                                    .font(.system(size: 17, weight: .semibold))
+                                    .foregroundColor(.white)
+                                
+                                Text("2×2 ArUco Tags")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(.white.opacity(0.7))
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 16)
+                        
+                        Spacer()
+                        
+                        // Bottom controls
+                        VStack(spacing: 12) {
+                            // Grid layout indicator
+                            HStack(spacing: 8) {
+                                Text("\(manager.verificationBoardConfig.columns)×\(manager.verificationBoardConfig.rows)")
+                                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                                    .foregroundColor(.white)
+                                Text("Grid")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(.white.opacity(0.7))
+                                
+                                Spacer()
+                                
+                                // Quick presets
+                                Menu {
+                                    Button("1×3 (Vertical)") {
+                                        manager.verificationBoardConfig = .preset1x3
+                                    }
+                                    Button("1×4 (Vertical)") {
+                                        manager.verificationBoardConfig = .preset1x4
+                                    }
+                                    Button("2×2 (Square)") {
+                                        manager.verificationBoardConfig = .preset2x2
+                                    }
+                                    Button("3×1 (Horizontal)") {
+                                        manager.verificationBoardConfig = .preset3x1
+                                    }
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "rectangle.grid.1x2")
+                                        Text("Presets")
+                                            .font(.system(size: 13, weight: .medium))
+                                    }
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(.ultraThinMaterial)
+                                    .clipShape(Capsule())
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            
+                            // Board info
+                            HStack(spacing: 12) {
+                                StatItem(
+                                    label: "TAG",
+                                    value: String(format: "%.0f", manager.verificationBoardConfig.tagSizeMM),
+                                    unit: "mm",
+                                    color: .blue
+                                )
+                                StatItem(
+                                    label: "GAP",
+                                    value: String(format: "%.0f", manager.verificationBoardConfig.marginMM),
+                                    unit: "mm",
+                                    color: .green
+                                )
+                                StatItem(
+                                    label: "CTR",
+                                    value: String(format: "%.0f", manager.verificationBoardConfig.centerDistanceMM),
+                                    unit: "mm",
+                                    color: .orange
+                                )
+                                if manager.verificationBoardConfig.columns >= 2 && manager.verificationBoardConfig.rows >= 2 {
+                                    StatItem(
+                                        label: "DIAG",
+                                        value: String(format: "%.1f", manager.verificationBoardConfig.diagonalDistanceMM),
+                                        unit: "mm",
+                                        color: .purple
+                                    )
+                                }
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .background(.ultraThinMaterial)
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            
+                            // Tag IDs display - dynamic based on grid
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    ForEach(Array(manager.verificationBoardConfig.effectiveTagIds.enumerated()), id: \.offset) { index, tagId in
+                                        VStack(spacing: 2) {
+                                            Text("#\(index + 1)")
+                                                .font(.system(size: 9, weight: .bold))
+                                                .foregroundColor(.white.opacity(0.6))
+                                            Text("ID \(tagId)")
+                                                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                                                .foregroundColor(.white)
+                                        }
+                                        .frame(width: 50)
+                                    }
+                                }
+                                .padding(.horizontal, 16)
+                            }
+                            .padding(.vertical, 8)
+                            .background(.ultraThinMaterial)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            
+                            // Config button
+                            Button(action: { showConfig = true }) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "slider.horizontal.3")
+                                    Text("Configure")
+                                }
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 24)
+                                .padding(.vertical, 12)
+                                .background(.ultraThinMaterial)
+                                .clipShape(Capsule())
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 30)
+                    }
+                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                }
+            }
+            .onTapGesture {
+                if !showConfig {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showControls.toggle()
+                    }
+                    if showControls {
+                        resetHideTimer()
+                    }
+                }
+            }
+        }
+        .statusBarHidden(true)
+        .onAppear {
+            // Max brightness for best tag detection
+            brightness = UIScreen.main.brightness
+            UIScreen.main.brightness = 1.0
+            resetHideTimer()
+        }
+        .onDisappear {
+            // Restore brightness
+            UIScreen.main.brightness = brightness
+            hideControlsTimer?.invalidate()
+        }
+        .sheet(isPresented: $showConfig) {
+            verificationBoardConfigSheet
+        }
+    }
+    
+    private var verificationBoardConfigSheet: some View {
+        NavigationView {
+            Form {
+                Section("Grid Layout") {
+                    Stepper("Columns: \(manager.verificationBoardConfig.columns)",
+                            value: Binding(
+                                get: { manager.verificationBoardConfig.columns },
+                                set: { manager.verificationBoardConfig.columns = $0 }
+                            ),
+                            in: 1...4)
+                    
+                    Stepper("Rows: \(manager.verificationBoardConfig.rows)",
+                            value: Binding(
+                                get: { manager.verificationBoardConfig.rows },
+                                set: { manager.verificationBoardConfig.rows = $0 }
+                            ),
+                            in: 1...6)
+                    
+                    HStack {
+                        Text("Total tags")
+                        Spacer()
+                        Text("\(manager.verificationBoardConfig.tagCount)")
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Section("Quick Presets") {
+                    Button("1×3 Vertical (fits most screens)") {
+                        manager.verificationBoardConfig = .preset1x3
+                    }
+                    Button("1×4 Vertical (compact)") {
+                        manager.verificationBoardConfig = .preset1x4
+                    }
+                    Button("2×2 Square") {
+                        manager.verificationBoardConfig = .preset2x2
+                    }
+                    Button("3×1 Horizontal") {
+                        manager.verificationBoardConfig = .preset3x1
+                    }
+                }
+                
+                Section("Tag Size") {
+                    VStack(alignment: .leading) {
+                        HStack {
+                            Text("Size: \(Int(manager.verificationBoardConfig.tagSizeMM)) mm")
+                            Spacer()
+                            Text("\(String(format: "%.1f", manager.verificationBoardConfig.tagSizeMM / 25.4))\"")
+                                .foregroundColor(.secondary)
+                        }
+                        Slider(
+                            value: Binding(
+                                get: { Double(manager.verificationBoardConfig.tagSizeMM) },
+                                set: { manager.verificationBoardConfig.tagSizeMM = Float($0) }
+                            ),
+                            in: 10...60,
+                            step: 1
+                        )
+                    }
+                }
+                
+                Section("Margin Between Tags") {
+                    VStack(alignment: .leading) {
+                        HStack {
+                            Text("Margin: \(Int(manager.verificationBoardConfig.marginMM)) mm")
+                            Spacer()
+                        }
+                        Slider(
+                            value: Binding(
+                                get: { Double(manager.verificationBoardConfig.marginMM) },
+                                set: { manager.verificationBoardConfig.marginMM = Float($0) }
+                            ),
+                            in: 5...40,
+                            step: 1
+                        )
+                    }
+                }
+                
+                Section("Tag IDs (row-major order)") {
+                    ForEach(0..<manager.verificationBoardConfig.tagCount, id: \.self) { index in
+                        HStack {
+                            Text("Tag \(index + 1):")
+                            Spacer()
+                            Stepper("ID \(manager.verificationBoardConfig.effectiveTagIds[index])",
+                                    value: Binding(
+                                        get: {
+                                            if index < manager.verificationBoardConfig.tagIds.count {
+                                                return manager.verificationBoardConfig.tagIds[index]
+                                            }
+                                            return index
+                                        },
+                                        set: { newValue in
+                                            // Ensure array is big enough
+                                            while manager.verificationBoardConfig.tagIds.count <= index {
+                                                manager.verificationBoardConfig.tagIds.append(manager.verificationBoardConfig.tagIds.count)
+                                            }
+                                            manager.verificationBoardConfig.tagIds[index] = newValue
+                                        }
+                                    ),
+                                    in: 0...49)
+                        }
+                    }
+                }
+                
+                Section("Expected Distances") {
+                    HStack {
+                        Text("Center-to-center (adj)")
+                        Spacer()
+                        Text("\(String(format: "%.1f", manager.verificationBoardConfig.centerDistanceMM)) mm")
+                            .foregroundColor(.secondary)
+                    }
+                    if manager.verificationBoardConfig.columns >= 2 && manager.verificationBoardConfig.rows >= 2 {
+                        HStack {
+                            Text("Diagonal")
+                            Spacer()
+                            Text("\(String(format: "%.2f", manager.verificationBoardConfig.diagonalDistanceMM)) mm")
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    HStack {
+                        Text("Board Size")
+                        Spacer()
+                        Text("\(String(format: "%.0f", manager.verificationBoardConfig.boardWidthMM)) × \(String(format: "%.0f", manager.verificationBoardConfig.boardHeightMM)) mm")
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    if !manager.verificationBoardFitsOnScreen {
+                        HStack {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.red)
+                            Text("Board exceeds screen size")
+                                .foregroundColor(.red)
+                        }
+                    } else {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                            Text("Board fits on screen")
+                                .foregroundColor(.green)
+                        }
+                    }
+                }
+                
+                Section("Usage") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Verify intrinsic calibration:")
+                            .font(.system(size: 13, weight: .medium))
+                        
+                        Text("• Detect tags with calibrated camera")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                        Text("• Measure 3D distances between tag centers")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                        Text("• Compare to expected values above")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                        
+                        HStack(spacing: 8) {
+                            Circle().fill(Color.green).frame(width: 8, height: 8)
+                            Text("< 2mm error = Good calibration")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.top, 4)
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+            .navigationTitle("Verification Board")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        showConfig = false
+                    }
+                }
+            }
+        }
+    }
+    
+    private func resetHideTimer() {
+        hideControlsTimer?.invalidate()
+        hideControlsTimer = Timer.scheduledTimer(withTimeInterval: 4.0, repeats: false) { _ in
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showControls = false
+            }
+        }
+    }
+}
+
+// MARK: - ArUco Verification Board Pattern View
+
+/// Draws a configurable grid of ArUco tags for verification
+struct ArucoVerificationBoardPatternView: View {
+    let columns: Int
+    let rows: Int
+    let tagSizePoints: CGFloat
+    let marginPoints: CGFloat
+    let tagIds: [Int]
+    let generateMarker: (Int, CGFloat) -> UIImage?
+    
+    var body: some View {
+        VStack(spacing: marginPoints) {
+            ForEach(0..<rows, id: \.self) { row in
+                HStack(spacing: marginPoints) {
+                    ForEach(0..<columns, id: \.self) { col in
+                        let index = row * columns + col
+                        if index < tagIds.count,
+                           let img = generateMarker(tagIds[index], tagSizePoints) {
+                            Image(uiImage: img)
+                                .resizable()
+                                .interpolation(.none)
+                                .frame(width: tagSizePoints, height: tagSizePoints)
+                        } else {
+                            // Placeholder for missing tag
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.3))
+                                .frame(width: tagSizePoints, height: tagSizePoints)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Checkerboard Pattern View
 
 /// Draws a checkerboard pattern
 struct CheckerboardPatternView: View {
@@ -2027,6 +2919,8 @@ struct CalibrationTabView: View {
     
     @State private var showArucoDisplay = false
     @State private var showCheckerboardDisplay = false
+    @State private var showCharucoDisplay = false
+    @State private var showVerificationBoardDisplay = false
     @State private var showScreenValidation = false
     @State private var showCalibrationCoordinator = false
     
@@ -2091,7 +2985,7 @@ struct CalibrationTabView: View {
                             action: { showArucoDisplay = true }
                         )
                         
-                        // Intrinsic (Checkerboard)
+                        // Intrinsic (Checkerboard / ChArUco)
                         CalibrationOptionCard(
                             title: "Intrinsic Calibration",
                             subtitle: "Camera focal length & distortion",
@@ -2104,7 +2998,26 @@ struct CalibrationTabView: View {
                             warningText: manager.checkerboardFitsOnScreen ? nil : "Pattern too large for screen",
                             actionTitle: "Display Checkerboard",
                             isEnabled: manager.checkerboardFitsOnScreen,
-                            action: { showCheckerboardDisplay = true }
+                            action: { showCheckerboardDisplay = true },
+                            secondaryActionTitle: "Display ChArUco",
+                            secondaryAction: { showCharucoDisplay = true }
+                        )
+                        
+                        // Verification Board (configurable ArUco grid)
+                        CalibrationOptionCard(
+                            title: "Calibration Verification",
+                            subtitle: "Verify intrinsic accuracy with 3D distances",
+                            icon: "checkmark.seal",
+                            iconColor: .green,
+                            details: [
+                                ("Grid", "\(manager.verificationBoardConfig.columns)×\(manager.verificationBoardConfig.rows)"),
+                                ("Tag", "\(Int(manager.verificationBoardConfig.tagSizeMM))mm"),
+                                ("Center", "\(Int(manager.verificationBoardConfig.centerDistanceMM))mm")
+                            ],
+                            warningText: manager.verificationBoardFitsOnScreen ? nil : "Board too large - tap to configure",
+                            actionTitle: "Display Verification Board",
+                            isEnabled: true,  // Always enable so user can open and configure
+                            action: { showVerificationBoardDisplay = true }
                         )
                     }
                     
@@ -2124,6 +3037,12 @@ struct CalibrationTabView: View {
             }
             .fullScreenCover(isPresented: $showCheckerboardDisplay) {
                 CheckerboardDisplayView()
+            }
+            .fullScreenCover(isPresented: $showCharucoDisplay) {
+                CharucoDisplayView()
+            }
+            .fullScreenCover(isPresented: $showVerificationBoardDisplay) {
+                ArucoVerificationBoardDisplayView()
             }
             .fullScreenCover(isPresented: $showCalibrationCoordinator) {
                 CalibrationCoordinatorView()
@@ -2324,6 +3243,8 @@ struct CalibrationOptionCard: View {
     let actionTitle: String
     let isEnabled: Bool
     let action: () -> Void
+    var secondaryActionTitle: String? = nil
+    var secondaryAction: (() -> Void)? = nil
     
     var body: some View {
         VStack(spacing: 16) {
@@ -2391,27 +3312,49 @@ struct CalibrationOptionCard: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
             }
             
-            // Action button
-            Button(action: action) {
-                HStack(spacing: 8) {
-                    Text(actionTitle)
-                        .font(.system(size: 15, weight: .semibold))
-                    Image(systemName: "arrow.up.right")
-                        .font(.system(size: 12, weight: .bold))
-                }
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(
-                    LinearGradient(
-                        colors: isEnabled ? [iconColor, iconColor.opacity(0.8)] : [Color.gray, Color.gray.opacity(0.8)],
-                        startPoint: .leading,
-                        endPoint: .trailing
+            // Action buttons
+            HStack(spacing: 12) {
+                // Primary Action
+                Button(action: action) {
+                    HStack(spacing: 8) {
+                        Text(actionTitle)
+                            .font(.system(size: 15, weight: .semibold))
+                        Image(systemName: "arrow.up.right")
+                            .font(.system(size: 12, weight: .bold))
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(
+                        LinearGradient(
+                            colors: isEnabled ? [iconColor, iconColor.opacity(0.8)] : [Color.gray, Color.gray.opacity(0.8)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
                     )
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .disabled(!isEnabled)
+                
+                // Secondary Action (if present)
+                if let secondaryActionTitle = secondaryActionTitle, let secondaryAction = secondaryAction {
+                    Button(action: secondaryAction) {
+                        HStack(spacing: 8) {
+                            Text(secondaryActionTitle)
+                                .font(.system(size: 15, weight: .semibold))
+                            Image(systemName: "square.grid.4x3.fill")
+                                .font(.system(size: 12, weight: .bold))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(
+                            Color.purple // ChArUco usually purple-ish theme in this app? Or maybe just distinct color.
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                }
             }
-            .disabled(!isEnabled)
         }
         .padding(16)
         .background(Color(.secondarySystemBackground))
