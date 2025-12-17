@@ -234,7 +234,7 @@ struct ContentView: View {
                 VStack(spacing: 4) {
                     Image(systemName: "video.fill")
                         .font(.title)
-                        .foregroundColor(.cyan)
+                        .foregroundColor(Color(hex: "#9F1239"))
                     Text("Video · Audio")
                         .font(.caption)
                         .foregroundColor(.white.opacity(0.7))
@@ -245,7 +245,7 @@ struct ContentView: View {
                 .frame(width: 120)
                 
                 // Arrows flowing right (from video/audio/sim toward button)
-                AnimatedArrows(color: .cyan)
+                AnimatedArrows(color: Color(hex: "#9F1239"))
                     
                 // Simple START button
                 Button {
@@ -258,7 +258,7 @@ struct ContentView: View {
                         .padding(.horizontal, 60)
                         .background(
                             LinearGradient(
-                                colors: [Color(hex: "#6366F1"), Color(hex: "#A855F7"), Color(hex: "#EC4899")],
+                                colors: [Color(hex: "#9F1239"), Color(hex: "#A855F7"), Color(hex: "#6366F1")],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
@@ -268,13 +268,13 @@ struct ContentView: View {
                 .buttonStyle(.plain)
                 
                 // Arrows flowing right (from button toward hand tracking)
-                AnimatedArrows(color: .pink)
+                AnimatedArrows(color: Color(hex: "#6366F1"))
                 
                 // Hand/Head tracking label (right side)
                 VStack(spacing: 4) {
                     Image(systemName: "hand.raised.fill")
                         .font(.title)
-                        .foregroundColor(.pink)
+                        .foregroundColor(Color(hex: "#6366F1"))
                     Text("Hand / Head")
                         .font(.caption)
                         .foregroundColor(.white.opacity(0.7))

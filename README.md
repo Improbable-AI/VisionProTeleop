@@ -52,6 +52,7 @@ A complete ecosystem for using Apple Vision Pro in robotics research — from **
 - [App Settings \& Customization](#app-settings--customization)
 - [API Reference](#api-reference)
   - [Hand Tracking Data 🆕](#hand-tracking-data-)
+    - [Predictive Hand Tracking 🆕](#predictive-hand-tracking-)
   - [Marker \& Image Tracking 🆕](#marker--image-tracking-)
   - [Stylus Tracking 🆕](#stylus-tracking-)
   - [Configuration Reference](#configuration-reference)
@@ -523,6 +524,21 @@ data["right_pinch_distance"] # float
 | 11 | `middleKnuckle` | 25 | `forearmWrist` |
 | 12 | `middleIntermediateBase` | 26 | `forearmArm` |
 | 13 | `middleIntermediateTip` | | |
+
+#### Predictive Hand Tracking 🆕
+
+To reduce perceived latency, the visionOS app uses ARKit's **predictive hand tracking** mode. Instead of querying hand poses at the current timestamp, it queries `handAnchors(at: futureTimestamp)` to get predicted poses ahead of time. This compensates for system and network latency, making the hand skeleton feel more responsive.
+
+**Configure in VisionOS App**: Settings → Hand Tracking → Prediction Offset
+
+| Offset | Effect |
+|--------|--------|
+| **0 ms** | No prediction (raw tracking data) |
+| **5 ms** | Default - minimal prediction |
+| **33 ms** | Compensates for ~2 frames at 60Hz |
+| **100 ms** | Maximum - may cause overshoot on fast movements |
+
+> **Note**: Higher prediction values reduce perceived latency but may cause the skeleton to "overshoot" during rapid hand movements. Start with the default (5ms) and increase if needed.
 
 ### Marker & Image Tracking 🆕
 

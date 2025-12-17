@@ -1488,6 +1488,9 @@ class VisionProStreamer:
                 elif msg_type == "ice-servers":
                     servers = data.get("servers")
                     self._log(f'[SIGNALING] Received {len(servers)} ICE servers')
+                    # Debug: log the structure
+                    for i, s in enumerate(servers):
+                        self._log(f'[SIGNALING]   Server {i}: type={type(s).__name__}, value={s}')
                     self._ice_servers = servers
                 
                 elif msg_type == "pong":
@@ -1537,10 +1540,74 @@ class VisionProStreamer:
         ProcessedVideoTrack = _create_processed_video_track_class(self)
         ProcessedAudioTrack = _create_processed_audio_track_class(self)
         
-        # Configure RTCPeerConnection
-        config = RTCConfiguration(
-            iceServers=[RTCIceServer(urls=["stun:stun.l.google.com:19302"])]
-        )
+        # Configure RTCPeerConnection with ICE servers (TURN for relay if needed)
+        ice_servers = []
+        if self._ice_servers:
+            # _ice_servers can be:
+            # 1. A list of server dicts: [{"urls": [...], "username": ..., "credential": ...}, ...]
+            # 2. A single server dict: {"urls": [...], "username": ..., "credential": ...}
+            
+            servers_list = self._ice_servers
+            # If it's a single dict (has 'urls' key), wrap it in a list
+            if isinstance(servers_list, dict) and "urls" in servers_list:
+                servers_list = [servers_list]
+            
+            self._log(f'[WEBRTC] Processing {len(servers_list)} ICE server(s) from signaling', force=True)
+            
+            for s in servers_list:
+                if not isinstance(s, dict):
+                    self._log(f'[WEBRTC] Warning: Unexpected ICE server format: {type(s)} - {s}', force=True)
+                    continue
+                    
+                urls = s.get("urls", [])
+                username = s.get("username")
+                credential = s.get("credential")
+                
+                # urls can be a string or list
+                if isinstance(urls, str):
+                    urls = [urls]
+                
+                # Debug log credentials (truncated for security)
+                if username:
+                    self._log(f'[WEBRTC]   Credentials: username={username[:16]}..., credential={credential[:16] if credential else None}...', force=True)
+                
+                # Filter and categorize URLs
+                stun_urls = []
+                turn_urls = []
+                for url in urls:
+                    if not isinstance(url, str):
+                        continue
+                    # Skip port 53 URLs as they can cause timeouts
+                    if ":53" in url:
+                        continue
+                    if url.startswith("stun:"):
+                        stun_urls.append(url)
+                    elif url.startswith("turn:") or url.startswith("turns:"):
+                        turn_urls.append(url)
+                
+                # Add STUN server (no credentials needed)
+                if stun_urls:
+                    self._log(f'[WEBRTC]   Adding STUN: {stun_urls[0]}', force=True)
+                    ice_servers.append(RTCIceServer(urls=stun_urls))
+                
+                # Add TURN server (with credentials)
+                if turn_urls and username and credential:
+                    self._log(f'[WEBRTC]   Adding TURN: {turn_urls[0][:60]}... ({len(turn_urls)} URLs)', force=True)
+                    ice_servers.append(RTCIceServer(
+                        urls=turn_urls,
+                        username=username,
+                        credential=credential
+                    ))
+        
+        # Always add Google STUN as fallback
+        ice_servers.append(RTCIceServer(urls=["stun:stun.l.google.com:19302"]))
+        
+        if len([s for s in ice_servers if any("turn:" in u or "turns:" in u for u in s.urls)]) == 0:
+            self._log('[WEBRTC] Warning: No TURN servers available, using STUN only (may fail across NAT)', force=True)
+        else:
+            self._log(f'[WEBRTC] Configured {len(ice_servers)} ICE servers (including TURN)', force=True)
+        
+        config = RTCConfiguration(iceServers=ice_servers)
         pc = RTCPeerConnection(configuration=config)
         self._pc = pc
         
@@ -1678,9 +1745,26 @@ class VisionProStreamer:
         })
         self._log('[SIGNALING] Sent SDP offer to VisionOS', force=True)
         
-        # Wait for and process the answer
+        # Wait for and process the answer with timeout
+        timeout_seconds = 30
+        wait_interval = 0.1
+        elapsed = 0.0
+        last_log_time = 0.0
+        
         while not hasattr(self, '_pending_answer') or self._pending_answer is None:
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(wait_interval)
+            elapsed += wait_interval
+            
+            # Log progress every 5 seconds
+            if elapsed - last_log_time >= 5.0:
+                self._log(f'[WEBRTC] Waiting for SDP answer from VisionOS... ({elapsed:.0f}s elapsed)', force=True)
+                last_log_time = elapsed
+            
+            if elapsed >= timeout_seconds:
+                self._log(f'[WEBRTC] Timeout waiting for SDP answer after {timeout_seconds}s', force=True)
+                self._log('[WEBRTC] Hint: Make sure VisionOS app has "Cross-Network" mode enabled and room code matches', force=True)
+                self._offer_in_progress = False
+                return
         
         answer_sdp = self._pending_answer
         self._pending_answer = None
@@ -1740,6 +1824,18 @@ class VisionProStreamer:
             return
         
         self._offer_in_progress = True
+        
+        # Wait for ICE servers before creating offer (needed for TURN relay)
+        if self._ice_servers is None:
+            self._log('[WEBRTC] Waiting for TURN servers from signaling...', force=True)
+            wait_count = 0
+            while self._ice_servers is None and wait_count < 50:  # 5 second timeout
+                time.sleep(0.1)
+                wait_count += 1
+            if self._ice_servers is None:
+                self._log('[WEBRTC] Warning: No TURN servers received, connection may fail across NAT', force=True)
+            else:
+                self._log(f'[WEBRTC] Got {len(self._ice_servers)} ICE servers (including TURN)', force=True)
         
         try:
             # Start a dedicated thread for the WebRTC loop if it doesn't exist

@@ -576,8 +576,7 @@ struct StatusOverlay: View {
                 Spacer()
                 
                 Text("VisionProTeleop")
-                    .font(.title2)
-                    .fontWeight(.bold)
+                    .font(.system(size: 26, weight: .bold))
                     .foregroundColor(.white)
                 
                 Spacer()
@@ -626,7 +625,7 @@ struct StatusOverlay: View {
                         .foregroundColor(appMode == mode ? .white : .white.opacity(0.5))
                         .padding(.horizontal, 20)
                         .padding(.vertical, 8)
-                        .font(.system(size: 18, weight: .bold))
+                        .font(.system(size: 20, weight: .bold))
                         .background(
                             appMode == mode 
                                 ? (mode == .teleop ? Color.blue : Color.orange)

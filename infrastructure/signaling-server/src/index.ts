@@ -188,7 +188,8 @@ export class SignalingRoom {
         const turnKeyId = this.env.CF_TURN_KEY_ID;
         const turnApiToken = this.env.CF_TURN_API_TOKEN;
 
-        const url = `https://rtc.live.cloudflare.com/v1/turn/keys/${turnKeyId}/credentials/generate`;
+        // Correct endpoint: /credentials/generate-ice-servers
+        const url = `https://rtc.live.cloudflare.com/v1/turn/keys/${turnKeyId}/credentials/generate-ice-servers`;
 
         try {
             const response = await fetch(url, {
@@ -202,10 +203,13 @@ export class SignalingRoom {
 
             if (!response.ok) {
                 const errorText = await response.text();
+                console.error(`Cloudflare TURN API error: ${response.status} ${errorText}`);
                 throw new Error(`Failed to generate ICE servers: ${response.status} ${errorText}`);
             }
 
             const data = await response.json() as any;
+            console.log("Cloudflare TURN response:", JSON.stringify(data, null, 2));
+            
             if (!data.iceServers) {
                 throw new Error("Invalid response from Cloudflare: missing iceServers");
             }

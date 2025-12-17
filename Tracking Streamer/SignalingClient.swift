@@ -26,13 +26,33 @@ class SignalingClient: ObservableObject {
     // MARK: - Callbacks
     
     /// Called when an SDP offer is received from Python
-    var onSDPOfferReceived: ((String) -> Void)?
+    var onSDPOfferReceived: ((String) -> Void)? {
+        didSet {
+            // If we have a pending offer buffered before callback was registered, deliver it now
+            if let pendingOffer = pendingSDPOffer, onSDPOfferReceived != nil {
+                print("[SIGNALING] Delivering buffered SDP offer")
+                onSDPOfferReceived?(pendingOffer)
+                pendingSDPOffer = nil
+            }
+        }
+    }
     
     /// Called when an SDP answer is received from Python
     var onSDPAnswerReceived: ((String) -> Void)?
     
     /// Called when an ICE candidate is received from Python
-    var onICECandidateReceived: (([String: Any]) -> Void)?
+    var onICECandidateReceived: (([String: Any]) -> Void)? {
+        didSet {
+            // Deliver any pending ICE candidates
+            if onICECandidateReceived != nil && !pendingICECandidates.isEmpty {
+                print("[SIGNALING] Delivering \(pendingICECandidates.count) buffered ICE candidates")
+                for candidate in pendingICECandidates {
+                    onICECandidateReceived?(candidate)
+                }
+                pendingICECandidates.removeAll()
+            }
+        }
+    }
     
     /// Called when Python peer joins the room
     var onPeerJoined: (() -> Void)?
@@ -45,6 +65,14 @@ class SignalingClient: ObservableObject {
     
     /// Called when Python peer leaves the room
     var onPeerLeft: (() -> Void)?
+    
+    // MARK: - Pending Message Buffers (for race condition handling)
+    
+    /// Buffered SDP offer received before callback was registered
+    private var pendingSDPOffer: String?
+    
+    /// Buffered ICE candidates received before callback was registered
+    private var pendingICECandidates: [[String: Any]] = []
     
     // MARK: - Lifecycle
     
@@ -262,7 +290,13 @@ class SignalingClient: ObservableObject {
                    let sdpType = json["sdpType"] as? String {
                     print("[SIGNALING] Received SDP \(sdpType)")
                     if sdpType == "offer" {
-                        onSDPOfferReceived?(sdp)
+                        if let callback = onSDPOfferReceived {
+                            callback(sdp)
+                        } else {
+                            // Buffer the offer until callback is registered
+                            print("[SIGNALING] Buffering SDP offer (callback not yet registered)")
+                            pendingSDPOffer = sdp
+                        }
                     } else if sdpType == "answer" {
                         onSDPAnswerReceived?(sdp)
                     }
@@ -271,7 +305,13 @@ class SignalingClient: ObservableObject {
             case "ice":
                 if let candidate = json["candidate"] as? [String: Any] {
                     print("[SIGNALING] Received ICE candidate")
-                    onICECandidateReceived?(candidate)
+                    if let callback = onICECandidateReceived {
+                        callback(candidate)
+                    } else {
+                        // Buffer the ICE candidate until callback is registered
+                        print("[SIGNALING] Buffering ICE candidate (callback not yet registered)")
+                        pendingICECandidates.append(candidate)
+                    }
                 }
                 
             case "ice-servers":
