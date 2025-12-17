@@ -2876,6 +2876,57 @@ private struct StateChangeModifiers: ViewModifier {
                     Thread.callStackSymbols.prefix(10).forEach { dlog("  \($0)") }
                 }
             }
+            // Handle disconnection signals (from WebRTCClient/Signaling)
+            .onChange(of: dataManager.connectionStatus) { _, status in
+                if status == "Peer disconnected" || status.contains("ICE disconnected") || status.contains("ICE failed") || status.contains("ICE closed") {
+                    dlog("🔄 [CombinedStreamingView] Disconnection detected ('\(status)'), restarting VideoStreamManager...")
+                    
+                    // Force restart of manager to return to "Waiting for Peer" state
+                    videoStreamManager.stop()
+                    
+                    // Reset UI state
+                    resetStreamingState()
+                    
+                    // Restart after brief delay to allow cleanup
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        videoStreamManager.start(imageData: imageData)
+                    }
+                }
+            }
+            // Handle cross-network USDZ loading via WebRTC data channel
+            .onChange(of: dataManager.loadedUsdzPath) { _, newPath in
+                guard let path = newPath, !path.isEmpty else { return }
+                dlog("📦 [CombinedStreamingView] Cross-network USDZ received: \(path)")
+                
+                // Convert to file URL and trigger the same loading flow as local mode
+                let fileURL = URL(fileURLWithPath: path)
+                
+                // Convert attach position/rotation
+                var position: SIMD3<Float>? = nil
+                var rotation: simd_quatf? = nil
+                
+                if let pos = dataManager.loadedUsdzAttachPosition, pos.count >= 3 {
+                    position = SIMD3<Float>(pos[0], pos[1], pos[2])
+                }
+                if let rot = dataManager.loadedUsdzAttachRotation, rot.count >= 4 {
+                    // [x, y, z, w] format
+                    rotation = simd_quatf(ix: rot[0], iy: rot[1], iz: rot[2], r: rot[3])
+                }
+                
+                // Set state to trigger the existing loading flow
+                attachToPosition = position
+                attachToRotation = rotation
+                mujocoUsdzURL = fileURL.absoluteString
+                mujocoManager.simEnabled = true
+                
+                // Register for recording
+                RecordingManager.shared.setUsdzUrl(fileURL)
+                
+                // Clear the loaded path so we can receive another
+                Task { @MainActor in
+                    dataManager.loadedUsdzPath = nil
+                }
+            }
             .onDisappear { handleOnDisappear() }
     }
     

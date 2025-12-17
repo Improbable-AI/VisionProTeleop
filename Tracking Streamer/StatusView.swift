@@ -104,9 +104,11 @@ struct StatusOverlay: View {
     @State private var showExtrinsicCalibrationSheet: Bool = false
     @State private var showCalibrationWizard: Bool = false
     @State private var startCalibrationVerification: Bool = false
+
     @ObservedObject private var calibrationManager = CameraCalibrationManager.shared
     @ObservedObject private var extrinsicCalibrationManager = ExtrinsicCalibrationManager.shared
     @ObservedObject private var cloudStorageSettings = CloudStorageSettings.shared
+    @ObservedObject private var signalingClient = SignalingClient.shared
     
     // App mode persistence
     @AppStorage("appMode") private var appMode: AppMode = .teleop
@@ -633,47 +635,123 @@ struct StatusOverlay: View {
 
     private var networkInfoSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            // IP addresses
-            ForEach(ipAddresses, id: \.address) { ip in
+            // Local Network Mode: Show IPs
+            if !dataManager.isCrossNetworkMode {
+                ForEach(ipAddresses, id: \.address) { ip in
+                    HStack(spacing: 8) {
+                        Image(systemName: "network")
+                            .font(.system(size: 13))
+                            .foregroundColor(.blue.opacity(0.8))
+                        Text(ip.name)
+                            .font(.callout)
+                            .foregroundColor(.white.opacity(0.6))
+                        Spacer()
+                        Text(ip.address)
+                            .font(.system(.callout, design: .monospaced))
+                            .foregroundColor(.white)
+                            .fontWeight(.medium)
+                    }
+                }
+                
+                // Connection status cards (Local Mode Only)
                 HStack(spacing: 8) {
-                    Image(systemName: "network")
-                        .font(.system(size: 13))
-                        .foregroundColor(.blue.opacity(0.8))
-                    Text(ip.name)
-                        .font(.callout)
-                        .foregroundColor(.white.opacity(0.6))
-                    Spacer()
-                    Text(ip.address)
-                        .font(.system(.callout, design: .monospaced))
-                        .foregroundColor(.white)
-                        .fontWeight(.medium)
+                    // Python connection card
+                    connectionStatusCard(
+                        icon: "terminal.fill",
+                        title: "Python",
+                        status: pythonConnected ? pythonIP : "Waiting...",
+                        isConnected: pythonConnected,
+                        accentColor: .green
+                    )
+                    
+                    // WebRTC connection card (only if video mode)
+                    if showVideoStatus {
+                        connectionStatusCard(
+                            icon: "video.fill",
+                            title: "WebRTC",
+                            status: webrtcConnected ? (DataManager.shared.webRTCConnectionType.isEmpty ? "Connected" : "Connected (\(DataManager.shared.webRTCConnectionType))") : "Waiting...",
+                            isConnected: webrtcConnected,
+                            accentColor: .purple
+                        )
+                    }
                 }
             }
             
-            // Connection status cards
-            HStack(spacing: 8) {
-                // Python connection card
-                connectionStatusCard(
-                    icon: "terminal.fill",
-                    title: "Python",
-                    status: pythonConnected ? pythonIP : "Waiting...",
-                    isConnected: pythonConnected,
-                    accentColor: .green
-                )
-                
-                // WebRTC connection card (only if video mode)
-                if showVideoStatus {
-                    connectionStatusCard(
-                        icon: "video.fill",
-                        title: "WebRTC",
-                        status: webrtcConnected ? "Connected" : "Waiting...",
-                        isConnected: webrtcConnected,
-                        accentColor: .purple
-                    )
+            // Cross-Network Mode: Show Room Code & Unified Status
+            if dataManager.isCrossNetworkMode {
+                // Room Code Row
+                HStack(spacing: 8) {
+                    Image(systemName: "globe")
+                        .font(.system(size: 13))
+                        .foregroundColor(.cyan.opacity(0.8))
+                    Text("Room Code")
+                        .font(.callout)
+                        .foregroundColor(.white.opacity(0.6))
+                    Spacer()
+                    Text(signalingClient.roomCode)
+                        .font(.system(.callout, design: .monospaced))
+                        .foregroundColor(.white)
+                        .fontWeight(.bold)
+                        .tracking(1)
                 }
+                
+                // Unified Status Row
+                Button {
+                    if !signalingClient.isConnected {
+                        dlog("🔄 [StatusView] Manual retry connection tapped")
+                        signalingClient.connect()
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "antenna.radiowaves.left.and.right")
+                            .font(.system(size: 13))
+                            .foregroundColor(signalingClient.peerConnected ? .green : (signalingClient.isConnected ? .orange : .red))
+                        Text("Status")
+                            .font(.callout)
+                            .foregroundColor(.white.opacity(0.6))
+                        Spacer()
+                        
+                        if signalingClient.peerConnected {
+                            let type = DataManager.shared.webRTCConnectionType
+                            let statusText = type.isEmpty ? "Connected" : "Connected (\(type))"
+                            Text(statusText)
+                                .font(.callout)
+                                .foregroundColor(.green)
+                                .fontWeight(.medium)
+                        } else if signalingClient.isConnected {
+                            HStack(spacing: 4) {
+                                ProgressView()
+                                    .scaleEffect(0.5)
+                                    .frame(width: 12, height: 12)
+                                Text("Waiting for Peer...")
+                                    .font(.callout)
+                                    .foregroundColor(.white.opacity(0.7))
+                            }
+                        } else {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.caption)
+                                Text("Disconnected (Retry)")
+                                    .font(.callout)
+                            }
+                            .foregroundColor(.red)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                
+                // Instructions (subtle)
+                Text("Share code with Python client")
+                    .font(.caption2)
+                    .foregroundColor(.white.opacity(0.4))
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, 4)
             }
         }
     }
+    
+    // roomCodeSection is now inlined into networkInfoSection for simplicity
+
     
     private func connectionStatusCard(icon: String, title: String, status: String, isConnected: Bool, accentColor: Color) -> some View {
         VStack(alignment: .leading, spacing: 6) {

@@ -1,0 +1,21 @@
+{
+    "compilerOptions": {
+        "target": "ES2021",
+        "module": "ES2022",
+        "moduleResolution": "node",
+        "lib": [
+            "ES2021"
+        ],
+        "types": [
+            "@cloudflare/workers-types"
+        ],
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "outDir": "dist"
+    },
+    "include": [
+        "src/**/*"
+    ]
+}

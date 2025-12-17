@@ -38,6 +38,7 @@
 		C1B6715F2EE68D4000574B6F /* PersonaCaptureController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1B6715E2EE68D4000574B6F /* PersonaCaptureController.swift */; };
 		C1C7672D2EF1CBB90020844F /* CustomImageStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1C7672C2EF1CBB90020844F /* CustomImageStorage.swift */; };
 		C1C7672F2EF1F0E20020844F /* AccessoryTrackingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1C7672E2EF1F0E20020844F /* AccessoryTrackingManager.swift */; };
+		C1C767312EF220010020844F /* SignalingClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1C767302EF220010020844F /* SignalingClient.swift */; };
 		C1DA80C42ECE377600B55CC2 /* StatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1DA80C32ECE377600B55CC2 /* StatusView.swift */; };
 		C1DA80C72ECE8C6F00B55CC2 /* ViewControlSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1DA80C62ECE8C6F00B55CC2 /* ViewControlSettings.swift */; };
 		C1DA80DC2ED0F61D00B55CC2 /* RealityKitContent in Frameworks */ = {isa = PBXBuildFile; productRef = C1DA80DB2ED0F61D00B55CC2 /* RealityKitContent */; };
@@ -120,6 +121,7 @@
 		C1B6715E2EE68D4000574B6F /* PersonaCaptureController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonaCaptureController.swift; sourceTree = "<group>"; };
 		C1C7672C2EF1CBB90020844F /* CustomImageStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomImageStorage.swift; sourceTree = "<group>"; };
 		C1C7672E2EF1F0E20020844F /* AccessoryTrackingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessoryTrackingManager.swift; sourceTree = "<group>"; };
+		C1C767302EF220010020844F /* SignalingClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalingClient.swift; sourceTree = "<group>"; };
 		C1DA80C32ECE377600B55CC2 /* StatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusView.swift; sourceTree = "<group>"; };
 		C1DA80C52ECE821800B55CC2 /* VisionProTeleop.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VisionProTeleop.entitlements; sourceTree = "<group>"; };
 		C1DA80C62ECE8C6F00B55CC2 /* ViewControlSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewControlSettings.swift; sourceTree = "<group>"; };
@@ -250,6 +252,7 @@
 				C1E05F792ECD850B0018C506 /* ImageData.swift */,
 				C1EAF9762ED7EC9000549580 /* CombinedStreamingView.swift */,
 				C1C7672E2EF1F0E20020844F /* AccessoryTrackingManager.swift */,
+				C1C767302EF220010020844F /* SignalingClient.swift */,
 				C1E05F7A2ECD850B0018C506 /* ImmersiveView.swift */,
 				C1E05F7B2ECD850B0018C506 /* WebRTCClient.swift */,
 				C1EAF97E2EDBB9C700549580 /* RecordingManager.swift */,
@@ -469,6 +472,7 @@
 				1642FAB52B4D54A60084F9ED /* 🛠️SettingPanel.swift in Sources */,
 				C1B6714D2EE220EF00574B6F /* GoogleDriveAuthManager.swift in Sources */,
 				16253CFB2B4E2FCB0028F0E2 /* 📏Unit.swift in Sources */,
+				C1C767312EF220010020844F /* SignalingClient.swift in Sources */,
 				C1B6715F2EE68D4000574B6F /* PersonaCaptureController.swift in Sources */,
 				165ADB512B4B71B0008A756F /* ContentView.swift in Sources */,
 				16EE5E9B2B576DB000D354ED /* 🧩Model.swift in Sources */,

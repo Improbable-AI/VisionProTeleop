@@ -1,0 +1,15 @@
+name = "visionpro-signaling"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+[durable_objects]
+bindings = [
+  { name = "ROOMS", class_name = "SignalingRoom" }
+]
+
+[vars]
+CF_TURN_KEY_ID = "ef24f8df718b5a6cad243268f4ecf353"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["SignalingRoom"]

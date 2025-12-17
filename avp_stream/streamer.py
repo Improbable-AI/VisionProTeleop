@@ -794,17 +794,23 @@ def _create_processed_video_track_class(streamer_instance):
 
 class VisionProStreamer:
 
-    def __init__(self, ip, record=True, ht_backend="grpc", benchmark_quiet=False, verbose=False, origin="avp"):
+    def __init__(self, ip=None, room=None, record=True, ht_backend="grpc", benchmark_quiet=False, verbose=False, origin="avp", signaling_url=None):
         """Initialize the VisionProStreamer.
 
         Parameters
         ----------
-        ip : str
-            Vision Pro IP address (shown inside the Tracking Streamer app – pick the wired one when using `setup-avp-wired`).
+        ip : str, optional
+            Vision Pro IP address for same-network connection via gRPC.
+            Required if `room` is not specified.
+        room : str, optional
+            Room code for cross-network connection via WebRTC signaling.
+            Get this code from the Vision Pro app's UI.
+            Cannot be used together with `ip`.
         record : bool, default True
             If True, every processed hand tracking sample is appended to an internal list retrievable via `get_recording()`.
         ht_backend : {"grpc","webrtc"}, default "grpc"
             Transport used for hand tracking. Use "webrtc" for lower latency after a WebRTC session is established.
+            Note: When using `room=` mode, hand tracking always uses WebRTC.
         benchmark_quiet : bool, default False
             Suppress benchmark printouts (see latency measurements in `latency_test.py`).
         verbose : bool, default False
@@ -814,16 +820,50 @@ class VisionProStreamer:
             - "avp": Hand tracking in Vision Pro's native coordinate frame (default).
             - "sim": Hand tracking relative to the simulation's attach_to position.
               Useful when you want hand positions in the same frame as your MuJoCo scene.
+        signaling_url : str, optional
+            Custom signaling server URL for cross-network mode.
+            Default: "wss://visionpro-signaling.<your-subdomain>.workers.dev/ws"
 
         Notes
         -----
-        Instantiates background threads immediately: (1) gRPC hand tracking stream and (2) HTTP info server for WebRTC discovery.
+        When using `ip=`: Instantiates gRPC hand tracking stream and HTTP info server (same-network mode).
+        When using `room=`: Connects to signaling server for cross-network WebRTC connection.
+        
+        Examples
+        --------
+        Same-network (existing behavior)::
+        
+            streamer = VisionProStreamer(ip="192.168.1.100")
+        
+        Cross-network (new)::
+        
+            streamer = VisionProStreamer(room="ABC-1234")
         """
+        
+        # Validate mutually exclusive parameters
+        if ip and room:
+            raise ValueError("Specify either ip= (same-network) or room= (cross-network), not both")
+        if not ip and not room:
+            raise ValueError("Must specify either ip= (same-network) or room= (cross-network)")
+        
+        # Determine connection mode
+        self._cross_network_mode = room is not None
+        self._room_code = room
+        self._signaling_url = signaling_url or "wss://visionpro-signaling.parkyh9492.workers.dev/ws"
+        self._signaling_ws = None
+        self._signaling_connected = False
+        self._peer_ready = False  # Track if VisionOS peer has joined
 
-        # Vision Pro IP 
+        # Vision Pro IP (only used in same-network mode)
         self.ip = ip
         self.record = record 
-        self.ht_backend = ht_backend.lower()
+        
+        # In cross-network mode, always use WebRTC for hand tracking
+        if self._cross_network_mode:
+            self.ht_backend = "webrtc"
+        else:
+            self.ht_backend = ht_backend.lower()
+            
         self.verbose = verbose
         self.origin = origin.lower()
         if self.ht_backend not in {"grpc", "webrtc"}:
@@ -856,6 +896,7 @@ class VisionProStreamer:
         self._webrtc_connected = False  # WebRTC ICE connection established
         self._webrtc_connection_condition = Condition()  # For blocking wait
         self._webrtc_loop = None  # Event loop for WebRTC thread
+        self._webrtc_thread = None # Thread object for WebRTC event loop
         self._benchmark_epoch = time.perf_counter()
         self._benchmark_condition = Condition()
         self._benchmark_events = {}
@@ -898,8 +939,15 @@ class VisionProStreamer:
         self._stylus_data: Optional[Dict[str, Any]] = None  # Full stylus data dict
         self._stylus_lock = Lock()
 
-        self._start_info_server()  # Start HTTP endpoint immediately
-        self._start_hand_tracking()  # Start hand tracking stream
+        # Start connection based on mode
+        if self._cross_network_mode:
+            self._log(f"[CROSS-NETWORK] Using room code: {room}", force=True)
+            self._log(f"[CROSS-NETWORK] Signaling server: {self._signaling_url}", force=True)
+            # Defer connection until stream() or start_webrtc() is called
+            # This allows configure_video() / configure_audio() to be called first
+        else:
+            self._start_info_server()  # Start HTTP endpoint immediately
+            self._start_hand_tracking()  # Start hand tracking stream
     
     def _log(self, message: str, force: bool = False):
         """Print a message if verbose mode is enabled or force is True.
@@ -1282,6 +1330,404 @@ class VisionProStreamer:
         self._log(' == DATA IS FLOWING IN! ==', force=True)
         self._log('Ready to start streaming.') 
 
+    def _start_signaling_connection(self):
+        """Start the cross-network signaling connection in a background thread.
+        
+        Note: This only establishes the signaling connection. The actual WebRTC
+        offer creation happens later when serve()/start_webrtc() is called,
+        ensuring video/audio configuration is complete before creating the offer.
+        """
+        signaling_thread = Thread(target=self._signaling_loop, daemon=True)
+        signaling_thread.start()
+        
+        self._ice_servers = None  # Initialize ICE servers storage
+        
+        self._log('[CROSS-NETWORK] Connecting to signaling server...', force=True)
+        
+        # Wait for signaling connection
+        retry_count = 0
+        while not self._signaling_connected:
+            time.sleep(0.1)
+            retry_count += 1
+            if retry_count > 100:  # 10 seconds timeout
+                self._log('[CROSS-NETWORK] WARNING: Still waiting for signaling connection...', force=True)
+                retry_count = 0
+        
+        self._log('[CROSS-NETWORK] Signaling connected.', force=True)
+        self._log('[CROSS-NETWORK] Call configure_video()/configure_mujoco() then start_webrtc() to begin streaming.', force=True)
+
+
+    def _signaling_loop(self):
+        """Background thread that maintains the signaling server connection."""
+        import websocket
+        
+        def on_open(ws):
+            self._log('[SIGNALING] WebSocket connected', force=True)
+            self._signaling_ws = ws
+            self._signaling_connected = True
+            
+            # Join the room
+            join_msg = json.dumps({
+                "type": "join",
+                "room": self._room_code,
+                "role": "python"
+            })
+            ws.send(join_msg)
+            self._log(f'[SIGNALING] Joining room: {self._room_code}')
+            
+            # Request ICE servers
+            ice_req = json.dumps({"type": "request-ice"})
+            ws.send(ice_req)
+            self._log('[SIGNALING] Requested ICE servers')
+        
+        def on_message(ws, message):
+            try:
+                data = json.loads(message)
+                msg_type = data.get("type")
+                
+                if msg_type == "joined":
+                    peers_count = data.get("peersInRoom", 0)
+                    self._log(f'[SIGNALING] Joined room with {peers_count} peer(s)', force=True)
+                    
+                    # If VisionOS is already in the room, mark it as ready
+                    if peers_count > 1:
+                        self._log('[SIGNALING] VisionOS already in room, ready for streaming', force=True)
+                        self._peer_ready = True
+                
+                elif msg_type == "peer-joined":
+                    peer_role = data.get("peerRole", "unknown")
+                    self._log(f'[SIGNALING] Peer joined: {peer_role}', force=True)
+                    # Mark peer as ready - offer will be created when serve() is called
+                    self._peer_ready = True
+                    self._log('[SIGNALING] Peer ready, waiting for start_webrtc() to initiate offer', force=True)
+                
+                elif msg_type == "peer-left":
+                    self._log('[SIGNALING] Peer left the room', force=True)
+                    self._webrtc_connected = False
+                
+                elif msg_type == "sdp":
+                    sdp = data.get("sdp")
+                    sdp_type = data.get("sdpType")
+                    if sdp_type == "offer":
+                        # We now create offers, so receiving one is unexpected
+                        self._log('[SIGNALING] Warning: Received unexpected SDP offer (Python is offerer)', force=True)
+                    elif sdp_type == "answer":
+                        self._log('[SIGNALING] Received SDP answer from VisionOS', force=True)
+                        self._handle_signaling_answer(sdp)
+                
+                elif msg_type == "ice":
+                    candidate = data.get("candidate")
+                    self._log(f'[SIGNALING] Received ICE candidate')
+                    self._handle_signaling_ice_candidate(candidate)
+                
+                elif msg_type == "error":
+                    self._log(f'[SIGNALING] Error: {data.get("message")}', force=True)
+                
+                elif msg_type == "ice-servers":
+                    servers = data.get("servers")
+                    self._log(f'[SIGNALING] Received {len(servers)} ICE servers')
+                    self._ice_servers = servers
+                
+                elif msg_type == "pong":
+                    pass  # Keepalive response
+                    
+            except json.JSONDecodeError:
+                self._log(f'[SIGNALING] Invalid JSON message: {message}', force=True)
+        
+        def on_error(ws, error):
+            self._log(f'[SIGNALING] WebSocket error: {error}', force=True)
+            self._signaling_connected = False
+        
+        def on_close(ws, close_status_code, close_msg):
+            self._log(f'[SIGNALING] WebSocket closed: {close_status_code} {close_msg}', force=True)
+            self._signaling_connected = False
+            self._signaling_ws = None
+        
+        # Connect to signaling server with retry
+        while True:
+            try:
+                ws = websocket.WebSocketApp(
+                    self._signaling_url,
+                    on_open=on_open,
+                    on_message=on_message,
+                    on_error=on_error,
+                    on_close=on_close
+                )
+                ws.run_forever(ping_interval=30, ping_timeout=10)
+            except Exception as e:
+                self._log(f'[SIGNALING] Connection error: {e}', force=True)
+            
+            # Retry after delay
+            self._log('[SIGNALING] Reconnecting in 5 seconds...', force=True)
+            time.sleep(5)
+
+    async def _create_webrtc_offer_signaling(self):
+        """Create WebRTC offer with video/audio/sim tracks for cross-network mode.
+        
+        Python creates the offer (offerer role) - mirrors local mode pattern.
+        VisionOS will create the answer.
+        """
+        from aiortc import RTCPeerConnection, RTCSessionDescription, RTCConfiguration, RTCIceServer
+        
+        self._log('[WEBRTC] Creating WebRTC offer for cross-network mode...', force=True)
+        
+        # Create track factory classes with reference to this streamer
+        ProcessedVideoTrack = _create_processed_video_track_class(self)
+        ProcessedAudioTrack = _create_processed_audio_track_class(self)
+        
+        # Configure RTCPeerConnection
+        config = RTCConfiguration(
+            iceServers=[RTCIceServer(urls=["stun:stun.l.google.com:19302"])]
+        )
+        pc = RTCPeerConnection(configuration=config)
+        self._pc = pc
+        
+        # Helper to log ICE state
+        @pc.on("iceconnectionstatechange")
+        async def on_ice_state_change():
+            self._log(f"[WEBRTC] ICE state: {pc.iceConnectionState}", force=True)
+            if pc.iceConnectionState == "connected" or pc.iceConnectionState == "completed":
+                with self._webrtc_connection_condition:
+                    self._webrtc_connected = True
+                    self._webrtc_connection_condition.notify_all()
+            if pc.iceConnectionState in ("failed", "closed", "disconnected"):
+                with self._webrtc_connection_condition:
+                    self._webrtc_connected = False
+        
+        @pc.on("track")
+        def on_track(track):
+            self._log(f"[WEBRTC] Track received: {track.kind}")
+        
+        # Data Channels - Python creates them as offerer
+        @pc.on("datachannel")
+        def on_datachannel(channel):
+            self._log(f"[WEBRTC] Data channel received: {channel.label}")
+            if channel.label == "hand-tracking":
+                self._register_webrtc_data_channel(channel)
+            elif channel.label == "sim-poses":
+                self._register_webrtc_sim_channel(channel)
+        
+        # Send local ICE candidates via signaling
+        @pc.on("icecandidate")
+        def on_icecandidate(candidate):
+            if candidate:
+                self._send_signaling_message({
+                    "type": "ice",
+                    "candidate": {
+                        "candidate": candidate.candidate,
+                        "sdpMid": candidate.sdpMid,
+                        "sdpMLineIndex": candidate.sdpMLineIndex
+                    }
+                })
+        
+        # Create hand-tracking data channel
+        hand_channel = pc.createDataChannel("hand-tracking", ordered=True)
+        self._register_webrtc_data_channel(hand_channel)
+        self._log("[WEBRTC] Created hand-tracking data channel")
+        
+        # Create sim-poses data channel if simulation is configured
+        if self._sim_config is not None:
+            sim_channel = pc.createDataChannel(
+                "sim-poses",
+                ordered=False,
+                maxRetransmits=0,
+            )
+            self._register_webrtc_sim_channel(sim_channel)
+            self._log("[WEBRTC] Created sim-poses data channel", force=True)
+            
+            # Create USDZ transfer channel for cross-network scene loading
+            usdz_channel = pc.createDataChannel(
+                "usdz-transfer",
+                ordered=True,  # Must be ordered for file integrity
+            )
+            self._register_webrtc_usdz_channel(usdz_channel)
+            self._log("[WEBRTC] Created usdz-transfer data channel", force=True)
+        
+        # Add video track if configured (mirrors local mode serve())
+        if self._video_config is not None:
+            video_cfg = self._video_config
+            device = video_cfg.get("device")
+            fmt = video_cfg.get("format")
+            fps = video_cfg.get("fps", 30)
+            width = video_cfg.get("width", 640)
+            height = video_cfg.get("height", 480)
+            size = video_cfg.get("size", "640x480")
+            
+            try:
+                if device is None:
+                    self._log("[VIDEO] Creating synthetic video stream for cross-network...", force=True)
+                    if self.frame_callback is None:
+                        self._log("[VIDEO] Warning: No frame callback registered. Stream will be blank.", force=True)
+                else:
+                    self._log(f"[VIDEO] Opening video device: {device}...", force=True)
+                
+                processed_track = ProcessedVideoTrack(
+                    device, 
+                    fmt, 
+                    fps,
+                    (width, height),
+                    self.frame_callback
+                )
+                
+                self.camera = processed_track
+                
+                if device is None:
+                    self._log(f"[VIDEO] Synthetic video track created ({size} @ {fps}fps)", force=True)
+                else:
+                    self._log(f"[VIDEO] Camera track created for device: {device}", force=True)
+                
+                pc.addTrack(processed_track)
+                self._log("[WEBRTC] Added video track to offer", force=True)
+            except Exception as e:
+                self._log(f"[VIDEO] Error creating video track: {e}", force=True)
+                import traceback
+                traceback.print_exc()
+        
+        # Add audio track if configured
+        if self._audio_config is not None:
+            audio_cfg = self._audio_config
+            audio_device = audio_cfg.get("device")
+            audio_format = audio_cfg.get("format")
+            sample_rate = audio_cfg.get("sample_rate", 48000)
+            stereo = audio_cfg.get("stereo", False)
+            
+            try:
+                audio_track = ProcessedAudioTrack(
+                    audio_device,
+                    audio_format,
+                    self.audio_callback,
+                    stereo=stereo,
+                    sample_rate=sample_rate
+                )
+                pc.addTrack(audio_track)
+                self._log("[WEBRTC] Added audio track to offer", force=True)
+            except Exception as e:
+                self._log(f"[AUDIO] Error creating audio track: {e}", force=True)
+        
+        # Create Offer
+        offer = await pc.createOffer()
+        await pc.setLocalDescription(offer)
+        
+        # Send Offer via Signaling
+        self._send_signaling_message({
+            "type": "sdp",
+            "sdp": pc.localDescription.sdp,
+            "sdpType": "offer"
+        })
+        self._log('[SIGNALING] Sent SDP offer to VisionOS', force=True)
+        
+        # Wait for and process the answer
+        while not hasattr(self, '_pending_answer') or self._pending_answer is None:
+            await asyncio.sleep(0.1)
+        
+        answer_sdp = self._pending_answer
+        self._pending_answer = None
+        
+        self._log('[WEBRTC] Processing SDP answer from VisionOS...', force=True)
+        answer = RTCSessionDescription(sdp=answer_sdp, type="answer")
+        await pc.setRemoteDescription(answer)
+        self._log('[WEBRTC] Remote description set successfully')
+        
+        # Process any pending ICE candidates
+        if hasattr(self, '_pending_ice_candidates'):
+            for candidate in self._pending_ice_candidates:
+                await self._add_ice_candidate(candidate)
+            self._pending_ice_candidates = []
+        
+        # Scene loading will be triggered when USDZ channel opens (see _register_webrtc_usdz_channel)
+
+
+    async def _add_ice_candidate(self, candidate_dict):
+        """Add an ICE candidate to the peer connection."""
+        from aiortc import RTCIceCandidate
+        from aiortc.sdp import candidate_from_sdp
+        if not self._pc: return
+        
+        try:
+            # Parse the candidate string from the dictionary
+            cand_str = candidate_dict['candidate']
+            sdp_mid = candidate_dict.get('sdpMid')
+            sdp_mline_index = candidate_dict.get('sdpMLineIndex')
+            
+            # Use aiortc's parser to create the object from the candidate string
+            # candidate_from_sdp returns a single RTCIceCandidate object
+            candidate = candidate_from_sdp(cand_str)
+            
+            if candidate:
+                candidate.sdpMid = sdp_mid
+                candidate.sdpMLineIndex = sdp_mline_index
+                await self._pc.addIceCandidate(candidate)
+                self._log(f"[WEBRTC] Added ICE candidate: {candidate.type} {candidate.protocol} {candidate.ip}:{candidate.port}", force=True)
+                
+        except Exception as e:
+            self._log(f"[WEBRTC] Error adding ICE candidate: {e}", force=True)
+
+    def _trigger_webrtc_offer(self):
+        """Trigger WebRTC offer creation in a background thread.
+        
+        Called when VisionOS peer joins or is already in the room.
+        Python creates and sends the SDP offer.
+        """
+        # Avoid re-triggering if already connected or an offer is in progress
+        if self._webrtc_connected:
+            self._log('[WEBRTC] Already connected, skipping offer creation')
+            return
+        
+        if hasattr(self, '_offer_in_progress') and self._offer_in_progress:
+            self._log('[WEBRTC] Offer already in progress, skipping')
+            return
+        
+        self._offer_in_progress = True
+        
+        try:
+            # Start a dedicated thread for the WebRTC loop if it doesn't exist
+            if self._webrtc_thread is None or not self._webrtc_thread.is_alive():
+                def run_webrtc_loop():
+                    try:
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        self._webrtc_loop = loop
+                        loop.run_until_complete(self._create_webrtc_offer_signaling())
+                        loop.run_forever()
+                    except Exception as e:
+                        self._log(f"[WEBRTC] Error in WebRTC loop: {e}", force=True)
+                        import traceback
+                        traceback.print_exc()
+                    finally:
+                        self._offer_in_progress = False
+                
+                self._webrtc_thread = Thread(target=run_webrtc_loop, daemon=True)
+                self._webrtc_thread.start()
+            else:
+                # If loop exists, schedule it
+                asyncio.run_coroutine_threadsafe(self._create_webrtc_offer_signaling(), self._webrtc_loop)
+        except Exception as e:
+            self._log(f"[SIGNALING] Error triggering WebRTC offer: {e}", force=True)
+            self._offer_in_progress = False
+
+    def _handle_signaling_answer(self, sdp: str):
+        """Handle incoming SDP answer via signaling server."""
+        if not hasattr(self, '_pending_answer'):
+            self._pending_answer = None
+        self._pending_answer = sdp
+        self._log('[SIGNALING] Stored pending SDP answer')
+
+    def _handle_signaling_ice_candidate(self, candidate: dict):
+        """Handle incoming ICE candidate via signaling server."""
+        if not hasattr(self, '_pending_ice_candidates'):
+            self._pending_ice_candidates = []
+        self._pending_ice_candidates.append(candidate)
+        self._log(f'[SIGNALING] Stored ICE candidate (total: {len(self._pending_ice_candidates)})')
+
+    def _send_signaling_message(self, message: dict):
+        """Send a message to the signaling server."""
+        if self._signaling_ws and self._signaling_connected:
+            try:
+                self._signaling_ws.send(json.dumps(message))
+            except Exception as e:
+                self._log(f'[SIGNALING] Failed to send message: {e}', force=True)
+        else:
+            self._log('[SIGNALING] Cannot send message: not connected', force=True)
 
     def stream(self): 
 
@@ -2880,14 +3326,23 @@ class VisionProStreamer:
 
     
     def _load_and_send_scene(self):
-        """Load USDZ scene and send to VisionPro via gRPC.
+        """Load USDZ scene and send to VisionPro.
         
         Handles both MuJoCo and Isaac Lab scenes based on which configure_* was called.
+        
+        In local mode: Uses gRPC for fast, reliable transfer.
+        In cross-network mode: Uses WebRTC data channel for NAT traversal.
         """
         if self._sim_config is None:
             return False
         
         attach_to = self._sim_config["attach_to"]
+        
+        # Cross-network mode: Use WebRTC data channel for USDZ transfer
+        if self._cross_network_mode:
+            return self._load_and_send_scene_webrtc(attach_to)
+        
+        # Local mode: Use gRPC
         grpc_port = self._sim_config["grpc_port"]
         
         # Check if this is an Isaac Lab scene
@@ -2899,6 +3354,208 @@ class VisionProStreamer:
         else:
             # MuJoCo: convert XML to USDZ
             return self._load_and_send_mujoco_scene(attach_to, grpc_port)
+    
+    def _load_and_send_scene_webrtc(self, attach_to) -> bool:
+        """Send USDZ scene via WebRTC data channel for cross-network mode.
+        
+        Uses a dedicated data channel to transfer the USDZ file in chunks.
+        This works across NAT/firewalls since WebRTC connection is already established.
+        """
+        import tempfile
+        import hashlib
+        import json
+        import struct
+        
+        is_isaac = self._sim_config.get("type") == "isaac"
+        
+        # Get or generate the USDZ file path (using existing caching logic)
+        if is_isaac:
+            # Isaac Lab: export to cached USDZ
+            if self._isaac_stage is None or self._isaac_config is None:
+                self._log("[USDZ-WEBRTC] Error: No Isaac stage configured", force=True)
+                return False
+            
+            cache_key = self._compute_isaac_cache_key()
+            cache_dir = os.path.join(tempfile.gettempdir(), "isaac_usdz_cache")
+            os.makedirs(cache_dir, exist_ok=True)
+            usdz_path = os.path.join(cache_dir, f"isaac_scene_{cache_key}.usdz")
+            
+            force_reload = self._isaac_config.get("force_reload", False)
+            if force_reload or not os.path.exists(usdz_path):
+                self._log("[USDZ-WEBRTC] Exporting Isaac stage to USDZ...", force=True)
+                try:
+                    from avp_stream.utils.isaac_usdz_export import export_stage_to_usdz
+                    include_ground = self._isaac_config.get("include_ground", False)
+                    env_indices = self._isaac_config.get("env_indices")
+                    usdz_path = export_stage_to_usdz(
+                        stage=self._isaac_stage,
+                        output_path=usdz_path,
+                        include_ground=include_ground,
+                        env_indices=env_indices,
+                    )
+                except Exception as e:
+                    self._log(f"[USDZ-WEBRTC] Error exporting Isaac: {e}", force=True)
+                    return False
+        else:
+            # MuJoCo: convert to cached USDZ
+            xml_path = self._sim_config["xml_path"]
+            force_reload = self._sim_config.get("force_reload", False)
+            
+            with open(xml_path, 'rb') as f:
+                xml_content = f.read()
+            xml_hash = hashlib.sha256(xml_content).hexdigest()[:16]
+            
+            cache_dir = os.path.join(tempfile.gettempdir(), "mujoco_usdz_cache")
+            os.makedirs(cache_dir, exist_ok=True)
+            usdz_path = os.path.join(cache_dir, f"mujoco_scene_{xml_hash}.usdz")
+            
+            if force_reload or not os.path.exists(usdz_path):
+                self._log("[USDZ-WEBRTC] Converting MuJoCo XML to USDZ...", force=True)
+                try:
+                    usdz_path = self._convert_to_usdz(xml_path, output_path=usdz_path)
+                    self._log(f"[USDZ-WEBRTC] Converted: {usdz_path}", force=True)
+                except Exception as e:
+                    self._log(f"[USDZ-WEBRTC] Local conversion failed: {e}, trying external...", force=True)
+                    # Try external converter
+                    try:
+                        from avp_stream.mujoco_msg.upload_xml import convert_and_download
+                        from pathlib import Path
+                        usdz_path = convert_and_download(
+                            server="http://mujoco-usd-convert.xyz",
+                            scene_xml=Path(xml_path),
+                            out_dir=Path(cache_dir)
+                        )
+                        self._log(f"[USDZ-WEBRTC] External conversion succeeded: {usdz_path}", force=True)
+                    except Exception as e2:
+                        self._log(f"[USDZ-WEBRTC] Error converting MuJoCo: {e2}", force=True)
+                        return False
+        
+        # Read USDZ file
+        if not os.path.exists(usdz_path):
+            self._log(f"[USDZ-WEBRTC] Error: USDZ file not found: {usdz_path}", force=True)
+            return False
+        
+        with open(usdz_path, 'rb') as f:
+            usdz_data = f.read()
+        
+        filename = os.path.basename(usdz_path)
+        total_size = len(usdz_data)
+        chunk_size = 16 * 1024  # 16KB chunks
+        total_chunks = (total_size + chunk_size - 1) // chunk_size
+        
+        self._log(f"[USDZ-WEBRTC] Sending {total_size/1024/1024:.2f} MB in {total_chunks} chunks", force=True)
+        
+        # Check if usdz-transfer channel exists and is open
+        if not hasattr(self, '_webrtc_usdz_channel') or self._webrtc_usdz_channel is None:
+            self._log("[USDZ-WEBRTC] Error: USDZ transfer channel not available", force=True)
+            return False
+        
+        channel = self._webrtc_usdz_channel
+        
+        if channel.readyState != "open":
+            self._log(f"[USDZ-WEBRTC] Error: Channel not open (state: {channel.readyState})", force=True)
+            return False
+        
+        self._log("[USDZ-WEBRTC] Channel is open, starting transfer...", force=True)
+        
+        # Prepare attach_to metadata
+        attach_position = None
+        attach_rotation = None
+        if attach_to:
+            attach_position = list(attach_to[:3])  # [x, y, z]
+            quat_wxyz = attach_to[3:]
+            attach_rotation = [quat_wxyz[1], quat_wxyz[2], quat_wxyz[3], quat_wxyz[0]]  # wxyz -> xyzw
+        
+        # Send metadata message (JSON)
+        metadata = {
+            "type": "metadata",
+            "filename": filename,
+            "totalSize": total_size,
+            "totalChunks": total_chunks,
+            "attachPosition": attach_position,
+            "attachRotation": attach_rotation,
+        }
+        
+        # Use call_soon_threadsafe since we're in a background thread
+        def send_message(msg):
+            if self._webrtc_loop is not None:
+                self._webrtc_loop.call_soon_threadsafe(channel.send, msg)
+            else:
+                channel.send(msg)
+        
+        send_message(json.dumps(metadata))
+        self._log(f"[USDZ-WEBRTC] Sent metadata for {filename}", force=True)
+        
+        # Send data chunks (binary: 4-byte index + chunk data)
+        for i in range(total_chunks):
+            start = i * chunk_size
+            end = min(start + chunk_size, total_size)
+            chunk_data = usdz_data[start:end]
+            
+            # Pack chunk index as 4-byte big-endian + chunk data
+            chunk_message = struct.pack('>I', i) + chunk_data
+            send_message(chunk_message)
+            
+            if (i + 1) % 50 == 0 or i == total_chunks - 1:
+                progress = (i + 1) / total_chunks * 100
+                self._log(f"[USDZ-WEBRTC] Sent chunk {i+1}/{total_chunks} ({progress:.1f}%)", force=True)
+        
+        self._log("[USDZ-WEBRTC] All chunks sent, waiting for acknowledgment...", force=True)
+        
+        # Wait for acknowledgment (stored by channel message handler)
+        self._usdz_transfer_complete = False
+        max_wait = 30  # seconds
+        waited = 0
+        while not self._usdz_transfer_complete and waited < max_wait:
+            import time
+            time.sleep(0.1)
+            waited += 0.1
+        
+        if self._usdz_transfer_complete:
+            self._log("[USDZ-WEBRTC] Transfer completed successfully!", force=True)
+            return True
+        else:
+            self._log("[USDZ-WEBRTC] Warning: No acknowledgment received (timeout)", force=True)
+            return True  # Still return True as data was sent
+    
+    def _register_webrtc_usdz_channel(self, channel):
+        """Register the USDZ transfer data channel and its handlers."""
+        import json
+        
+        self._webrtc_usdz_channel = channel
+        self._usdz_channel_ready = False
+        
+        @channel.on("open")
+        def on_open():
+            self._log("[USDZ-WEBRTC] Transfer channel opened", force=True)
+            self._usdz_channel_ready = True
+            
+            # Trigger USDZ transfer now that channel is open
+            if self._sim_config is not None and not getattr(self, '_usdz_sent', False):
+                import threading
+                
+                def send_usdz_delayed():
+                    import time
+                    time.sleep(0.3)  # Small delay for channel stabilization
+                    self._log("[USDZ-WEBRTC] Triggering USDZ transfer...", force=True)
+                    if self._load_and_send_scene_webrtc(self._sim_config.get("attach_to")):
+                        self._usdz_sent = True
+                
+                threading.Thread(target=send_usdz_delayed, daemon=True).start()
+        
+        @channel.on("message")
+        def on_message(message):
+            # Handle acknowledgment from VisionOS
+            try:
+                if isinstance(message, str):
+                    data = json.loads(message)
+                    if data.get("type") == "complete":
+                        self._log(f"[USDZ-WEBRTC] VisionOS loaded scene: {data.get('path')}", force=True)
+                        self._usdz_transfer_complete = True
+                    elif data.get("type") == "error":
+                        self._log(f"[USDZ-WEBRTC] VisionOS error: {data.get('message')}", force=True)
+            except Exception as e:
+                self._log(f"[USDZ-WEBRTC] Error parsing message: {e}")
     
     def _compute_isaac_cache_key(self) -> str:
         """Compute a hash key for the current Isaac configuration for USDZ caching.
@@ -3240,6 +3897,36 @@ class VisionProStreamer:
         """
         self._webrtc_port = port
         
+        # Cross-network mode: trigger WebRTC offer creation
+        # (Video/audio/sim is now configured, so offer will include tracks)
+        if self._cross_network_mode:
+            self._log("[CROSS-NETWORK] Starting WebRTC streaming...", force=True)
+            
+            # Check if anything is configured
+            if self._video_config is None and self._audio_config is None and self._sim_config is None:
+                self._log("[CONFIG] Warning: No video/audio/simulation configured. Call configure_*() first.", force=True)
+                return
+            
+            # Trigger offer creation (will include video/audio/sim tracks)
+            self._log("[CROSS-NETWORK] Creating WebRTC offer with configured tracks...", force=True)
+            self._trigger_webrtc_offer()
+            
+            # Wait for WebRTC connection if not already connected
+            if not self._webrtc_connected:
+                self._log("[CROSS-NETWORK] Waiting for WebRTC connection...", force=True)
+                retry_count = 0
+                while not self._webrtc_connected:
+                    time.sleep(0.1)
+                    retry_count += 1
+                    if retry_count > 100:  # 10 seconds
+                        self._log("[CROSS-NETWORK] Still waiting for WebRTC connection...", force=True)
+                        retry_count = 0
+            
+            self._log("[CROSS-NETWORK] WebRTC signaling flow started.", force=True)
+            return
+        
+        # Local mode: start TCP server and wait for VisionOS connection
+        
         # Start simulation streaming if configured
         if self._sim_config is not None:
             self._log("[SIM] Starting MuJoCo simulation streaming...")
@@ -3321,9 +4008,21 @@ class VisionProStreamer:
                 streamer_instance._log(f"[WEBRTC] VisionOS client connected from {client_addr}", force=True)
                 
                 # Configure RTCPeerConnection for low latency
-                config = RTCConfiguration(
-                    iceServers=[RTCIceServer(urls=["stun:stun.l.google.com:19302"])]
-                )
+                # Configure RTCPeerConnection for low latency
+                ice_servers = []
+                if streamer_instance._ice_servers:
+                    streamer_instance._log(f"[WEBRTC] Using {len(streamer_instance._ice_servers)} custom ICE servers from signaling")
+                    for s in streamer_instance._ice_servers:
+                        ice_servers.append(RTCIceServer(
+                            urls=s.get("urls"),
+                            username=s.get("username"),
+                            credential=s.get("credential")
+                        ))
+                else:
+                    streamer_instance._log("[WEBRTC] Warning: No custom ICE servers, falling back to Google STUN")
+                    ice_servers = [RTCIceServer(urls=["stun:stun.l.google.com:19302"])]
+
+                config = RTCConfiguration(iceServers=ice_servers)
                 pc = RTCPeerConnection(configuration=config)
                 
                 @pc.on("iceconnectionstatechange")
@@ -3491,6 +4190,59 @@ class VisionProStreamer:
                 await pc.setRemoteDescription(answer)
                 streamer_instance._log("[WEBRTC] Connection established!", force=True)
                 
+                # Start stats monitoring
+                async def monitor_stats():
+                    while True:
+                        try:
+                            await asyncio.sleep(5)
+                            if pc.connectionState in ["closed", "failed"]:
+                                break
+                                
+                            stats = await pc.getStats()
+                            active_pair = None
+                            
+                            # Find the active candidate pair
+                            for report in stats.values():
+                                if report.type == "transport":
+                                    selected_pair_id = getattr(report, "selectedCandidatePairId", None)
+                                    if selected_pair_id:
+                                        active_pair = stats.get(selected_pair_id)
+                                        break
+                            
+                            if active_pair:
+                                local_candidate = stats.get(active_pair.localCandidateId)
+                                remote_candidate = stats.get(active_pair.remoteCandidateId)
+                                
+                                if local_candidate and remote_candidate:
+                                    local_type = getattr(local_candidate, "candidateType", "unknown")
+                                    remote_type = getattr(remote_candidate, "candidateType", "unknown")
+                                    protocol = getattr(local_candidate, "protocol", "unknown").upper()
+                                    
+                                    # Determine simplified connection type
+                                    # relay = TURN
+                                    # srflx = STUN (Server Reflexive)
+                                    # prflx = STUN (Peer Reflexive)
+                                    # host = Local/Direct
+                                    
+                                    conn_type = "UNKNOWN"
+                                    if local_type == "relay" or remote_type == "relay":
+                                        conn_type = "TURN (Relay)"
+                                    elif local_type in ["srflx", "prflx"] or remote_type in ["srflx", "prflx"]:
+                                        conn_type = "STUN (P2P)"
+                                    elif local_type == "host" and remote_type == "host":
+                                        conn_type = "Direct (Host)"
+                                    
+                                    streamer_instance._log(
+                                        f"[STATS] Connected via {conn_type} "
+                                        f"({local_type} <-> {remote_type} over {protocol})"
+                                    )
+                        except Exception as e:
+                            streamer_instance._log(f"[STATS] Error monitoring stats: {e}")
+                            # Don't crash the loop
+                            await asyncio.sleep(5)
+
+                asyncio.create_task(monitor_stats())
+
                 # Keep connection alive
                 try:
                     while True:
@@ -3566,11 +4318,23 @@ class VisionProStreamer:
             else:
                 print("Timeout waiting for VisionOS connection")
         """
-        self.serve(port=port)
-        
-        if blocking:
-            return self.wait_for_connection(timeout=timeout)
-        return True
+        if self._cross_network_mode:
+            # In cross-network mode, start signaling if not already active
+            if not self._signaling_connected and not (self._signaling_ws and self._signaling_ws.keep_running):
+                self._start_signaling_connection()
+            
+            # Call serve() to trigger WebRTC offer creation with configured tracks
+            self.serve(port=port)
+            
+            if blocking:
+                return self.wait_for_connection(timeout=timeout)
+            return True
+        else:
+            self.serve(port=port)
+            
+            if blocking:
+                return self.wait_for_connection(timeout=timeout)
+            return True
 
     def wait_for_sim_channel(self, timeout: float = 30.0) -> bool:
         """
@@ -3597,11 +4361,29 @@ class VisionProStreamer:
             return False
         
         start_time = time.time()
+        
+        # Wait for sim channel to open
         while not self._webrtc_sim_ready:
             if time.time() - start_time > timeout:
                 self._log(f"[WEBRTC] Warning: Timeout waiting for sim-poses channel (waited {timeout}s)", force=True)
                 return False
             time.sleep(0.1)
+            
+        # In cross-network mode, also wait for USDZ transfer to complete
+        if self._cross_network_mode:
+            self._log("[USDZ-WEBRTC] Waiting for USDZ transfer to complete...", force=True)
+            # Use remaining time from timeout
+            elapsed = time.time() - start_time
+            remaining = max(0.1, timeout - elapsed)
+            wait_usdz_start = time.time()
+            
+            while not getattr(self, '_usdz_transfer_complete', False):
+                if time.time() - wait_usdz_start > remaining:
+                    self._log(f"[USDZ-WEBRTC] Warning: Timeout waiting for USDZ transfer (waited {remaining:.1f}s)", force=True)
+                    return False
+                time.sleep(0.1)
+            
+            self._log("[USDZ-WEBRTC] Transfer complete and confirmed!", force=True)
         
         return True
 
@@ -3868,8 +4650,16 @@ class VisionProStreamer:
                 stereo=stereo_audio,
             )
         
-        # Start the WebRTC server
-        self.serve(port=port)
+        if self._cross_network_mode:
+            # If not already connected (e.g. via start_webrtc), connect now
+            if not self._signaling_connected and not (self._signaling_ws and self._signaling_ws.keep_running):
+                self._start_signaling_connection()
+            
+            self._log('[CROSS-NETWORK] Signaling started. WebRTC handshake will proceed automatically.', force=True)
+            return
+        else:
+            # Start the video streaming server (WebRTC)
+            asyncio.run(self.start_async_server(self._webrtc_port))
     
     def _send_webrtc_info_via_grpc(self, host, port, stereo_video=False, stereo_audio=False, audio_enabled=False, video_enabled=False, sim_enabled=False):
         """Send WebRTC server info to VisionOS by opening a new gRPC connection."""

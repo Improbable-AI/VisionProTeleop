@@ -34,6 +34,9 @@ struct ContentView: View {
     @StateObject private var googleAuthManager = GoogleDriveAuthManager.shared
     @StateObject private var dropboxAuthManager = DropboxAuthManager.shared
     @ObservedObject private var cloudStorageSettings = CloudStorageSettings.shared
+
+    @ObservedObject private var signalingClient = SignalingClient.shared
+    @ObservedObject private var dataManager = DataManager.shared
     
     /// Check if user opted out of sign-in prompt
     private var dontShowSignInAgain: Bool {
@@ -160,6 +163,13 @@ struct ContentView: View {
     
     private func proceedToImmersiveSpace() {
         Task {
+            // If in Remote mode, connect to signaling server first
+            if dataManager.isCrossNetworkMode {
+                signalingClient.connect()
+                // Store the room code in DataManager so it can be used by VideoStreamManager
+                DataManager.shared.crossNetworkRoomCode = signalingClient.roomCode
+            }
+            
             await self.openImmersiveSpace(id: "combinedStreamSpace")
             self.dismissWindow()
         }
@@ -278,27 +288,116 @@ struct ContentView: View {
             }
             .padding(.top, 16)
             
-            VStack(spacing: 12) {
-                // IP Addresses in a clean card layout
-                IPAddressCard(addresses: getIPAddresses())
-                
-                // Server status
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(serverReady ? Color.green : Color.orange)
-                        .frame(width: 12, height: 12)
-                        .shadow(color: serverReady ? Color.green.opacity(0.6) : Color.orange.opacity(0.6), radius: 6)
-                    Text(serverReady ? "gRPC Server Ready" : "Starting gRPC Server...")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundColor(serverReady ? .green : .orange)
-                }
-                .onAppear {
-                    // Poll for server ready status
-                    Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { timer in
-                        serverReady = DataManager.shared.grpcServerReady
-                        if serverReady {
-                            timer.invalidate()
+            // Connection Mode Toggle + Info
+            VStack(spacing: 16) {
+                // Mode toggle (Local / Remote)
+                HStack(spacing: 0) {
+
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            dataManager.isCrossNetworkMode = false
                         }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "wifi")
+                                .font(.headline)
+                            Text("Local")
+                                .font(.headline)
+                        }
+                        .foregroundColor(!dataManager.isCrossNetworkMode ? .white : .white.opacity(0.5))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(!dataManager.isCrossNetworkMode ? Color.blue.opacity(0.6) : Color.clear)
+                        )
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            dataManager.isCrossNetworkMode = true
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "globe")
+                                .font(.headline)
+                            Text("Remote")
+                                .font(.headline)
+                        }
+                        .foregroundColor(dataManager.isCrossNetworkMode ? .white : .white.opacity(0.5))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(dataManager.isCrossNetworkMode ? Color.cyan.opacity(0.6) : Color.clear)
+                        )
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+                .frame(height: 54) // Enforce fixed height on the container
+                .padding(4)
+                .background(Color.white.opacity(0.1))
+                .cornerRadius(16)
+                .frame(width: 300) // Fixed width for the toggle container
+                
+                // Connection info based on mode
+                if dataManager.isCrossNetworkMode {
+                    // Remote mode - show room code
+                    VStack(spacing: 8) {
+                        HStack(spacing: 12) {
+                            Text(signalingClient.roomCode)
+                                .font(.system(size: 32, weight: .bold, design: .monospaced))
+                                .foregroundColor(.white)
+                                .tracking(2)
+                            
+                            Button {
+                                signalingClient.generateRoomCode()
+                            } label: {
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.body)
+                                    .foregroundColor(.white.opacity(0.5))
+                                    .padding(8)
+                                    .background(Color.white.opacity(0.1))
+                                    .cornerRadius(8)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        
+                        Text("Python: VisionProStreamer(room=\"\(signalingClient.roomCode)\")")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.5))
+                    }
+                    .frame(height: 80) // Fixed height to prevent layout jump
+                } else {
+                    // Local mode - show IP addresses
+                    // Wrap in specific frame to match remote mode height roughly
+                    VStack {
+                         IPAddressCard(addresses: getIPAddresses())
+                    }
+                    .frame(minHeight: 80)
+                }
+                
+                // Server status - ONLY SHOW IN LOCAL MODE
+                if !dataManager.isCrossNetworkMode {
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(serverReady ? Color.green : Color.orange)
+                            .frame(width: 12, height: 12)
+                            .shadow(color: serverReady ? Color.green.opacity(0.6) : Color.orange.opacity(0.6), radius: 6)
+                        Text(serverReady ? "gRPC Server Ready" : "Starting gRPC Server...")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundColor(serverReady ? .green : .orange)
+                    }
+                    .transition(.opacity) // Smooth fade in/out
+                }
+            }
+            .onAppear {
+                // Poll for server ready status (keep polling even if hidden, so state is ready when switching back)
+                Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { timer in
+                    serverReady = DataManager.shared.grpcServerReady
+                    if serverReady {
+                        timer.invalidate()
                     }
                 }
             }

@@ -19,7 +19,7 @@ def main(args):
     data = mujoco.MjData(model)
 
     from avp_stream import VisionProStreamer
-    streamer = VisionProStreamer(ip=args.ip, record=False)
+    streamer = VisionProStreamer(room=args.ip, record=False)
 
     # attach_to format: [x, y, z, yaw_degrees]
     attach_to = [0.2, 1.0, 0.7, -90]
@@ -33,6 +33,12 @@ def main(args):
     )
 
     streamer.start_webrtc()
+    
+    # Wait for connection and USDZ transfer
+    print("[CROSS-NETWORK] Waiting for WebRTC connection and scene transfer...")
+    if not streamer.wait_for_sim_channel(timeout=60.0):
+        print("Timeout or error waiting for connection!")
+        return
 
 
     logs_dir = ASSETS_DIR / "logs"

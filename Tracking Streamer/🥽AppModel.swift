@@ -154,6 +154,19 @@ class DataManager: ObservableObject {
     @Published var audioEnabled: Bool = false  // Whether audio track is present at all
     @Published var videoEnabled: Bool = false  // Whether video track is present at all
     @Published var simEnabled: Bool = false    // Whether simulation is enabled
+    @Published var crossNetworkRoomCode: String? = nil  // Room code for cross-network mode (nil = local mode)
+    
+    // USDZ scene loaded via WebRTC (cross-network mode)
+    @Published var loadedUsdzPath: String? = nil  // Path to the loaded USDZ file
+    @Published var loadedUsdzAttachPosition: [Float]? = nil  // Attach position [x, y, z]
+    @Published var loadedUsdzAttachRotation: [Float]? = nil  // Attach rotation [x, y, z, w]
+    
+    // Persistent setting for Cross-Network Mode (vs Local Mode)
+    @Published var isCrossNetworkMode: Bool {
+        didSet {
+            UserDefaults.standard.set(isCrossNetworkMode, forKey: "isCrossNetworkMode")
+        }
+    }
     
     // Video source selection (persistent via UserDefaults)
     @Published var videoSource: VideoSource {
@@ -168,6 +181,7 @@ class DataManager: ObservableObject {
     @Published var audioSampleRate: Int = 0
     
     @Published var connectionStatus: String = "Initializing..."
+    @Published var webRTCConnectionType: String = "" // Host, STUN, or TURN
     
     // Video plane z-distance setting (persistent via UserDefaults)
     @Published var videoPlaneZDistance: Float {
@@ -296,18 +310,18 @@ class DataManager: ObservableObject {
     
     private init() {
         // Load saved video source or default to network
-        if let savedVideoSource = UserDefaults.standard.string(forKey: "videoSource"),
-           let source = VideoSource(rawValue: savedVideoSource) {
-            self.videoSource = source
-        } else {
-            self.videoSource = .network
-        }
-        // Load saved z-distance or use default of -10.0
-        self.videoPlaneZDistance = UserDefaults.standard.object(forKey: "videoPlaneZDistance") as? Float ?? -10.0
-        // Load saved y-position or use default of 0.0
-        self.videoPlaneYPosition = UserDefaults.standard.object(forKey: "videoPlaneYPosition") as? Float ?? 0.0
-        // Load saved auto-perpendicular or use default of false
-        self.videoPlaneAutoPerpendicular = UserDefaults.standard.object(forKey: "videoPlaneAutoPerpendicular") as? Bool ?? false
+        self.videoSource = VideoSource(rawValue: UserDefaults.standard.string(forKey: "videoSource") ?? "") ?? .network
+        
+        // Use local vars for checks to avoid accessing self before full init
+        let savedZ = UserDefaults.standard.float(forKey: "videoPlaneZDistance")
+        self.videoPlaneZDistance = (savedZ == 0) ? 1.6 : savedZ
+        
+        let savedY = UserDefaults.standard.float(forKey: "videoPlaneYPosition")
+        self.videoPlaneYPosition = (savedY == 0) ? 1.5 : savedY
+        
+        self.videoPlaneAutoPerpendicular = UserDefaults.standard.object(forKey: "videoPlaneAutoPerpendicular") as? Bool ?? true
+        
+        self.isCrossNetworkMode = UserDefaults.standard.bool(forKey: "isCrossNetworkMode")
         // Always default to head-following (false) on startup, ignoring any saved state
         self.videoPlaneFixedToWorld = false
         // Load saved minimized status position or use defaults

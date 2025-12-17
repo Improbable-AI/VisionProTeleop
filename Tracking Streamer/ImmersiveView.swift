@@ -550,90 +550,8 @@ class VideoStreamManager: ObservableObject {
         connectionTask = Task {
             do {
                 dlog("🎬 [DEBUG] VideoStreamManager.start() called")
-                dlog("⏳ [DEBUG] Waiting for Python client to connect via gRPC...")
-                dlog("💡 [DEBUG] Run your Python script now if you haven't already!")
                 
-                // Wait for Python client to connect via gRPC
-                var pythonIP: String?
-                var attempts = 0
-                let maxAttempts = 600  // Wait up to 60 seconds (600 * 100ms)
-                
-                for i in 0..<maxAttempts {
-                    // Check if task was cancelled
-                    if Task.isCancelled {
-                        dlog("🛑 [DEBUG] Connection task cancelled during Python client wait")
-                        return
-                    }
-                    
-                    if let ip = DataManager.shared.pythonClientIP {
-                        pythonIP = ip
-                        dlog("✅ [DEBUG] Python client found after \(i * 100)ms")
-                        break
-                    }
-                    
-                    // Print status every 5 seconds
-                    if i > 0 && i % 50 == 0 {
-                        let secondsWaited = i / 10
-                        dlog("⏳ [DEBUG] Still waiting for Python client... (\(secondsWaited)s elapsed)")
-                    }
-                    
-                    try await Task.sleep(nanoseconds: 100_000_000)  // 100ms
-                    attempts += 1
-                }
-                
-                guard let pythonIP = pythonIP else {
-                    dlog("❌ [DEBUG] Timeout: Python client not connected after \(attempts * 100)ms")
-                    dlog("💡 [DEBUG] Make sure you run the Python script with VisionProStreamer")
-                    return
-                }
-                
-                // Check cancellation again
-                if Task.isCancelled {
-                    dlog("🛑 [DEBUG] Connection task cancelled after finding Python client")
-                    return
-                }
-                
-                dlog("🔍 [DEBUG] Found Python client at: \(pythonIP)")
-                dlog("⏳ [DEBUG] Waiting for WebRTC server info via gRPC...")
-                
-                // Wait for WebRTC server info to arrive via gRPC
-                var webrtcInfo: (host: String, port: Int)?
-                for attempt in 0..<60 {  // Try for 60 seconds
-                    // Check if task was cancelled
-                    if Task.isCancelled {
-                        dlog("🛑 [DEBUG] Connection task cancelled during WebRTC info wait")
-                        return
-                    }
-                    
-                    if let info = DataManager.shared.webrtcServerInfo {
-                        webrtcInfo = info
-                        dlog("✅ [DEBUG] WebRTC info received via gRPC: \(info.host):\(info.port)")
-                        break
-                    }
-                    
-                    if attempt % 10 == 0 && attempt > 0 {
-                        dlog("⏳ [DEBUG] Still waiting for WebRTC server info... (\(attempt)s elapsed)")
-                        dlog("💡 [DEBUG] Make sure start_streaming() was called in Python")
-                    }
-                    
-                    try await Task.sleep(nanoseconds: 1_000_000_000)  // 1 second
-                }
-                
-                guard let info = webrtcInfo else {
-                    dlog("❌ [DEBUG] Timeout: WebRTC server info not received")
-                    dlog("💡 [DEBUG] Make sure start_streaming() was called in Python")
-                    return
-                }
-                
-                // Final cancellation check before creating connection
-                if Task.isCancelled {
-                    dlog("🛑 [DEBUG] Connection task cancelled before WebRTC connection")
-                    return
-                }
-                
-                dlog("🔗 [DEBUG] Connecting to WebRTC server at \(info.host):\(info.port)...")
-                
-                // Connect to WebRTC server
+                // CREATE SHARED WEBRTC CLIENT / RENDERERS
                 let client = WebRTCClient()
                 self.webrtcClient = client
                 
@@ -656,18 +574,119 @@ class VideoStreamManager: ObservableObject {
                 let audioRenderer = AudioFrameRenderer()
                 self.audioRenderer = audioRenderer
                 
-                try await client.connect(to: info.host, port: info.port)
-                dlog("✅ [DEBUG] WebRTC connection established!")
+                client.addVideoRenderer(videoRenderer)
+                client.addAudioRenderer(audioRenderer)
+                
+                // CHECK IF CROSS-NETWORK MODE IS ENABLED
+                if let roomCode = DataManager.shared.crossNetworkRoomCode {
+                    dlog("🌍 [DEBUG] Cross-Network Mode Detected (Room: \(roomCode))")
+                    dlog("⏳ [DEBUG] Waiting for active signaling connection...")
+                    
+                    // Wait for SignalingClient to be ready and peer verified
+                    // SignalingClient connection should have been initiated in ContentView
+                    let signaling = SignalingClient.shared
+                    
+                    var attempts = 0
+                    while !signaling.isConnected {
+                        if Task.isCancelled { return }
+                        if attempts % 10 == 0 { dlog("⏳ [DEBUG] Connecting to signaling server...") }
+                        if !signaling.isConnected { signaling.connect() } // Ensure connected
+                        try await Task.sleep(nanoseconds: 500_000_000) // 500ms
+                        attempts += 1
+                        if attempts > 20 { throw NSError(domain: "Timeout", code: 1, userInfo: [NSLocalizedDescriptionKey: "Signaling connection timeout"]) }
+                    }
+                    
+                    // Wait for Peer to join room
+                    attempts = 0
+                    while !signaling.peerConnected {
+                        if Task.isCancelled { return }
+                        if attempts % 10 == 0 { dlog("⏳ [DEBUG] Waiting for Python peer to join room...") }
+                        try await Task.sleep(nanoseconds: 500_000_000) // 500ms
+                        attempts += 1
+                        if attempts > 120 { // 60 seconds
+                            dlog("❌ [DEBUG] Timeout waiting for Python peer")
+                            return
+                        }
+                    }
+                    
+                    dlog("✅ [DEBUG] Python peer present! Initiating WebRTC...")
+                    
+                    // Connect via Signaling
+                    try await client.connectWithSignaling(signaling)
+                    dlog("✅ [DEBUG] WebRTC connection sequence initiated via Signaling!")
+                    
+                } else {
+                    // LOCAL NETWORK MODE (Existing gRPC Flow)
+                    dlog("🏠 [DEBUG] Local Network Mode - Waiting for Python client via gRPC...")
+                    dlog("💡 [DEBUG] Run your Python script now if you haven't already!")
+                    
+                    // Wait for Python client to connect via gRPC
+                    var pythonIP: String?
+                    var attempts = 0
+                    let maxAttempts = 600  // Wait up to 60 seconds (600 * 100ms)
+                    
+                    for i in 0..<maxAttempts {
+                        if Task.isCancelled { return }
+                        
+                        if let ip = DataManager.shared.pythonClientIP {
+                            pythonIP = ip
+                            dlog("✅ [DEBUG] Python client found after \(i * 100)ms")
+                            break
+                        }
+                        
+                        if i > 0 && i % 50 == 0 {
+                            dlog("⏳ [DEBUG] Still waiting for Python client... (\(i/10)s elapsed)")
+                        }
+                        
+                        try await Task.sleep(nanoseconds: 100_000_000)
+                        attempts += 1
+                    }
+                    
+                    guard let pythonIP = pythonIP else {
+                        dlog("❌ [DEBUG] Timeout: Python client not connected")
+                        return
+                    }
+                    
+                    // Wait for WebRTC server info via gRPC
+                    dlog("⏳ [DEBUG] Waiting for WebRTC server info via gRPC...")
+                    var webrtcInfo: (host: String, port: Int)?
+                    
+                    for attempt in 0..<60 {
+                        if Task.isCancelled { return }
+                        
+                        if let info = DataManager.shared.webrtcServerInfo {
+                            webrtcInfo = info
+                            dlog("✅ [DEBUG] WebRTC info received: \(info.host):\(info.port)")
+                            break
+                        }
+                        
+                        if attempt % 10 == 0 && attempt > 0 {
+                            dlog("⏳ [DEBUG] Still waiting for WebRTC info... (\(attempt)s)")
+                        }
+                        
+                        try await Task.sleep(nanoseconds: 1_000_000_000)
+                    }
+                    
+                    guard let info = webrtcInfo else {
+                        dlog("❌ [DEBUG] Timeout: WebRTC server info not received")
+                        return
+                    }
+                    
+                    dlog("🔗 [DEBUG] Connecting to WebRTC server at \(info.host):\(info.port)...")
+                    try await client.connect(to: info.host, port: info.port)
+                    dlog("✅ [DEBUG] WebRTC connection established!")
+                }
+                
+                // Log Stereo Mode
                 let stereoVideo = DataManager.shared.stereoEnabled
                 let stereoAudio = DataManager.shared.stereoAudioEnabled
                 dlog("📊 [DEBUG] Stereo modes - Video: \(stereoVideo), Audio: \(stereoAudio)")
-                client.addVideoRenderer(videoRenderer)
-                client.addAudioRenderer(audioRenderer)
+                
             } catch {
                 if Task.isCancelled {
                     dlog("🛑 [DEBUG] Connection task was cancelled")
                 } else {
-                    dlog("❌ [DEBUG] Failed to connect to WebRTC server: \(error)")
+                    dlog("❌ [DEBUG] Check connection failed: \(error)")
                 }
             }
         }

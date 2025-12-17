@@ -1,0 +1,13 @@
+
+# Cloudflare Workers / Wrangler
+.wrangler/
+.dev.vars
+dist/
+worker/
+
+# Node
+node_modules/
+npm-debug.log
+
+# OS
+.DS_Store
