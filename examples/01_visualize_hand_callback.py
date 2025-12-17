@@ -90,8 +90,7 @@ if __name__ == "__main__":
 
     import argparse 
     parser = argparse.ArgumentParser(description="Synthetic Video Streamer for VisionPro")
-    parser.add_argument("--ip", type=str, default = None)
-    parser.add_argument("--room", type=str, default = None)
+    parser.add_argument("--ip", type=str, required=True, help="Vision Pro IP address (e.g., 192.168.1.100) or room code (e.g., ABC-1234)")
     parser.add_argument(
         "--hand-tracking-backend",
         type=str,
@@ -100,13 +99,8 @@ if __name__ == "__main__":
         help="Transport used for hand tracking data (default: grpc)",
     )
     args = parser.parse_args()
-    # Create streamer
-    if args.ip is not None:
-        streamer = VisionProStreamer(ip=args.ip, ht_backend=args.hand_tracking_backend)
-    elif args.room is not None:
-        streamer = VisionProStreamer(room=args.room, ht_backend=args.hand_tracking_backend)
-    else:
-        raise ValueError("Must provide either --ip or --room")
+    # Create streamer (ip can be an IP address or room code)
+    streamer = VisionProStreamer(ip=args.ip, ht_backend=args.hand_tracking_backend)
     
     streamer.register_frame_callback(hand_tracking_visualizer(streamer))
     

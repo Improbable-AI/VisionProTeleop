@@ -550,6 +550,7 @@ class VideoStreamManager: ObservableObject {
         connectionTask = Task {
             do {
                 dlog("🎬 [DEBUG] VideoStreamManager.start() called")
+                dlog("🔄 [DEBUG] Dual-mode: Waiting for Python client via Local (gRPC) OR Remote (Signaling)...")
                 
                 // CREATE SHARED WEBRTC CLIENT / RENDERERS
                 let client = WebRTCClient()
@@ -577,80 +578,52 @@ class VideoStreamManager: ObservableObject {
                 client.addVideoRenderer(videoRenderer)
                 client.addAudioRenderer(audioRenderer)
                 
-                // CHECK IF CROSS-NETWORK MODE IS ENABLED
-                if let roomCode = DataManager.shared.crossNetworkRoomCode {
-                    dlog("🌍 [DEBUG] Cross-Network Mode Detected (Room: \(roomCode))")
-                    dlog("⏳ [DEBUG] Waiting for active signaling connection...")
+                // DUAL-MODE CONNECTION: Race local gRPC vs remote signaling
+                // Whichever Python client connects first wins
+                
+                let signaling = SignalingClient.shared
+                var connectionMode: ConnectionMode? = nil
+                let maxAttempts = 600  // 60 seconds total (100ms per attempt)
+                
+                for attempt in 0..<maxAttempts {
+                    if Task.isCancelled { return }
                     
-                    // Wait for SignalingClient to be ready and peer verified
-                    // SignalingClient connection should have been initiated in ContentView
-                    let signaling = SignalingClient.shared
-                    
-                    var attempts = 0
-                    while !signaling.isConnected {
-                        if Task.isCancelled { return }
-                        if attempts % 10 == 0 { dlog("⏳ [DEBUG] Connecting to signaling server...") }
-                        if !signaling.isConnected { signaling.connect() } // Ensure connected
-                        try await Task.sleep(nanoseconds: 500_000_000) // 500ms
-                        attempts += 1
-                        if attempts > 20 { throw NSError(domain: "Timeout", code: 1, userInfo: [NSLocalizedDescriptionKey: "Signaling connection timeout"]) }
+                    // Check for local gRPC connection (Python connected via IP)
+                    if DataManager.shared.pythonClientIP != nil {
+                        connectionMode = .local
+                        dlog("✅ [DEBUG] Local Python client detected via gRPC (attempt \(attempt))")
+                        break
                     }
                     
-                    // Wait for Peer to join room
-                    attempts = 0
-                    while !signaling.peerConnected {
-                        if Task.isCancelled { return }
-                        if attempts % 10 == 0 { dlog("⏳ [DEBUG] Waiting for Python peer to join room...") }
-                        try await Task.sleep(nanoseconds: 500_000_000) // 500ms
-                        attempts += 1
-                        if attempts > 120 { // 60 seconds
-                            dlog("❌ [DEBUG] Timeout waiting for Python peer")
-                            return
-                        }
+                    // Check for remote signaling connection (Python joined via room code)
+                    if signaling.isConnected && signaling.peerConnected {
+                        connectionMode = .remote
+                        dlog("✅ [DEBUG] Remote Python peer detected via Signaling (attempt \(attempt))")
+                        break
                     }
                     
-                    dlog("✅ [DEBUG] Python peer present! Initiating WebRTC...")
-                    
-                    // Connect via Signaling
-                    try await client.connectWithSignaling(signaling)
-                    dlog("✅ [DEBUG] WebRTC connection sequence initiated via Signaling!")
-                    
-                } else {
-                    // LOCAL NETWORK MODE (Existing gRPC Flow)
-                    dlog("🏠 [DEBUG] Local Network Mode - Waiting for Python client via gRPC...")
-                    dlog("💡 [DEBUG] Run your Python script now if you haven't already!")
-                    
-                    // Wait for Python client to connect via gRPC
-                    var pythonIP: String?
-                    var attempts = 0
-                    let maxAttempts = 600  // Wait up to 60 seconds (600 * 100ms)
-                    
-                    for i in 0..<maxAttempts {
-                        if Task.isCancelled { return }
-                        
-                        if let ip = DataManager.shared.pythonClientIP {
-                            pythonIP = ip
-                            dlog("✅ [DEBUG] Python client found after \(i * 100)ms")
-                            break
-                        }
-                        
-                        if i > 0 && i % 50 == 0 {
-                            dlog("⏳ [DEBUG] Still waiting for Python client... (\(i/10)s elapsed)")
-                        }
-                        
-                        try await Task.sleep(nanoseconds: 100_000_000)
-                        attempts += 1
+                    // Log progress every 5 seconds
+                    if attempt > 0 && attempt % 50 == 0 {
+                        dlog("⏳ [DEBUG] Still waiting for Python client... (\(attempt/10)s elapsed)")
+                        dlog("   Local (gRPC): \(DataManager.shared.pythonClientIP != nil ? "Connected" : "Waiting...")")
+                        dlog("   Remote (Signaling): \(signaling.isConnected ? (signaling.peerConnected ? "Peer Connected" : "Waiting for peer...") : "Connecting...")")
                     }
                     
-                    guard let pythonIP = pythonIP else {
-                        dlog("❌ [DEBUG] Timeout: Python client not connected")
-                        return
-                    }
+                    try await Task.sleep(nanoseconds: 100_000_000)  // 100ms
+                }
+                
+                guard let mode = connectionMode else {
+                    dlog("❌ [DEBUG] Timeout: No Python client connected via either method")
+                    return
+                }
+                
+                // Now connect based on which mode was detected
+                switch mode {
+                case .local:
+                    // LOCAL NETWORK MODE - Wait for WebRTC info via gRPC
+                    dlog("🏠 [DEBUG] Using Local Network Mode (gRPC + direct WebRTC)")
                     
-                    // Wait for WebRTC server info via gRPC
-                    dlog("⏳ [DEBUG] Waiting for WebRTC server info via gRPC...")
                     var webrtcInfo: (host: String, port: Int)?
-                    
                     for attempt in 0..<60 {
                         if Task.isCancelled { return }
                         
@@ -674,7 +647,14 @@ class VideoStreamManager: ObservableObject {
                     
                     dlog("🔗 [DEBUG] Connecting to WebRTC server at \(info.host):\(info.port)...")
                     try await client.connect(to: info.host, port: info.port)
-                    dlog("✅ [DEBUG] WebRTC connection established!")
+                    dlog("✅ [DEBUG] WebRTC connection established (Local)!")
+                    
+                case .remote:
+                    // REMOTE/CROSS-NETWORK MODE - Connect via Signaling
+                    dlog("🌍 [DEBUG] Using Remote Mode (Signaling + relayed WebRTC)")
+                    
+                    try await client.connectWithSignaling(signaling)
+                    dlog("✅ [DEBUG] WebRTC connection sequence initiated via Signaling!")
                 }
                 
                 // Log Stereo Mode
@@ -690,6 +670,12 @@ class VideoStreamManager: ObservableObject {
                 }
             }
         }
+    }
+    
+    /// Connection mode for dual-mode support
+    private enum ConnectionMode {
+        case local   // Python connected via gRPC (same network)
+        case remote  // Python connected via Signaling (cross-network)
     }
     
     private func queryWebRTCInfo(pythonIP: String) async throws -> (host: String, port: Int) {

@@ -29,6 +29,10 @@ A complete ecosystem for using Apple Vision Pro in robotics research — from **
 
 - [Overview](#overview)
 - [Installations](#installations)
+- [NEW: External Network (Remote) Mode](#new-external-network-remote-mode)
+  - [How It Works](#how-it-works)
+  - [Usage](#usage)
+  - [Notes](#notes)
 - [Use Case 1: Real-World Teleoperation](#use-case-1-real-world-teleoperation)
   - [Video \& Audio Streaming](#video--audio-streaming)
   - [Video Configuration Examples](#video-configuration-examples)
@@ -124,6 +128,50 @@ Installing is easy: install it from the App Store and PyPI.
 No other network configurations are required. Everything should work out of the box after installation. An easy way to get onboarded is to go through the [examples](examples/) folder. All examples should work out of the box without any extra configurations required. 
 
 **Note**: Some examples demonstrate teleoperating things within IsaacLab world; since IsaacLab is an extremely heavy dependency, I did not include that as a dependency for `avp_stream`. If you're trying to run examples including IsaacLab as a simulation backend, you should install things according to their official installation guide. 
+
+---
+
+## NEW: External Network (Remote) Mode
+
+So far, Vision Pro and your Python client had to be on the **same local network** (e.g., same WiFi) for them to communicate. With **External Network Mode** with v2.5 release, you can make bilateral connection from anywhere over the internet! It's extremely useful when your robot is in a lab (likely behind school/company network's firewall) and you're working remotely using your home WiFi outside the school network. 
+
+| Mode | Connection Method | Use Case |
+|------|-------------------|----------|
+| **Local Network** | IP address (e.g., `"192.168.1.100"`) | Same WiFi/LAN |
+| **External Network** | Room code (e.g., `"ABC-1234"`) | Different networks, over internet |
+
+### How It Works
+
+External Network Mode uses WebRTC with TURN relay servers for NAT traversal:
+
+1. **Vision Pro** generates a room code and connects to a signaling server
+2. **Python client** connects using the same room code
+3. **Signaling server** facilitates the initial handshake (SDP offer/answer, ICE candidates)
+4. **TURN servers** relay media when direct peer-to-peer connection isn't possible
+5. Once connected, all streaming works the same as local mode
+
+### Usage
+
+```python
+from avp_stream import VisionProStreamer
+
+# Instead of IP address, use the room code shown on Vision Pro
+s = VisionProStreamer(ip="ABC-1234")
+
+# Everything else works exactly the same
+s.configure_video(device="/dev/video0", format="v4l2", size="1280x720", fps=30)
+s.start_webrtc()
+
+while True:
+    r = s.get_latest()
+    # ...
+```
+
+
+### Notes
+
+- **Latency**: Expect slightly higher latency compared to local network due to relay routing
+- **Signaling/TURN server**: We provide a Cloudflare-hosted signaling and TURN server for now by default. If we detect extreme usage or abuse, we may introduce usage limits or require a paid tier in the future. 
 
 ---
 

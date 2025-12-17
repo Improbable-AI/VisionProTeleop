@@ -792,25 +792,40 @@ def _create_processed_video_track_class(streamer_instance):
     return ProcessedVideoTrack
 
 
+def _is_room_code(value: str) -> bool:
+    """Check if a string looks like a room code vs an IP address.
+    
+    Room codes are alphanumeric with dashes (e.g., "ABC-1234", "XYZ-5678").
+    IP addresses are numeric with dots (e.g., "192.168.1.100").
+    """
+    if not value:
+        return False
+    # IP addresses contain only digits and dots
+    if all(c.isdigit() or c == '.' for c in value):
+        # Verify it looks like a valid IP (4 octets)
+        parts = value.split('.')
+        if len(parts) == 4 and all(p.isdigit() and 0 <= int(p) <= 255 for p in parts):
+            return False  # It's an IP address
+    # Anything else (contains letters, dashes, etc.) is treated as a room code
+    return True
+
+
 class VisionProStreamer:
 
-    def __init__(self, ip=None, room=None, record=True, ht_backend="grpc", benchmark_quiet=False, verbose=False, origin="avp", signaling_url=None):
+    def __init__(self, ip=None, record=True, ht_backend="grpc", benchmark_quiet=False, verbose=False, origin="avp", signaling_url=None):
         """Initialize the VisionProStreamer.
 
         Parameters
         ----------
-        ip : str, optional
-            Vision Pro IP address for same-network connection via gRPC.
-            Required if `room` is not specified.
-        room : str, optional
-            Room code for cross-network connection via WebRTC signaling.
-            Get this code from the Vision Pro app's UI.
-            Cannot be used together with `ip`.
+        ip : str
+            Connection identifier. The format determines the connection mode:
+            - IP address (e.g., "192.168.1.100"): Same-network mode via gRPC.
+            - Room code (e.g., "ABC-1234"): Cross-network mode via WebRTC signaling.
         record : bool, default True
             If True, every processed hand tracking sample is appended to an internal list retrievable via `get_recording()`.
         ht_backend : {"grpc","webrtc"}, default "grpc"
             Transport used for hand tracking. Use "webrtc" for lower latency after a WebRTC session is established.
-            Note: When using `room=` mode, hand tracking always uses WebRTC.
+            Note: In cross-network mode (room code), hand tracking always uses WebRTC.
         benchmark_quiet : bool, default False
             Suppress benchmark printouts (see latency measurements in `latency_test.py`).
         verbose : bool, default False
@@ -826,36 +841,35 @@ class VisionProStreamer:
 
         Notes
         -----
-        When using `ip=`: Instantiates gRPC hand tracking stream and HTTP info server (same-network mode).
-        When using `room=`: Connects to signaling server for cross-network WebRTC connection.
+        The connection mode is automatically inferred from the `ip` parameter:
+        - If it looks like an IP address (e.g., "192.168.1.100"): Local/same-network mode.
+        - If it looks like a room code (e.g., "ABC-1234"): Cross-network mode.
         
         Examples
         --------
-        Same-network (existing behavior)::
+        Same-network (IP address)::
         
             streamer = VisionProStreamer(ip="192.168.1.100")
         
-        Cross-network (new)::
+        Cross-network (room code)::
         
-            streamer = VisionProStreamer(room="ABC-1234")
+            streamer = VisionProStreamer(ip="ABC-1234")
         """
         
-        # Validate mutually exclusive parameters
-        if ip and room:
-            raise ValueError("Specify either ip= (same-network) or room= (cross-network), not both")
-        if not ip and not room:
-            raise ValueError("Must specify either ip= (same-network) or room= (cross-network)")
+        # Validate required parameter
+        if not ip:
+            raise ValueError("Must specify ip= parameter (IP address for local mode, or room code for cross-network mode)")
         
-        # Determine connection mode
-        self._cross_network_mode = room is not None
-        self._room_code = room
+        # Determine connection mode based on ip format
+        self._cross_network_mode = _is_room_code(ip)
+        self._room_code = ip if self._cross_network_mode else None
         self._signaling_url = signaling_url or "wss://visionpro-signaling.parkyh9492.workers.dev/ws"
         self._signaling_ws = None
         self._signaling_connected = False
         self._peer_ready = False  # Track if VisionOS peer has joined
 
         # Vision Pro IP (only used in same-network mode)
-        self.ip = ip
+        self.ip = None if self._cross_network_mode else ip
         self.record = record 
         
         # In cross-network mode, always use WebRTC for hand tracking
@@ -938,10 +952,12 @@ class VisionProStreamer:
         # Stylus tracking state
         self._stylus_data: Optional[Dict[str, Any]] = None  # Full stylus data dict
         self._stylus_lock = Lock()
+        
+        self._ice_servers = None  # Initialize ICE servers (populated in cross-network mode)
 
         # Start connection based on mode
         if self._cross_network_mode:
-            self._log(f"[CROSS-NETWORK] Using room code: {room}", force=True)
+            self._log(f"[CROSS-NETWORK] Using room code: {self._room_code}", force=True)
             self._log(f"[CROSS-NETWORK] Signaling server: {self._signaling_url}", force=True)
             # Defer connection until stream() or start_webrtc() is called
             # This allows configure_video() / configure_audio() to be called first
@@ -1329,6 +1345,52 @@ class VisionProStreamer:
         
         self._log(' == DATA IS FLOWING IN! ==', force=True)
         self._log('Ready to start streaming.') 
+
+    def _ensure_cross_network_connected(self):
+        """Ensure cross-network WebRTC connection is established (lazy initialization).
+        
+        Called automatically on first get_latest() in cross-network mode.
+        This enables hand-tracking-only use cases without explicit start_webrtc() call.
+        """
+        if not self._cross_network_mode:
+            return
+        
+        # Avoid re-entry
+        if hasattr(self, '_cross_network_connecting') and self._cross_network_connecting:
+            return
+        self._cross_network_connecting = True
+        
+        try:
+            # Step 1: Connect to signaling server if not connected
+            if not self._signaling_connected:
+                self._start_signaling_connection()
+            
+            # Step 2: Wait for VisionOS peer to be ready
+            self._log('[CROSS-NETWORK] Waiting for VisionOS peer...', force=True)
+            retry_count = 0
+            while not self._peer_ready:
+                time.sleep(0.1)
+                retry_count += 1
+                if retry_count > 100:  # 10 seconds
+                    self._log('[CROSS-NETWORK] Still waiting for VisionOS to join the room...', force=True)
+                    retry_count = 0
+            
+            # Step 3: Trigger WebRTC offer (hand-tracking only, no video/audio configured)
+            self._trigger_webrtc_offer()
+            
+            # Step 4: Wait for hand tracking data to flow
+            self._log('[CROSS-NETWORK] Waiting for hand tracking data...', force=True)
+            retry_count = 0
+            while not self._webrtc_hand_ready:
+                time.sleep(0.1)
+                retry_count += 1
+                if retry_count > 100:  # 10 seconds
+                    self._log('[CROSS-NETWORK] Still waiting for hand tracking channel...', force=True)
+                    retry_count = 0
+            
+            self._log('[CROSS-NETWORK] Hand tracking connected!', force=True)
+        finally:
+            self._cross_network_connecting = False
 
     def _start_signaling_connection(self):
         """Start the cross-network signaling connection in a background thread.
@@ -1860,6 +1922,10 @@ class VisionProStreamer:
                 index_tip = data.right.indexTip  # 4x4 matrix
                 pinch = data.right.pinch_distance
         """
+        # Lazy connection for cross-network mode
+        if self._cross_network_mode and not self._webrtc_connected:
+            self._ensure_cross_network_connected()
+        
         raw_data = None
         if use_cache:
             current_time = time.perf_counter()

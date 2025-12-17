@@ -163,12 +163,10 @@ struct ContentView: View {
     
     private func proceedToImmersiveSpace() {
         Task {
-            // If in Remote mode, connect to signaling server first
-            if dataManager.isCrossNetworkMode {
-                signalingClient.connect()
-                // Store the room code in DataManager so it can be used by VideoStreamManager
-                DataManager.shared.crossNetworkRoomCode = signalingClient.roomCode
-            }
+            // Always connect to signaling server for room code availability
+            // Python client can choose to use either IP (local) or room code (remote)
+            signalingClient.connect()
+            DataManager.shared.crossNetworkRoomCode = signalingClient.roomCode
             
             await self.openImmersiveSpace(id: "combinedStreamSpace")
             self.dismissWindow()
@@ -288,109 +286,83 @@ struct ContentView: View {
             }
             .padding(.top, 16)
             
-            // Connection Mode Toggle + Info
-            VStack(spacing: 16) {
-                // Mode toggle (Local / Remote)
-                HStack(spacing: 0) {
-
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            dataManager.isCrossNetworkMode = false
-                        }
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "wifi")
-                                .font(.headline)
-                            Text("Local")
-                                .font(.headline)
-                        }
-                        .foregroundColor(!dataManager.isCrossNetworkMode ? .white : .white.opacity(0.5))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(!dataManager.isCrossNetworkMode ? Color.blue.opacity(0.6) : Color.clear)
-                        )
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            dataManager.isCrossNetworkMode = true
-                        }
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "globe")
-                                .font(.headline)
-                            Text("Remote")
-                                .font(.headline)
-                        }
-                        .foregroundColor(dataManager.isCrossNetworkMode ? .white : .white.opacity(0.5))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(dataManager.isCrossNetworkMode ? Color.cyan.opacity(0.6) : Color.clear)
-                        )
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                }
-                .frame(height: 54) // Enforce fixed height on the container
-                .padding(4)
-                .background(Color.white.opacity(0.1))
-                .cornerRadius(16)
-                .frame(width: 300) // Fixed width for the toggle container
-                
-                // Connection info based on mode
-                if dataManager.isCrossNetworkMode {
-                    // Remote mode - show room code
-                    VStack(spacing: 8) {
-                        HStack(spacing: 12) {
-                            Text(signalingClient.roomCode)
-                                .font(.system(size: 32, weight: .bold, design: .monospaced))
-                                .foregroundColor(.white)
-                                .tracking(2)
-                            
-                            Button {
-                                signalingClient.generateRoomCode()
-                            } label: {
-                                Image(systemName: "arrow.clockwise")
-                                    .font(.body)
-                                    .foregroundColor(.white.opacity(0.5))
-                                    .padding(8)
-                                    .background(Color.white.opacity(0.1))
-                                    .cornerRadius(8)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        
-                        Text("Python: VisionProStreamer(room=\"\(signalingClient.roomCode)\")")
+            // Connection Info - Side by side: Local Network | Remote
+            HStack(alignment: .top, spacing: 32) {
+                // LEFT: Local Network Section
+                VStack(spacing: 12) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "wifi")
                             .font(.caption)
-                            .foregroundColor(.white.opacity(0.5))
+                            .foregroundColor(.blue)
+                        Text("Local Network")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(.white.opacity(0.7))
+                        
+                        InfoTooltipButton(
+                            title: "Local Network Mode",
+                            message: "Use this when your Vision Pro and Python client are on the same network (e.g., same WiFi). Provides the lowest latency connection via direct gRPC."
+                        )
                     }
-                    .frame(height: 80) // Fixed height to prevent layout jump
-                } else {
-                    // Local mode - show IP addresses
-                    // Wrap in specific frame to match remote mode height roughly
-                    VStack {
-                         IPAddressCard(addresses: getIPAddresses())
-                    }
-                    .frame(minHeight: 80)
-                }
-                
-                // Server status - ONLY SHOW IN LOCAL MODE
-                if !dataManager.isCrossNetworkMode {
+                    
+                    IPAddressCard(addresses: getIPAddresses())
+                    
+                    // Server status
                     HStack(spacing: 8) {
                         Circle()
                             .fill(serverReady ? Color.green : Color.orange)
-                            .frame(width: 12, height: 12)
-                            .shadow(color: serverReady ? Color.green.opacity(0.6) : Color.orange.opacity(0.6), radius: 6)
-                        Text(serverReady ? "gRPC Server Ready" : "Starting gRPC Server...")
-                            .font(.subheadline.weight(.medium))
+                            .frame(width: 10, height: 10)
+                            .shadow(color: serverReady ? Color.green.opacity(0.6) : Color.orange.opacity(0.6), radius: 4)
+                        Text(serverReady ? "gRPC Server Ready" : "Starting gRPC...")
+                            .font(.caption.weight(.medium))
                             .foregroundColor(serverReady ? .green : .orange)
                     }
-                    .transition(.opacity) // Smooth fade in/out
                 }
+                .frame(minWidth: 200)
+                
+                // Vertical Divider
+                Rectangle()
+                    .fill(Color.white.opacity(0.2))
+                    .frame(width: 1, height: 100)
+                
+                // RIGHT: Remote Section
+                VStack(spacing: 12) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "globe")
+                            .font(.caption)
+                            .foregroundColor(.cyan)
+                        Text("Remote (Any Network)")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(.white.opacity(0.7))
+                        
+                        InfoTooltipButton(
+                            title: "Cross-Network Mode",
+                            message: "Use this when your Vision Pro and Python client are on different networks, or when firewalls block direct connections. Uses STUN/TURN server relaying to establish connectivity."
+                        )
+                    }
+                    
+                    Text(signalingClient.roomCode)
+                        .font(.system(size: 28, weight: .bold, design: .monospaced))
+                        .foregroundColor(.white)
+                        .tracking(2)
+                    
+                    Button {
+                        signalingClient.generateRoomCode()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.caption)
+                            Text("New Code")
+                                .font(.caption.weight(.medium))
+                        }
+                        .foregroundColor(.white.opacity(0.5))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.white.opacity(0.1))
+                        .cornerRadius(8)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .frame(minWidth: 200)
             }
             .onAppear {
                 // Poll for server ready status (keep polling even if hidden, so state is ready when switching back)
@@ -430,13 +402,13 @@ struct IPAddressCard: View {
     let addresses: [(name: String, address: String)]
     
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 8) {
             if addresses.isEmpty {
                 Text("No network connection")
                     .font(.title3)
                     .foregroundColor(.white.opacity(0.6))
-            } else if addresses.count == 1 {
-                // Single address - centered
+            } else {
+                // Single column layout with original styling
                 ForEach(addresses, id: \.address) { ip in
                     HStack(spacing: 10) {
                         Text(ip.name)
@@ -450,52 +422,40 @@ struct IPAddressCard: View {
                         Text(ip.address)
                             .font(.system(size: 20, weight: .semibold, design: .monospaced))
                             .foregroundColor(.white)
-                            .frame(width: 200, alignment: .trailing)
-                    }
-                }
-            } else {
-                // Grid layout for 2+ addresses
-                HStack(alignment: .top, spacing: 24) {
-                    // Left column
-                    VStack(spacing: 8) {
-                        ForEach(Array(addresses.enumerated()).filter { $0.offset % 2 == 0 }, id: \.element.address) { _, ip in
-                            HStack(spacing: 8) {
-                                Text(ip.name)
-                                    .font(.system(size: 14, weight: .medium, design: .monospaced))
-                                    .foregroundColor(.white.opacity(0.7))
-                                    .frame(width: 55)
-                                    .padding(.vertical, 4)
-                                    .padding(.horizontal, 8)
-                                    .background(Color.white.opacity(0.15))
-                                    .cornerRadius(6)
-                                Text(ip.address)
-                                    .font(.system(size: 20, weight: .semibold, design: .monospaced))
-                                    .foregroundColor(.white)
-                                    .frame(width: 180, alignment: .trailing)
-                            }
-                        }
-                    }
-                    // Right column
-                    VStack(spacing: 8) {
-                        ForEach(Array(addresses.enumerated()).filter { $0.offset % 2 == 1 }, id: \.element.address) { _, ip in
-                            HStack(spacing: 8) {
-                                Text(ip.name)
-                                    .font(.system(size: 14, weight: .medium, design: .monospaced))
-                                    .foregroundColor(.white.opacity(0.7))
-                                    .frame(width: 55)
-                                    .padding(.vertical, 4)
-                                    .padding(.horizontal, 8)
-                                    .background(Color.white.opacity(0.15))
-                                    .cornerRadius(6)
-                                Text(ip.address)
-                                    .font(.system(size: 20, weight: .semibold, design: .monospaced))
-                                    .foregroundColor(.white)
-                                    .frame(width: 180, alignment: .trailing)
-                            }
-                        }
                     }
                 }
             }
+        }
+    }
+}
+
+// MARK: - Info Tooltip Button Component
+struct InfoTooltipButton: View {
+    let title: String
+    let message: String
+    @State private var showingPopover = false
+    
+    var body: some View {
+        Button {
+            showingPopover.toggle()
+        } label: {
+            Image(systemName: "questionmark.circle")
+                .font(.system(size: 14))
+                .foregroundColor(.white.opacity(0.5))
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: $showingPopover, arrowEdge: .bottom) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundColor(.white)
+                Text(message)
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.8))
+                    .lineLimit(nil)
+            }
+            .padding(16)
+            .frame(width: 320)
         }
     }
 }

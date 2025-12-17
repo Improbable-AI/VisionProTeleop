@@ -19,7 +19,7 @@ def main(args):
     data = mujoco.MjData(model)
 
     from avp_stream import VisionProStreamer
-    streamer = VisionProStreamer(room=args.ip, record=False)
+    streamer = VisionProStreamer(ip=args.ip, record=False)
 
     # attach_to format: [x, y, z, yaw_degrees]
     attach_to = [0.2, 1.0, 0.7, -90]

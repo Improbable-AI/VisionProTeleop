@@ -548,6 +548,7 @@ extension WebRTCClient {
             
             Task { @MainActor in
                 DataManager.shared.connectionStatus = "Video track enabled, waiting for frames..."
+                DataManager.shared.videoEnabled = true
             }
         }
         if let audioTrack = stream.audioTracks.first {
@@ -563,6 +564,7 @@ extension WebRTCClient {
             
             Task { @MainActor in
                 DataManager.shared.connectionStatus = "Audio track enabled"
+                DataManager.shared.audioEnabled = true
             }
         }
     }
@@ -591,6 +593,13 @@ extension WebRTCClient {
                 dlog("⚠️ [WebRTC] ICE connection \(status)")
                 DataManager.shared.connectionStatus = "ICE \(status)"
                 self.onConnectionStateChanged?(false)
+                
+                // Reset flags on disconnect
+                if newState == .closed || newState == .disconnected {
+                     DataManager.shared.videoEnabled = false
+                     DataManager.shared.audioEnabled = false
+                     DataManager.shared.simEnabled = false
+                }
             } else if newState == .checking {
                 DataManager.shared.connectionStatus = "Checking ICE connection..."
             }
@@ -668,6 +677,7 @@ extension WebRTCClient {
             dlog("🔔 [WebRTC] Sim-poses data channel connected! hasCallback=\(hasCallback)")
             Task { @MainActor in
                 DataManager.shared.connectionStatus = "Sim-poses data channel open"
+                DataManager.shared.simEnabled = true
             }
         } else if dataChannel.label == "usdz-transfer" {
             usdzDataChannel = dataChannel
