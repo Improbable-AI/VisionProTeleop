@@ -102,7 +102,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     # Create streamer
     if args.ip is not None:
-        streamer = VisionProStreamer(room=args.ip, ht_backend=args.hand_tracking_backend)
+        streamer = VisionProStreamer(ip=args.ip, ht_backend=args.hand_tracking_backend)
     elif args.room is not None:
         streamer = VisionProStreamer(room=args.room, ht_backend=args.hand_tracking_backend)
     else:
