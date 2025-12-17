@@ -74,6 +74,13 @@ class SignalingClient: ObservableObject {
     /// Buffered ICE candidates received before callback was registered
     private var pendingICECandidates: [[String: Any]] = []
     
+    /// Clear all pending messages (call when peer disconnects to avoid stale data)
+    func clearPendingMessages() {
+        print("[SIGNALING] Clearing pending messages")
+        pendingSDPOffer = nil
+        pendingICECandidates.removeAll()
+    }
+    
     // MARK: - Lifecycle
     
     init() {
@@ -283,23 +290,29 @@ class SignalingClient: ObservableObject {
                 print("[SIGNALING] Peer left")
                 peerConnected = false
                 connectionStatus = "Room: \(roomCode)"
+                // Clear any pending messages from previous session
+                clearPendingMessages()
                 onPeerLeft?()
                 
             case "sdp":
                 if let sdp = json["sdp"] as? String,
                    let sdpType = json["sdpType"] as? String {
-                    print("[SIGNALING] Received SDP \(sdpType)")
+                    print("[SIGNALING] Received SDP \(sdpType) (length: \(sdp.count) chars)")
                     if sdpType == "offer" {
                         if let callback = onSDPOfferReceived {
+                            print("[SIGNALING] Delivering SDP offer to callback")
                             callback(sdp)
                         } else {
                             // Buffer the offer until callback is registered
-                            print("[SIGNALING] Buffering SDP offer (callback not yet registered)")
+                            print("[SIGNALING] ⚠️ Buffering SDP offer (callback not yet registered)")
                             pendingSDPOffer = sdp
                         }
                     } else if sdpType == "answer" {
+                        print("[SIGNALING] Delivering SDP answer to callback")
                         onSDPAnswerReceived?(sdp)
                     }
+                } else {
+                    print("[SIGNALING] ⚠️ Failed to parse SDP message: \(json)")
                 }
                 
             case "ice":

@@ -234,10 +234,54 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
     
     /// Handle incoming SDP offer from Python and create answer
     private func handleOfferAndCreateAnswer(sdp: String, signalingClient: SignalingClient) async {
+        dlog("📥 [WEBRTC] handleOfferAndCreateAnswer called with SDP length: \(sdp.count)")
+        
+        // If peerConnection doesn't exist (was closed due to previous disconnect), recreate it
+        if self.peerConnection == nil {
+            dlog("🔄 [WEBRTC] PeerConnection is nil, recreating for new session...")
+            
+            // Recreate peer connection with STUN (TURN servers would need to be re-requested)
+            let config = LKRTCConfiguration()
+            config.iceServers = [LKRTCIceServer(urlStrings: [stunServer])]
+            config.iceCandidatePoolSize = 10
+            config.continualGatheringPolicy = .gatherContinually
+            
+            let constraints = LKRTCMediaConstraints(
+                mandatoryConstraints: nil,
+                optionalConstraints: ["DtlsSrtpKeyAgreement": "true"]
+            )
+            
+            guard let pc = factory.peerConnection(
+                with: config,
+                constraints: constraints,
+                delegate: self
+            ) else {
+                dlog("❌ [WEBRTC] Failed to recreate PeerConnection")
+                return
+            }
+            
+            self.peerConnection = pc
+            
+            // Re-wire ICE candidate generation
+            self.onLocalICECandidateGenerated = { candidate in
+                Task { @MainActor in
+                    signalingClient.sendICECandidate(
+                        candidate: candidate.sdp,
+                        sdpMid: candidate.sdpMid,
+                        sdpMLineIndex: candidate.sdpMLineIndex
+                    )
+                }
+            }
+            
+            dlog("✅ [WEBRTC] PeerConnection recreated successfully")
+        }
+        
         guard let pc = self.peerConnection else {
-            dlog("❌ [WEBRTC] PeerConnection not initialized, cannot handle offer")
+            dlog("❌ [WEBRTC] PeerConnection still nil after recreation attempt")
             return
         }
+        
+        dlog("✅ [WEBRTC] PeerConnection exists, processing offer...")
         
         do {
             await MainActor.run {
@@ -245,9 +289,10 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
             }
             
             // Set remote description (Python's offer)
+            dlog("[WEBRTC] Setting remote description...")
             let offer = LKRTCSessionDescription(type: .offer, sdp: sdp)
             try await pc.setRemoteDescription(offer)
-            dlog("DEBUG: Remote description (offer) set successfully")
+            dlog("✅ [WEBRTC] Remote description (offer) set successfully")
             
             // Create answer
             let constraints = LKRTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: nil)

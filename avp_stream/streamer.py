@@ -15,6 +15,7 @@ import os
 import shutil
 import re
 import traceback
+import logging
 from copy import deepcopy
 from typing import Optional, Tuple, List, Dict, Any, Callable, TYPE_CHECKING
 from pathlib import Path
@@ -22,6 +23,9 @@ from aiortc import VideoStreamTrack, AudioStreamTrack
 from av import VideoFrame, AudioFrame
 from avp_stream.mujoco_msg import mujoco_ar_pb2, mujoco_ar_pb2_grpc
 from scipy.spatial.transform import Rotation as R
+
+# Suppress noisy aioice TURN channel bind errors (non-fatal, connection still works via STUN)
+logging.getLogger("aioice.turn").setLevel(logging.ERROR)
 
 
 # =============================================================================
@@ -1622,6 +1626,14 @@ class VisionProStreamer:
             if pc.iceConnectionState in ("failed", "closed", "disconnected"):
                 with self._webrtc_connection_condition:
                     self._webrtc_connected = False
+        
+        @pc.on("signalingstatechange")
+        async def on_signaling_state_change():
+            self._log(f"[WEBRTC] Signaling state: {pc.signalingState}", force=True)
+        
+        @pc.on("connectionstatechange")
+        async def on_connection_state_change():
+            self._log(f"[WEBRTC] Connection state: {pc.connectionState}", force=True)
         
         @pc.on("track")
         def on_track(track):
