@@ -16,6 +16,8 @@ import shutil
 import re
 import traceback
 import logging
+import atexit
+import signal
 from copy import deepcopy
 from typing import Optional, Tuple, List, Dict, Any, Callable, TYPE_CHECKING
 from pathlib import Path
@@ -26,6 +28,35 @@ from scipy.spatial.transform import Rotation as R
 
 # Suppress noisy aioice TURN channel bind errors (non-fatal, connection still works via STUN)
 logging.getLogger("aioice.turn").setLevel(logging.ERROR)
+
+# Global list to track active streamers for cleanup
+_active_streamers = []
+
+def _cleanup_all_streamers():
+    """Clean up all active streamers on process exit."""
+    for streamer in list(_active_streamers):
+        try:
+            streamer.cleanup()
+        except Exception as e:
+            print(f"[CLEANUP] Error during cleanup: {e}")
+
+def _signal_handler(signum, frame):
+    """Handle SIGINT/SIGTERM to ensure clean shutdown."""
+    print(f"\n[SIGNAL] Received signal {signum}, cleaning up...")
+    _cleanup_all_streamers()
+    # Re-raise to allow normal exit
+    raise KeyboardInterrupt()
+
+# Register cleanup handlers
+atexit.register(_cleanup_all_streamers)
+
+# Only register signal handlers in main thread
+try:
+    signal.signal(signal.SIGINT, _signal_handler)
+    signal.signal(signal.SIGTERM, _signal_handler)
+except ValueError:
+    # Signal handlers can only be registered in main thread
+    pass
 
 
 # =============================================================================
@@ -958,6 +989,9 @@ class VisionProStreamer:
         self._stylus_lock = Lock()
         
         self._ice_servers = None  # Initialize ICE servers (populated in cross-network mode)
+        
+        # Register for cleanup on exit
+        _active_streamers.append(self)
 
         # Start connection based on mode
         if self._cross_network_mode:
@@ -968,6 +1002,45 @@ class VisionProStreamer:
         else:
             self._start_info_server()  # Start HTTP endpoint immediately
             self._start_hand_tracking()  # Start hand tracking stream
+    
+    def cleanup(self):
+        """Clean up resources and notify VisionOS of disconnect.
+        
+        This method should be called before the Python process exits to ensure
+        VisionOS receives a proper disconnect notification.
+        """
+        self._log("[CLEANUP] Cleaning up streamer resources...", force=True)
+        
+        # Send explicit leave message via signaling
+        if self._cross_network_mode and self._signaling_ws and self._signaling_connected:
+            try:
+                self._send_signaling_message({"type": "leave"})
+                self._log("[CLEANUP] Sent leave message to signaling server", force=True)
+                # Give the message time to send
+                time.sleep(0.1)
+            except Exception as e:
+                self._log(f"[CLEANUP] Error sending leave message: {e}", force=True)
+        
+        # Close WebSocket
+        if self._signaling_ws:
+            try:
+                self._signaling_ws.close()
+                self._log("[CLEANUP] Closed signaling WebSocket", force=True)
+            except Exception as e:
+                self._log(f"[CLEANUP] Error closing WebSocket: {e}", force=True)
+        
+        # Close WebRTC peer connection
+        if hasattr(self, '_pc') and self._pc:
+            try:
+                if self._webrtc_loop:
+                    asyncio.run_coroutine_threadsafe(self._pc.close(), self._webrtc_loop)
+                self._log("[CLEANUP] Closed WebRTC peer connection", force=True)
+            except Exception as e:
+                self._log(f"[CLEANUP] Error closing WebRTC: {e}", force=True)
+        
+        # Remove from active streamers list
+        if self in _active_streamers:
+            _active_streamers.remove(self)
     
     def _log(self, message: str, force: bool = False):
         """Print a message if verbose mode is enabled or force is True.
