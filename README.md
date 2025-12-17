@@ -29,7 +29,7 @@ A complete ecosystem for using Apple Vision Pro in robotics research — from **
 
 - [Overview](#overview)
 - [Installations](#installations)
-- [NEW: External Network (Remote) Mode](#new-external-network-remote-mode)
+- [External Network (Remote) Mode 🆕](#external-network-remote-mode-)
   - [How It Works](#how-it-works)
   - [Usage](#usage)
   - [Notes](#notes)
@@ -39,7 +39,7 @@ A complete ecosystem for using Apple Vision Pro in robotics research — from **
   - [Audio Configuration Examples](#audio-configuration-examples)
 - [Use Case 2: Simulation Teleoperation](#use-case-2-simulation-teleoperation)
   - [MuJoCo Streaming](#mujoco-streaming)
-  - [Isaac Lab Streaming](#isaac-lab-streaming)
+  - [Isaac Lab Streaming 🆕](#isaac-lab-streaming-)
   - [Positioning Your Simulation in AR](#positioning-your-simulation-in-ar)
   - [Hand Tracking Coordinate Frame](#hand-tracking-coordinate-frame)
 - [Use Case 3: Egocentric Video Dataset Recording](#use-case-3-egocentric-video-dataset-recording)
@@ -47,11 +47,13 @@ A complete ecosystem for using Apple Vision Pro in robotics research — from **
   - [Camera Calibration](#camera-calibration)
 - [Recording \& Cloud Storage](#recording--cloud-storage)
   - [Automatic Cloud Sync](#automatic-cloud-sync)
-  - [Companion iOS App: Tracking Manager](#companion-ios-app-tracking-manager)
-  - [Public Dataset Sharing](#public-dataset-sharing)
+  - [Companion iOS App: Tracking Manager 🆕](#companion-ios-app-tracking-manager-)
+  - [Public Dataset Sharing 🆕](#public-dataset-sharing-)
 - [App Settings \& Customization](#app-settings--customization)
 - [API Reference](#api-reference)
-  - [Available Data](#available-data)
+  - [Hand Tracking Data 🆕](#hand-tracking-data-)
+  - [Marker \& Image Tracking 🆕](#marker--image-tracking-)
+  - [Stylus Tracking 🆕](#stylus-tracking-)
   - [Configuration Reference](#configuration-reference)
   - [Axis Convention](#axis-convention)
   - [Hand Skeleton](#hand-skeleton)
@@ -131,7 +133,8 @@ No other network configurations are required. Everything should work out of the 
 
 ---
 
-## NEW: External Network (Remote) Mode
+## External Network (Remote) Mode 🆕
+
 
 So far, Vision Pro and your Python client had to be on the **same local network** (e.g., same WiFi) for them to communicate. With **External Network Mode** with v2.5 release, you can make bilateral connection from anywhere over the internet! It's extremely useful when your robot is in a lab (likely behind school/company network's firewall) and you're working remotely using your home WiFi outside the school network. 
 
@@ -288,7 +291,7 @@ while True:
     s.update_sim()  # Stream updated poses to Vision Pro
 ```
 
-### Isaac Lab Streaming
+### Isaac Lab Streaming 🆕
 
 ```python
 from avp_stream import VisionProStreamer
@@ -392,13 +395,13 @@ Both calibrations can be performed using **Tracking Manager**, our iOS companion
 
 Any session (whether real-world teleoperation, simulation teleoperation, or egocentric recording) can be saved to cloud storage for easy access and sharing.
 
-### Automatic Cloud Sync
+### Automatic Cloud Sync 
 
 Configure cloud storage in the Tracking Streamer app settings, or our companion iOS app. It supports setting up your personal:
 
 - iCloud Drive
-- Google Drive
-- Dropbox
+- Google Drive 🆕
+- Dropbox 🆕
 
 Recordings basically include all incoming data streams (videos, audios, simulation data streams, simulation scenes, etc.) and outgoing data streams (hand/head tracking).
 - Video file (H.264/H.265 encoded)
@@ -410,7 +413,7 @@ Recordings basically include all incoming data streams (videos, audios, simulati
 **Important Note:** We never have access to your data; everything will be logged to your personal drive (which also means that it's gonna occupy your personal drive storage), which you can definitely opt out. But you can also optionally choose to share your recordings to the public community through our iOS companion app. See more in the companion app section below. 
 
 
-### Companion iOS App: Tracking Manager
+### Companion iOS App: Tracking Manager 🆕
 
 The **Tracking Manager** iOS app provides a complete interface for managing your recordings:
 
@@ -422,7 +425,7 @@ The **Tracking Manager** iOS app provides a complete interface for managing your
 | **Vision Pro Settings** | Configure Tracking Streamer settings remotely |
 | **Public Sharing** | Share recordings with the research community |
 
-### Public Dataset Sharing
+### Public Dataset Sharing 🆕
 
 Want to contribute to the research community? The Tracking Manager app allows you to:
 
@@ -432,6 +435,25 @@ Want to contribute to the research community? The Tracking Manager app allows yo
 4. Browse and download others' public recordings
 
 This creates a growing community dataset of egocentric manipulation videos with tracking data. 
+
+**Accessing Public Datasets via Python**:
+
+You can browse and download publicly shared recordings directly from Python:
+
+```python
+from avp_stream.datasets import list_public_recordings, download_recording
+
+# List all public recordings
+recordings = list_public_recordings()
+for rec in recordings:
+    print(f"{rec.title} - {rec.duration:.1f}s, {rec.frame_count} frames")
+    print(f"  Data: video={rec.has_video}, hands={rec.has_left_hand or rec.has_right_hand}")
+
+# Download a recording
+download_path = download_recording(recordings[0], dest_dir="./downloads")
+```
+
+See [`examples/18_public_datasets.py`](examples/18_public_datasets.py) for a complete interactive browser.
 
 **IMPORTANT NOTE:** The data always belongs to you; making your recordings public doesn't *copy* your dataset into some other data storage. It just makes your recording on your personal cloud to be *shareable with anyone **with a link***, and CloudKit logs that link and shares with anyone who joins the app. If you want to make your recordings to be *private* again, you can simply make the google drive / dropbox dataset folder to be "private" again, or toggle it through our iOS companion app. You can always delete the recordings on your personal cloud storage as well. 
 
@@ -459,20 +481,111 @@ These settings persist across sessions and can also be configured remotely via t
 
 ## API Reference
 
-### Available Data
+### Hand Tracking Data 🆕
+
+`get_latest()` returns a `TrackingData` object that supports both **new attribute-style** and **legacy dict-style** access (fully backward compatible).
 
 ```python
-r = s.get_latest()
+data = s.get_latest()
+
+# New attribute-style API (recommended)
+data.head                    # (4, 4) head pose matrix
+data.right                   # HandData: (27, 4, 4) joint transforms in world frame
+data.right.wrist             # (4, 4) wrist transform
+data.right.indexTip          # (4, 4) index fingertip transform
+data.right[9]                # Same as above (index 9 = indexTip)
+data.right.pinch_distance    # float: thumb-index distance (m)
+data.right.wrist_roll        # float: axial wrist rotation (rad)
+
+# Legacy dict-style API (still works)
+data["head"]                 # (1, 4, 4) head pose
+data["right_wrist"]          # (1, 4, 4) wrist pose
+data["right_fingers"]        # (25, 4, 4) finger joints
+data["right_arm"]            # (27, 4, 4) full skeleton
+data["right_pinch_distance"] # float
+```
+
+**HandData Joint Names** (use as attributes, e.g., `data.right.indexTip`):
+
+| Joint Index | Name | Joint Index | Name |
+|-------------|------|-------------|------|
+| 0 | `wrist` | 14 | `middleTip` |
+| 1 | `thumbKnuckle` | 15 | `ringMetacarpal` |
+| 2 | `thumbIntermediateBase` | 16 | `ringKnuckle` |
+| 3 | `thumbIntermediateTip` | 17 | `ringIntermediateBase` |
+| 4 | `thumbTip` | 18 | `ringIntermediateTip` |
+| 5 | `indexMetacarpal` | 19 | `ringTip` |
+| 6 | `indexKnuckle` | 20 | `littleMetacarpal` |
+| 7 | `indexIntermediateBase` | 21 | `littleKnuckle` |
+| 8 | `indexIntermediateTip` | 22 | `littleIntermediateBase` |
+| 9 | `indexTip` | 23 | `littleIntermediateTip` |
+| 10 | `middleMetacarpal` | 24 | `littleTip` |
+| 11 | `middleKnuckle` | 25 | `forearmWrist` |
+| 12 | `middleIntermediateBase` | 26 | `forearmArm` |
+| 13 | `middleIntermediateTip` | | |
+
+### Marker & Image Tracking 🆕
+
+Track ArUco markers and custom reference images in the environment. Enable marker detection in the VisionOS app settings.
+
+**ArUco Markers** (`get_markers()`):
+
+```python
+markers = s.get_markers()
+for marker_id, info in markers.items():
+    pose = info["pose"]        # (4, 4) transform matrix
+    position = pose[:3, 3]     # XYZ position
+    is_fixed = info["is_fixed"]      # Whether pose is frozen
+    is_tracked = info["is_tracked"]  # Whether actively tracked by ARKit
+    aruco_dict = info["dict"]        # ArUco dictionary type (e.g., 0 = DICT_4X4_50)
+```
+
+**All Tracked Images** (`get_tracked_images()`):
+
+Returns both ArUco markers and custom images in a unified format:
+
+```python
+images = s.get_tracked_images()
+for image_id, info in images.items():
+    # image_id format: "aruco_0_5" or "custom_0"
+    print(f"{info['name']}: type={info['image_type']}, tracked={info['is_tracked']}")
+    position = info["pose"][:3, 3]
 ```
 
 | Key | Type | Description |
 |-----|------|-------------|
-| `head` | `(1,4,4) ndarray` | Head pose matrix (Z-up frame) |
-| `left_wrist` / `right_wrist` | `(1,4,4) ndarray` | Wrist pose matrices |
-| `left_fingers` / `right_fingers` | `(25,4,4) ndarray` | Finger joints in wrist frame |
-| `left_arm` / `right_arm` | `(27,4,4) ndarray` | Full skeleton (includes forearm) |
-| `left_pinch_distance` / `right_pinch_distance` | `float` | Thumb-index pinch distance (m) |
-| `left_wrist_roll` / `right_wrist_roll` | `float` | Axial wrist rotation (rad) |
+| `image_type` | `str` | `"aruco"` or `"custom"` |
+| `name` | `str` | Display name (e.g., "ArUco 4x4 #5") |
+| `pose` | `(4,4) ndarray` | Transform matrix in tracking frame |
+| `is_fixed` | `bool` | Whether pose is frozen (for calibration) |
+| `is_tracked` | `bool` | Whether ARKit is actively tracking |
+
+**Custom Images**: You can register your own reference images (photos, logos, posters) via the VisionOS app settings under "Marker Detection → Custom Images". These are tracked just like ArUco markers.
+
+### Stylus Tracking 🆕
+
+Track [Logitech Muse](https://www.apple.com/shop/product/hs9u2zm/a/logitech-muse) stylus in space (requires visionOS 26.0+). Enable in VisionOS app settings.
+
+```python
+stylus = s.get_stylus()
+if stylus is not None:
+    pose = stylus["pose"]           # (4, 4) transform matrix
+    position = pose[:3, 3]          # XYZ position
+    
+    if stylus["tip_pressed"]:
+        pressure = stylus["tip_pressure"]  # 0.0 - 1.0
+        print(f"Drawing at {position} with pressure {pressure:.2f}")
+```
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `pose` | `(4,4) ndarray` | Stylus transform matrix |
+| `tip_pressed` | `bool` | Whether tip is pressed |
+| `tip_pressure` | `float` | Tip pressure (0.0-1.0) |
+| `primary_pressed` | `bool` | Primary button state |
+| `primary_pressure` | `float` | Primary button pressure |
+| `secondary_pressed` | `bool` | Secondary button state |
+| `secondary_pressure` | `float` | Secondary button pressure |
 
 ### Configuration Reference
 
