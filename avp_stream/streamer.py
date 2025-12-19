@@ -1822,13 +1822,31 @@ class VisionProStreamer:
         offer = await pc.createOffer()
         await pc.setLocalDescription(offer)
         
-        # Send Offer via Signaling
+        # Gather config flags for visionOS
+        video_cfg = self._video_config or {}
+        audio_cfg = self._audio_config or {}
+        stereo_video = video_cfg.get("stereo", False)
+        stereo_audio = audio_cfg.get("stereo", False)
+        video_enabled = self._video_config is not None
+        audio_enabled = self._audio_config is not None
+        sim_enabled = self._sim_config is not None
+        
+        # Debug: log the config being read
+        self._log(f'[DEBUG] Video config at offer time: {self._video_config}', force=True)
+        self._log(f'[DEBUG] stereo_video={stereo_video}, video_enabled={video_enabled}', force=True)
+        
+        # Send Offer via Signaling with config flags
         self._send_signaling_message({
             "type": "sdp",
             "sdp": pc.localDescription.sdp,
-            "sdpType": "offer"
+            "sdpType": "offer",
+            "stereoVideo": stereo_video,
+            "stereoAudio": stereo_audio,
+            "videoEnabled": video_enabled,
+            "audioEnabled": audio_enabled,
+            "simEnabled": sim_enabled,
         })
-        self._log('[SIGNALING] Sent SDP offer to VisionOS', force=True)
+        self._log(f'[SIGNALING] Sent SDP offer to VisionOS (stereoVideo={stereo_video}, stereoAudio={stereo_audio})', force=True)
         
         # Wait for and process the answer with timeout
         timeout_seconds = 30

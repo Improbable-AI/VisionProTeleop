@@ -801,6 +801,11 @@ class VideoFrameRenderer: NSObject, LKRTCVideoRenderer {
             guard let self = self else { return }
             let isStereo = DataManager.shared.stereoEnabled
             
+            // Debug: Log stereo mode periodically (every 30 frames ~ 1 second at 30fps)
+            if self.frameCount % 30 == 0 {
+                dlog("🎥 [VideoFrameRenderer] stereoEnabled=\(isStereo), frame=\(self.frameCount)")
+            }
+            
             if isStereo {
                 // Optimize: Return CGImages directly instead of wrapping in UIImage
                 if let (leftCG, rightCG) = self.splitSideBySideImage(uiImage) {

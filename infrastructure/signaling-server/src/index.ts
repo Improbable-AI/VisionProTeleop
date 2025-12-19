@@ -64,6 +64,12 @@ interface SignalingMessage {
     sdpType?: "offer" | "answer";
     candidate?: { candidate: string; sdpMid?: string; sdpMLineIndex?: number };
     message?: string;
+    // Stream configuration flags (sent with SDP offer from Python)
+    stereoVideo?: boolean;
+    stereoAudio?: boolean;
+    videoEnabled?: boolean;
+    audioEnabled?: boolean;
+    simEnabled?: boolean;
 }
 
 export class SignalingRoom {
@@ -133,6 +139,12 @@ export class SignalingRoom {
                     type: "sdp",
                     sdp: msg.sdp,
                     sdpType: msg.sdpType,
+                    // Pass through stream configuration flags
+                    stereoVideo: msg.stereoVideo,
+                    stereoAudio: msg.stereoAudio,
+                    videoEnabled: msg.videoEnabled,
+                    audioEnabled: msg.audioEnabled,
+                    simEnabled: msg.simEnabled,
                 });
                 break;
 

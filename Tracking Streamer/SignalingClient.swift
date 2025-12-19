@@ -14,6 +14,12 @@ class SignalingClient: ObservableObject {
     @Published var roomCode: String = ""
     @Published var peerConnected: Bool = false
     @Published var connectionStatus: String = "Disconnected"
+    @Published var isRoomCodeLocked: Bool = false  // Whether room code persists across sessions
+    
+    // MARK: - UserDefaults Keys
+    
+    private let roomCodeKey = "persistentRoomCode"
+    private let roomCodeLockedKey = "roomCodeLocked"
     
     // MARK: - Private Properties
     
@@ -81,10 +87,24 @@ class SignalingClient: ObservableObject {
         pendingICECandidates.removeAll()
     }
     
+    /// Clear WebRTC-related callbacks (call when session ends so new session can re-register)
+    /// This ensures that when a new WebRTCClient is created, it can register fresh callbacks
+    /// and receive any buffered offers.
+    func clearWebRTCCallbacks() {
+        print("[SIGNALING] Clearing WebRTC callbacks for session reset")
+        onSDPOfferReceived = nil
+        onSDPAnswerReceived = nil
+        onICECandidateReceived = nil
+        onPeerJoined = nil
+        onOfferRequested = nil
+        onIceServersReceived = nil
+        // Note: onPeerLeft is kept so VideoStreamManager can still handle future disconnects
+    }
+    
     // MARK: - Lifecycle
     
     init() {
-        generateRoomCode()
+        loadPersistedRoomCode()
     }
     
     deinit {
@@ -95,16 +115,49 @@ class SignalingClient: ObservableObject {
     
     // MARK: - Public Methods
     
-    /// Generate a new room code (format: ABC-1234)
+    /// Load persisted room code from UserDefaults, or generate a new one
+    private func loadPersistedRoomCode() {
+        isRoomCodeLocked = UserDefaults.standard.bool(forKey: roomCodeLockedKey)
+        
+        if isRoomCodeLocked, let savedCode = UserDefaults.standard.string(forKey: roomCodeKey), !savedCode.isEmpty {
+            roomCode = savedCode
+            print("[SIGNALING] Loaded persisted room code: \(roomCode)")
+        } else {
+            generateRoomCode()
+        }
+    }
+    
+    /// Generate a new room code (format: ABCD-1234)
     func generateRoomCode() {
         let letters = "ABCDEFGHJKLMNPQRSTUVWXYZ"  // Excludes I and O to avoid confusion
         let numbers = "0123456789"
         
-        let letterPart = String((0..<3).map { _ in letters.randomElement()! })
+        let letterPart = String((0..<4).map { _ in letters.randomElement()! })
         let numberPart = String((0..<4).map { _ in numbers.randomElement()! })
         
         roomCode = "\(letterPart)-\(numberPart)"
         print("[SIGNALING] Generated room code: \(roomCode)")
+        
+        // If locked, save the new code too
+        if isRoomCodeLocked {
+            UserDefaults.standard.set(roomCode, forKey: roomCodeKey)
+        }
+    }
+    
+    /// Lock/unlock the current room code for persistence across sessions
+    func setRoomCodeLocked(_ locked: Bool) {
+        isRoomCodeLocked = locked
+        UserDefaults.standard.set(locked, forKey: roomCodeLockedKey)
+        
+        if locked {
+            // Save current code
+            UserDefaults.standard.set(roomCode, forKey: roomCodeKey)
+            print("[SIGNALING] Room code locked: \(roomCode)")
+        } else {
+            // Clear saved code (will generate new on next launch)
+            UserDefaults.standard.removeObject(forKey: roomCodeKey)
+            print("[SIGNALING] Room code unlocked (will regenerate on next launch)")
+        }
     }
     
     /// Connect to the signaling server and join the room
@@ -161,13 +214,14 @@ class SignalingClient: ObservableObject {
     
     /// Send SDP answer to the peer via signaling server
     func sendSDPAnswer(_ sdp: String) {
+        print("[SIGNALING] 📤 Sending SDP answer to Python (length: \(sdp.count) chars)...")
         let message: [String: Any] = [
             "type": "sdp",
             "sdp": sdp,
             "sdpType": "answer"
         ]
         sendMessage(message)
-        print("[SIGNALING] Sent SDP answer")
+        print("[SIGNALING] ✅ SDP answer sent successfully")
     }
     
     /// Send ICE candidate to the peer via signaling server
@@ -245,7 +299,7 @@ class SignalingClient: ObservableObject {
                 self.receiveMessage()
                 
             case .failure(let error):
-                print("[SIGNALING] Receive error: \(error.localizedDescription)")
+                print("[SIGNALING] ❌ Receive error: \(error.localizedDescription)")
                 Task { @MainActor in
                     self.isConnected = false
                     self.connectionStatus = "Connection lost"
@@ -256,12 +310,18 @@ class SignalingClient: ObservableObject {
     }
     
     private func handleMessage(_ text: String) {
+        // Log ALL incoming messages to debug reconnection issues
+        let preview = text.prefix(80)
+        print("[SIGNALING] 📩 Message received: \(preview)...")
+        
         guard let data = text.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let type = json["type"] as? String else {
-            print("[SIGNALING] Invalid message: \(text)")
+            print("[SIGNALING] ❌ Invalid message: \(text)")
             return
         }
+        
+        print("[SIGNALING] 📩 Parsed message type: \(type)")
         
         Task { @MainActor in
             switch type {
@@ -281,30 +341,64 @@ class SignalingClient: ObservableObject {
                 
             case "peer-joined":
                 let peerRole = json["peerRole"] as? String ?? "unknown"
-                print("[SIGNALING] Peer joined: \(peerRole)")
+                print("[SIGNALING] 🔵 Peer joined: \(peerRole)")
+                print("[SIGNALING] 🔍 onSDPOfferReceived callback is \(onSDPOfferReceived == nil ? "NIL ❌" : "SET ✅")")
                 peerConnected = true
                 connectionStatus = "Python connected!"
                 onPeerJoined?()
                 
             case "peer-left":
-                print("[SIGNALING] Peer left")
+                print("[SIGNALING] 🔴 Peer left")
                 peerConnected = false
                 connectionStatus = "Room: \(roomCode)"
                 // Clear any pending messages from previous session
                 clearPendingMessages()
+                // Clear WebRTC callbacks so new WebRTCClient can register fresh ones
+                // This is critical: offers arriving after this will be buffered
+                // until the new WebRTCClient registers its callbacks
+                clearWebRTCCallbacks()
                 onPeerLeft?()
                 
             case "sdp":
                 if let sdp = json["sdp"] as? String,
                    let sdpType = json["sdpType"] as? String {
-                    print("[SIGNALING] Received SDP \(sdpType) (length: \(sdp.count) chars)")
+                    print("[SIGNALING] 📨 Received SDP \(sdpType) (length: \(sdp.count) chars)")
+                    
+                    // Extract stereo and enabled flags from offer (sent by Python)
                     if sdpType == "offer" {
+                        // Debug: Log raw JSON values for stereo flags
+                        let rawStereoVideo = json["stereoVideo"]
+                        let rawStereoAudio = json["stereoAudio"]
+                        let stereoVideoType = rawStereoVideo == nil ? "nil" : String(describing: Swift.type(of: rawStereoVideo!))
+                        let stereoAudioType = rawStereoAudio == nil ? "nil" : String(describing: Swift.type(of: rawStereoAudio!))
+                        print("[SIGNALING] 🔍 Raw JSON values: stereoVideo=\(String(describing: rawStereoVideo)) (type: \(stereoVideoType)), stereoAudio=\(String(describing: rawStereoAudio)) (type: \(stereoAudioType))")
+                        
+                        let stereoVideo = json["stereoVideo"] as? Bool ?? false
+                        let stereoAudio = json["stereoAudio"] as? Bool ?? false
+                        let videoEnabled = json["videoEnabled"] as? Bool ?? false
+                        let audioEnabled = json["audioEnabled"] as? Bool ?? false
+                        let simEnabled = json["simEnabled"] as? Bool ?? false
+                        
+                        print("[SIGNALING] 🎬 Stream config: stereoVideo=\(stereoVideo), stereoAudio=\(stereoAudio), video=\(videoEnabled), audio=\(audioEnabled), sim=\(simEnabled)")
+                        
+                        // Update DataManager with stream configuration
+                        DataManager.shared.stereoEnabled = stereoVideo
+                        DataManager.shared.stereoAudioEnabled = stereoAudio
+                        DataManager.shared.videoEnabled = videoEnabled
+                        DataManager.shared.audioEnabled = audioEnabled
+                        DataManager.shared.simEnabled = simEnabled
+                        
+                        // Verify the flags were set correctly
+                        print("[SIGNALING] ✅ DataManager.stereoEnabled is now: \(DataManager.shared.stereoEnabled)")
+                        
+                        print("[SIGNALING] 🔍 Checking if onSDPOfferReceived callback is set...")
                         if let callback = onSDPOfferReceived {
-                            print("[SIGNALING] Delivering SDP offer to callback")
+                            print("[SIGNALING] ✅ Callback IS set, delivering SDP offer now...")
                             callback(sdp)
+                            print("[SIGNALING] ✅ Callback invoked successfully")
                         } else {
                             // Buffer the offer until callback is registered
-                            print("[SIGNALING] ⚠️ Buffering SDP offer (callback not yet registered)")
+                            print("[SIGNALING] ⚠️ Callback is NIL - Buffering SDP offer")
                             pendingSDPOffer = sdp
                         }
                     } else if sdpType == "answer" {

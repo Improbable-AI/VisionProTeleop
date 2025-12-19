@@ -111,49 +111,14 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
     func connectWithSignaling(_ signalingClient: SignalingClient) async throws {
         dlog("DEBUG: Connecting with signaling client (Cross-Network Mode - Answerer)")
         await MainActor.run {
-            DataManager.shared.connectionStatus = "Requesting TURN servers..."
-        }
-        
-        // Request ICE servers (including TURN) from signaling server
-        var receivedIceServers: [LKRTCIceServer]?
-        
-        await MainActor.run {
-            signalingClient.onIceServersReceived = { servers in
-                dlog("📡 [WEBRTC] Received \(servers.count) ICE servers from signaling")
-                receivedIceServers = servers
-            }
-            signalingClient.requestIceServers()
-        }
-        
-        // Wait for ICE servers with timeout
-        let timeout: UInt64 = 5_000_000_000 // 5 seconds
-        let start = DispatchTime.now()
-        while receivedIceServers == nil {
-            try await Task.sleep(nanoseconds: 100_000_000) // 100ms
-            if DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds > timeout {
-                dlog("⚠️ [WEBRTC] Timeout waiting for ICE servers, using STUN only")
-                break
-            }
+            DataManager.shared.connectionStatus = "Waiting for Python to connect..."
         }
         
         // Create peer connection with STUN/TURN servers
         let config = LKRTCConfiguration()
-        if let iceServers = receivedIceServers, !iceServers.isEmpty {
-            config.iceServers = iceServers
-            dlog("✅ [WEBRTC] Using \(iceServers.count) ICE servers (including TURN)")
-            for server in iceServers {
-                dlog("   - \(server.urlStrings.joined(separator: ", "))")
-            }
-        } else {
-            config.iceServers = [LKRTCIceServer(urlStrings: [stunServer])]
-            dlog("⚠️ [WEBRTC] Using STUN only - cross-network may fail without TURN")
-        }
+        config.iceServers = [LKRTCIceServer(urlStrings: [stunServer])]
         config.iceCandidatePoolSize = 10
         config.continualGatheringPolicy = .gatherContinually
-        
-        await MainActor.run {
-            DataManager.shared.connectionStatus = "Waiting for Python to connect..."
-        }
         
         let constraints = LKRTCMediaConstraints(
             mandatoryConstraints: nil,
@@ -172,8 +137,6 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
         
         // Setup Signaling Callbacks
         await MainActor.run {
-            dlog("🔧 [WEBRTC] Registering signaling callbacks...")
-            
             // Handle incoming SDP offer from Python (NEW: we are now the answerer)
             signalingClient.onSDPOfferReceived = { [weak self] sdp in
                 dlog("📥 [SIGNALING] Received SDP offer from Python")
@@ -181,7 +144,6 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
                     await self?.handleOfferAndCreateAnswer(sdp: sdp, signalingClient: signalingClient)
                 }
             }
-            dlog("✅ [WEBRTC] SDP offer callback registered")
             
             signalingClient.onICECandidateReceived = { [weak self] candidateDict in
                 guard let self = self,
@@ -193,7 +155,6 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
                 let candidate = LKRTCIceCandidate(sdp: sdp, sdpMLineIndex: sdpMLineIndex, sdpMid: sdpMid)
                 self.handleRemoteCandidate(candidate)
             }
-            dlog("✅ [WEBRTC] ICE candidate callback registered")
             
             // onOfferRequested is no longer needed - Python creates offers
             signalingClient.onOfferRequested = nil
@@ -234,54 +195,10 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
     
     /// Handle incoming SDP offer from Python and create answer
     private func handleOfferAndCreateAnswer(sdp: String, signalingClient: SignalingClient) async {
-        dlog("📥 [WEBRTC] handleOfferAndCreateAnswer called with SDP length: \(sdp.count)")
-        
-        // If peerConnection doesn't exist (was closed due to previous disconnect), recreate it
-        if self.peerConnection == nil {
-            dlog("🔄 [WEBRTC] PeerConnection is nil, recreating for new session...")
-            
-            // Recreate peer connection with STUN (TURN servers would need to be re-requested)
-            let config = LKRTCConfiguration()
-            config.iceServers = [LKRTCIceServer(urlStrings: [stunServer])]
-            config.iceCandidatePoolSize = 10
-            config.continualGatheringPolicy = .gatherContinually
-            
-            let constraints = LKRTCMediaConstraints(
-                mandatoryConstraints: nil,
-                optionalConstraints: ["DtlsSrtpKeyAgreement": "true"]
-            )
-            
-            guard let pc = factory.peerConnection(
-                with: config,
-                constraints: constraints,
-                delegate: self
-            ) else {
-                dlog("❌ [WEBRTC] Failed to recreate PeerConnection")
-                return
-            }
-            
-            self.peerConnection = pc
-            
-            // Re-wire ICE candidate generation
-            self.onLocalICECandidateGenerated = { candidate in
-                Task { @MainActor in
-                    signalingClient.sendICECandidate(
-                        candidate: candidate.sdp,
-                        sdpMid: candidate.sdpMid,
-                        sdpMLineIndex: candidate.sdpMLineIndex
-                    )
-                }
-            }
-            
-            dlog("✅ [WEBRTC] PeerConnection recreated successfully")
-        }
-        
         guard let pc = self.peerConnection else {
-            dlog("❌ [WEBRTC] PeerConnection still nil after recreation attempt")
+            dlog("❌ [WEBRTC] PeerConnection not initialized, cannot handle offer")
             return
         }
-        
-        dlog("✅ [WEBRTC] PeerConnection exists, processing offer...")
         
         do {
             await MainActor.run {
@@ -289,10 +206,9 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
             }
             
             // Set remote description (Python's offer)
-            dlog("[WEBRTC] Setting remote description...")
             let offer = LKRTCSessionDescription(type: .offer, sdp: sdp)
             try await pc.setRemoteDescription(offer)
-            dlog("✅ [WEBRTC] Remote description (offer) set successfully")
+            dlog("DEBUG: Remote description (offer) set successfully")
             
             // Create answer
             let constraints = LKRTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: nil)
@@ -549,18 +465,6 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
             
             // Fallback: iterate candidate-pair stats to find the one with 'nominated' and 'state'='succeeded' 
             // if selectedCandidatePairId isn't reliable in some versions
-            if activePairId == nil {
-                for (id, stats) in report.statistics {
-                    if stats.type == "candidate-pair" {
-                        let nominated = stats.values["nominated"] as? Bool ?? false
-                        let state = stats.values["state"] as? String
-                        if nominated && state == "succeeded" {
-                            activePairId = id
-                            break
-                        }
-                    }
-                }
-            }
             
             guard let pairId = activePairId,
                   let pairStats = report.statistics[pairId] else {
@@ -571,45 +475,37 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
             let remoteId = pairStats.values["remoteCandidateId"] as? String
             
             var connectionTypeString = "Unknown"
-            var localType: String?
-            var remoteType: String?
-            var localIP: String?
-            var remoteIP: String?
             
-            // Get local candidate info
-            if let localId = localId,
-               let localCandidate = report.statistics[localId] {
-                localType = localCandidate.values["candidateType"] as? String
-                localIP = localCandidate.values["ip"] as? String ?? localCandidate.values["address"] as? String
-            }
-            
-            // Get remote candidate info
             if let remoteId = remoteId,
                let remoteCandidate = report.statistics[remoteId] {
-                remoteType = remoteCandidate.values["candidateType"] as? String
-                remoteIP = remoteCandidate.values["ip"] as? String ?? remoteCandidate.values["address"] as? String
+                
+                // Inspect candidate types
+                // types: host, srflx, prflx, relay
+                if let type = remoteCandidate.values["candidateType"] as? String {
+                    if type == "relay" {
+                        connectionTypeString = "TURN (Relay)"
+                    } else if type == "srflx" || type == "prflx" {
+                        connectionTypeString = "STUN (P2P)"
+                    } else if type == "host" {
+                        connectionTypeString = "Direct (Host)"
+                    }
+                }
+                
+                // If local is relay, it's definitely relay
+                if let localId = localId,
+                   let localCandidate = report.statistics[localId],
+                   let localType = localCandidate.values["candidateType"] as? String {
+                    if localType == "relay" {
+                        connectionTypeString = "TURN (Relay)"
+                    }
+                }
             }
             
-            // Determine connection type based on BOTH local and remote candidate types
-            // relay = TURN (traffic goes through relay server)
-            // srflx = Server Reflexive (public IP discovered via STUN)
-            // prflx = Peer Reflexive (public IP discovered during ICE)
-            // host = Local network address
-            
-            if localType == "relay" || remoteType == "relay" {
-                connectionTypeString = "TURN (Relay)"
-            } else if localType == "srflx" || localType == "prflx" || 
-                      remoteType == "srflx" || remoteType == "prflx" {
-                connectionTypeString = "STUN (P2P)"
-            } else if localType == "host" && remoteType == "host" {
-                connectionTypeString = "Direct (Host)"
-            }
-            
-            // Log detailed info for debugging
-            dlog("[STATS] Connection: \(connectionTypeString) - Local: \(localType ?? "?") (\(localIP ?? "?")) <-> Remote: \(remoteType ?? "?") (\(remoteIP ?? "?"))")
-            
-            // Update UI
+            // Check current status to append/update
             Task { @MainActor in
+                let current = DataManager.shared.connectionStatus
+                // Only update if it contains "Connected" to avoid overwriting transient states
+                // Or if we specifically want to show this info always once connected
                 DataManager.shared.webRTCConnectionType = connectionTypeString
             }
         }

@@ -345,22 +345,43 @@ struct ContentView: View {
                         .foregroundColor(.white)
                         .tracking(2)
                     
-                    Button {
-                        signalingClient.generateRoomCode()
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.caption)
-                            Text("New Code")
-                                .font(.caption.weight(.medium))
+                    // Button row: New Code and Lock/Unlock
+                    HStack(spacing: 8) {
+                        Button {
+                            signalingClient.generateRoomCode()
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.caption)
+                                Text("New Code")
+                                    .font(.caption.weight(.medium))
+                            }
+                            .foregroundColor(.white.opacity(0.5))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.white.opacity(0.1))
+                            .cornerRadius(8)
                         }
-                        .foregroundColor(.white.opacity(0.5))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.white.opacity(0.1))
-                        .cornerRadius(8)
+                        .buttonStyle(.plain)
+                        
+                        Button {
+                            signalingClient.setRoomCodeLocked(!signalingClient.isRoomCodeLocked)
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: signalingClient.isRoomCodeLocked ? "lock.fill" : "lock.open")
+                                    .font(.caption)
+                                Text(signalingClient.isRoomCodeLocked ? "Locked" : "Lock")
+                                    .font(.caption.weight(.medium))
+                            }
+                            .foregroundColor(signalingClient.isRoomCodeLocked ? .yellow : .white.opacity(0.5))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(signalingClient.isRoomCodeLocked ? Color.yellow.opacity(0.15) : Color.white.opacity(0.1))
+                            .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
+                        .help(signalingClient.isRoomCodeLocked ? "Room code persists across sessions. Tap to unlock." : "Tap to keep this code across sessions.")
                     }
-                    .buttonStyle(.plain)
                 }
                 .frame(minWidth: 200)
             }

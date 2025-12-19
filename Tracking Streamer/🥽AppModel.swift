@@ -349,8 +349,8 @@ class DataManager: ObservableObject {
         
         // Load saved hand joints opacity or default to 0.9 (90%)
         self.handJointsOpacity = UserDefaults.standard.object(forKey: "handJointsOpacity") as? Float ?? 0.9
-        // Load saved hand prediction offset or default to 0.005 (5ms)
-        self.handPredictionOffset = UserDefaults.standard.object(forKey: "handPredictionOffset") as? Float ?? 0.005
+        // Load saved hand prediction offset or default to 0.033 (33ms)
+        self.handPredictionOffset = UserDefaults.standard.object(forKey: "handPredictionOffset") as? Float ?? 0.033
         // Load saved video plane scale or default to 1.0 (100%)
         self.videoPlaneScale = UserDefaults.standard.object(forKey: "videoPlaneScale") as? Float ?? 1.0
         // Load saved stereo baseline offset or default to 0.0 (no adjustment)
