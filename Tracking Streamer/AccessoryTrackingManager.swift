@@ -428,7 +428,7 @@ class AccessoryTrackingManager: ObservableObject {
     func updateSnapshots() {
         // Debug: log guard condition occasionally
         if Int.random(in: 0...60) == 0 {
-            dlog("🔄 [AccessoryTracking] updateSnapshots: isEnabled=\(isEnabled), isTrackingActive=\(isTrackingActive)")
+            // dlog("🔄 [AccessoryTracking] updateSnapshots: isEnabled=\(isEnabled), isTrackingActive=\(isTrackingActive)")
         }
         
         guard isEnabled && isTrackingActive else {
