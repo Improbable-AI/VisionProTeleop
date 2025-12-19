@@ -3569,27 +3569,25 @@ struct StatusOverlay: View {
                     
                     ScrollView {
                         VStack(spacing: 6) {
-                            ForEach(cachedFiles, id: \.path) { fileInfo in
+                            ForEach(cachedFiles, id: \.cacheKey) { fileInfo in
                                 HStack(spacing: 12) {
                                     Image(systemName: "cube.fill")
                                         .font(.system(size: 14))
                                         .foregroundColor(.purple)
                                     
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text(fileInfo.lastPathComponent)
+                                        Text(fileInfo.filename)
                                             .font(.caption)
                                             .fontWeight(.medium)
                                             .foregroundColor(.white)
                                             .lineLimit(1)
                                         
-                                        if let size = try? FileManager.default.attributesOfItem(atPath: fileInfo.path)[.size] as? Int64 {
-                                            let sizeStr = size > 1024 * 1024 
-                                                ? String(format: "%.1f MB", Double(size) / 1024 / 1024)
-                                                : String(format: "%.0f KB", Double(size) / 1024)
-                                            Text(sizeStr)
-                                                .font(.caption2)
-                                                .foregroundColor(.white.opacity(0.5))
-                                        }
+                                        let sizeStr = fileInfo.size > 1024 * 1024 
+                                            ? String(format: "%.1f MB", Double(fileInfo.size) / 1024 / 1024)
+                                            : String(format: "%.0f KB", Double(fileInfo.size) / 1024)
+                                        Text(sizeStr)
+                                            .font(.caption2)
+                                            .foregroundColor(.white.opacity(0.5))
                                     }
                                     
                                     Spacer()
