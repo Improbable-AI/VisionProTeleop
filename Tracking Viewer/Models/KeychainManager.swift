@@ -114,7 +114,7 @@ class KeychainManager {
             dlog("✅ [KeychainManager] Loaded \(key.rawValue) from keychain")
             return data
         } else if status == errSecItemNotFound {
-            dlog("ℹ️ [KeychainManager] Key \(key.rawValue) not found in keychain")
+            // dlog("ℹ️ [KeychainManager] Key \(key.rawValue) not found in keychain")
             return nil
         } else {
             dlog("❌ [KeychainManager] Failed to load \(key.rawValue): \(status)")

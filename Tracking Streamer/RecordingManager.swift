@@ -349,7 +349,7 @@ class RecordingManager: ObservableObject {
     func loadCloudSettings() {
         CloudStorageSettings.shared.loadSettings()
         cloudProvider = CloudStorageSettings.shared.getActiveProvider()
-        dlog("☁️ [RecordingManager] Cloud provider: \(cloudProvider.displayName)")
+        // dlog("☁️ [RecordingManager] Cloud provider: \(cloudProvider.displayName)")
     }
     
     // MARK: - Auto-Recording Control

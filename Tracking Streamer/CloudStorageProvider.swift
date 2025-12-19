@@ -70,7 +70,7 @@ class CloudStorageSettings: ObservableObject {
         NotificationCenter.default.publisher(for: NSNotification.Name("NSApplicationDidBecomeActiveNotification"))
             .sink { [weak self] _ in
                 Task { @MainActor in
-                    dlog("☁️ [CloudStorageSettings] App became active, refreshing settings...")
+                    // dlog("☁️ [CloudStorageSettings] App became active, refreshing settings...")
                     self?.loadSettings()
                 }
             }
@@ -90,8 +90,8 @@ class CloudStorageSettings: ObservableObject {
     
     /// Reload settings from keychain (call when app comes to foreground)
     func loadSettings() {
-        dlog("☁️ [CloudStorageSettings] ==========================================")
-        dlog("☁️ [CloudStorageSettings] Loading settings from iCloud Keychain...")
+        // dlog("☁️ [CloudStorageSettings] ==========================================")
+        // dlog("☁️ [CloudStorageSettings] Loading settings from iCloud Keychain...")
         
         // Debug: Check all keys
         let providerValue = keychain.loadString(forKey: .selectedCloudProvider)
@@ -100,21 +100,21 @@ class CloudStorageSettings: ObservableObject {
         let hasGoogleDriveAccessToken = keychain.exists(key: .googleDriveAccessToken)
         let hasGoogleDriveRefreshToken = keychain.exists(key: .googleDriveRefreshToken)
         
-        dlog("☁️ [CloudStorageSettings] Raw keychain values:")
-        dlog("☁️   - selectedCloudProvider: \(providerValue ?? "nil")")
-        dlog("☁️   - dropboxAccessToken exists: \(hasDropboxAccessToken)")
-        dlog("☁️   - dropboxRefreshToken exists: \(hasDropboxRefreshToken)")
-        dlog("☁️   - googleDriveAccessToken exists: \(hasGoogleDriveAccessToken)")
-        dlog("☁️   - googleDriveRefreshToken exists: \(hasGoogleDriveRefreshToken)")
+        // dlog("☁️ [CloudStorageSettings] Raw keychain values:")
+        // dlog("☁️   - selectedCloudProvider: \(providerValue ?? "nil")")
+        // dlog("☁️   - dropboxAccessToken exists: \(hasDropboxAccessToken)")
+        // dlog("☁️   - dropboxRefreshToken exists: \(hasDropboxRefreshToken)")
+        // dlog("☁️   - googleDriveAccessToken exists: \(hasGoogleDriveAccessToken)")
+        // dlog("☁️   - googleDriveRefreshToken exists: \(hasGoogleDriveRefreshToken)")
         
         // Load selected provider
         if let providerString = providerValue,
            let provider = CloudStorageProvider(rawValue: providerString) {
             selectedProvider = provider
-            dlog("☁️ [CloudStorageSettings] ✅ Provider from keychain: \(provider.displayName)")
+            // dlog("☁️ [CloudStorageSettings] ✅ Provider from keychain: \(provider.displayName)")
         } else {
             selectedProvider = .iCloudDrive
-            dlog("☁️ [CloudStorageSettings] ⚠️ No provider in keychain, using iCloud Drive")
+            // dlog("☁️ [CloudStorageSettings] ⚠️ No provider in keychain, using iCloud Drive")
         }
         
         // Check if Dropbox is configured
@@ -137,8 +137,8 @@ class CloudStorageSettings: ObservableObject {
         Last sync: \(lastSyncTime?.formatted() ?? "never")
         """
         
-        dlog("☁️ [CloudStorageSettings] ==========================================")
-        dlog("☁️ [CloudStorageSettings] Final: Provider=\(selectedProvider.displayName), Dropbox=\(isDropboxAvailable), GoogleDrive=\(isGoogleDriveAvailable)")
+        // dlog("☁️ [CloudStorageSettings] ==========================================")
+        // dlog("☁️ [CloudStorageSettings] Final: Provider=\(selectedProvider.displayName), Dropbox=\(isDropboxAvailable), GoogleDrive=\(isGoogleDriveAvailable)")
         
         // Post notification for RecordingManager
         NotificationCenter.default.post(name: .cloudStorageSettingsDidChange, object: nil)
@@ -159,7 +159,7 @@ class CloudStorageSettings: ObservableObject {
     
     /// Force refresh settings (call from UI)
     func forceRefresh() {
-        dlog("☁️ [CloudStorageSettings] Force refresh requested")
+        // dlog("☁️ [CloudStorageSettings] Force refresh requested")
         loadSettings()
     }
 }
