@@ -948,7 +948,17 @@ class RecordingManager: ObservableObject {
     
     // MARK: - Saving
     
+    private var isSaveInProgress = false  // Guard against concurrent saves
+    
     private func saveRecording() async {
+        // Guard against concurrent save calls
+        guard !isSaveInProgress else {
+            dlog("⚠️ [RecordingManager] Save already in progress, ignoring duplicate call")
+            return
+        }
+        isSaveInProgress = true
+        defer { isSaveInProgress = false }
+        
         // Wait for recording queue to finish processing
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             recordingQueue.async {
@@ -980,6 +990,8 @@ class RecordingManager: ObservableObject {
             
             // Finalize video file
             if let writer = assetWriter, writer.status == .writing {
+                // Clear reference immediately to prevent other code from using it
+                assetWriter = nil
                 videoWriterInput?.markAsFinished()
                 
                 await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
@@ -1006,7 +1018,7 @@ class RecordingManager: ObservableObject {
                 }
             }
             
-            // Clean up writer references
+            // Clean up writer references (assetWriter may already be nil if we finalized above)
             assetWriter = nil
             videoWriterInput = nil
             pixelBufferAdaptor = nil

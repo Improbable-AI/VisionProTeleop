@@ -98,9 +98,14 @@ if __name__ == "__main__":
         choices=["grpc", "webrtc"],
         help="Transport used for hand tracking data (default: grpc)",
     )
+    parser.add_argument(
+        "--relay-only",
+        action="store_true",
+        help="Force TURN relay only (skip direct/STUN, for testing cross-network)",
+    )
     args = parser.parse_args()
     # Create streamer (ip can be an IP address or room code)
-    streamer = VisionProStreamer(ip=args.ip, ht_backend=args.hand_tracking_backend)
+    streamer = VisionProStreamer(ip=args.ip, ht_backend=args.hand_tracking_backend, relay_only=args.relay_only)
     
     streamer.register_frame_callback(hand_tracking_visualizer(streamer))
     

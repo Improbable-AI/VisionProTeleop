@@ -29,7 +29,8 @@ def create_stereo_depth_visualizer(streamer, disparity_scale=50.0):
         
         # This will be side-by-side stereo (left half = left eye, right half = right eye)
         half_w = w // 2
-        
+        quarter_w = half_w // 2  # Center of each eye view
+        center_y = h // 2
 
         # Get latest hand tracking data
         latest = streamer.get_latest()
@@ -40,11 +41,6 @@ def create_stereo_depth_visualizer(streamer, disparity_scale=50.0):
                 cv2.putText(blank_frame, msg, (eye_offset - 150, h//2),
                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
             return blank_frame
-        
-        # Virtual 3D space parameters
-        center_y = h // 2
-        quarter_w = half_w // 2  # Center of each eye view
-        
         
         # Scale factors for projection
         xy_scale = 800  # How much to scale X/Y coordinates (doubled for bigger hands)

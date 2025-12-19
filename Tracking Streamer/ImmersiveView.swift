@@ -427,24 +427,24 @@ struct ImmersiveView: View {
                 videoMinimized = false
                 hasAutoMinimized = false
                 fixedWorldTransform = nil
-                // Stop the video stream
-                videoStreamManager.stop()
+                // Stop the video stream but preserve for potential reconnection
+                videoStreamManager.stop(preserveForReconnect: true)
             }
         }
         .onChange(of: dataManager.webrtcGeneration) { oldValue, newValue in
             if newValue < 0 {
-                // Disconnection detected
+                // Disconnection detected - preserve client for reconnection
                 dlog("🔌 [ImmersiveView] WebRTC disconnected (generation: \(newValue)) - clearing state")
                 imageData.left = nil
                 imageData.right = nil
                 hasFrames = false
                 videoMinimized = false
                 fixedWorldTransform = nil
-                videoStreamManager.stop()
+                videoStreamManager.stop(preserveForReconnect: true)
             } else if newValue > 0 && oldValue != newValue {
-                // New connection or reconnection
+                // New connection or reconnection - preserve client for smooth transition
                 dlog("🔄 [ImmersiveView] WebRTC generation changed to \(newValue), restarting stream...")
-                videoStreamManager.stop()
+                videoStreamManager.stop(preserveForReconnect: true)
                 // Give it a moment to cleanup
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     videoStreamManager.start(imageData: imageData)
@@ -479,7 +479,7 @@ struct ImmersiveView: View {
         }
         .onDisappear {
             dlog("DEBUG: ImmersiveView disappeared, stopping video stream")
-            videoStreamManager.stop()
+            videoStreamManager.stop(preserveForReconnect: false)  // Full cleanup on disappear
             fixedWorldTransform = nil
         }
         .upperLimbVisibility(dataManager.upperLimbVisible ? .visible : .hidden)
@@ -552,9 +552,20 @@ class VideoStreamManager: ObservableObject {
                 dlog("🎬 [DEBUG] VideoStreamManager.start() called")
                 dlog("🔄 [DEBUG] Dual-mode: Waiting for Python client via Local (gRPC) OR Remote (Signaling)...")
                 
-                // CREATE SHARED WEBRTC CLIENT / RENDERERS
-                let client = WebRTCClient()
-                self.webrtcClient = client
+                // REUSE EXISTING WEBRTC CLIENT FOR RECONNECTION (if available)
+                // This is critical: creating a new client breaks the signaling callbacks
+                let client: WebRTCClient
+                let isReconnection: Bool
+                if let existingClient = self.webrtcClient {
+                    dlog("♻️ [DEBUG] Reusing existing WebRTCClient for reconnection")
+                    client = existingClient
+                    isReconnection = true
+                } else {
+                    dlog("🆕 [DEBUG] Creating new WebRTCClient (first connection)")
+                    client = WebRTCClient()
+                    self.webrtcClient = client
+                    isReconnection = false
+                }
                 
                 // Handle connection state changes
                 client.onConnectionStateChanged = { [weak self] isConnected in
@@ -569,16 +580,25 @@ class VideoStreamManager: ObservableObject {
                     client.onSimPosesReceived = simCallback
                 }
                 
-                let videoRenderer = VideoFrameRenderer(imageData: imageData)
-                self.videoRenderer = videoRenderer
+                // Only create new renderers if they don't exist
+                let videoRenderer: VideoFrameRenderer
+                if let existingRenderer = self.videoRenderer {
+                    videoRenderer = existingRenderer
+                } else {
+                    videoRenderer = VideoFrameRenderer(imageData: imageData)
+                    self.videoRenderer = videoRenderer
+                    client.addVideoRenderer(videoRenderer)
+                }
                 
-                let audioRenderer = AudioFrameRenderer()
-                self.audioRenderer = audioRenderer
-                
-                client.addVideoRenderer(videoRenderer)
-                client.addAudioRenderer(audioRenderer)
-                
-                // DUAL-MODE CONNECTION: Race local gRPC vs remote signaling
+                let audioRenderer: AudioFrameRenderer
+                if let existingRenderer = self.audioRenderer {
+                    audioRenderer = existingRenderer
+                } else {
+                    audioRenderer = AudioFrameRenderer()
+                    self.audioRenderer = audioRenderer
+                    client.addAudioRenderer(audioRenderer)
+                }
+                                // DUAL-MODE CONNECTION: Race local gRPC vs remote signaling
                 // Whichever Python client connects first wins
                 
                 let signaling = SignalingClient.shared
@@ -653,8 +673,22 @@ class VideoStreamManager: ObservableObject {
                     // REMOTE/CROSS-NETWORK MODE - Connect via Signaling
                     dlog("🌍 [DEBUG] Using Remote Mode (Signaling + relayed WebRTC)")
                     
-                    try await client.connectWithSignaling(signaling)
-                    dlog("✅ [DEBUG] WebRTC connection sequence initiated via Signaling!")
+                    // Check if signaling callbacks are already set up (i.e., this is a true reconnection)
+                    // We need to check if the callback is actually set, not just if the client exists
+                    let callbacksAlreadySet = signaling.onSDPOfferReceived != nil
+                    dlog("🔍 [DEBUG] Signaling callbacks already set: \(callbacksAlreadySet)")
+                    
+                    if isReconnection && callbacksAlreadySet {
+                        // This is a reconnection - callbacks are already set up
+                        // The SDP offer was already processed by the existing onSDPOfferReceived callback
+                        dlog("♻️ [DEBUG] Reconnection mode - skipping connectWithSignaling (callbacks already active)")
+                        dlog("✅ [DEBUG] WebRTC reconnection handled by existing signaling callbacks!")
+                    } else {
+                        // First connection OR callbacks not set - set up callbacks
+                        dlog("🔗 [DEBUG] Setting up signaling callbacks...")
+                        try await client.connectWithSignaling(signaling)
+                        dlog("✅ [DEBUG] WebRTC connection sequence initiated via Signaling!")
+                    }
                 }
                 
                 // Log Stereo Mode
@@ -717,18 +751,37 @@ class VideoStreamManager: ObservableObject {
         }
     }
     
-    func stop() {
-        dlog("🛑 [DEBUG] VideoStreamManager.stop() called")
+    /// Stop the video stream manager
+    /// - Parameter preserveForReconnect: If true, keeps the WebRTCClient alive for reconnection (default: true for auto-reconnect support)
+    func stop(preserveForReconnect: Bool = true) {
+        dlog("🛑 [DEBUG] VideoStreamManager.stop() called (preserveForReconnect=\(preserveForReconnect), isRunning=\(isRunning))")
+        
+        // Guard against multiple stop calls - only the first one should take action
+        // (unless it's a full cleanup which should always run)
+        if !isRunning && preserveForReconnect {
+            dlog("⚠️ [DEBUG] VideoStreamManager.stop() - already stopped, ignoring preserve call")
+            return
+        }
+        
         isRunning = false
         
         // Cancel any running connection task
         connectionTask?.cancel()
         connectionTask = nil
         
-        webrtcClient?.disconnect()
-        webrtcClient = nil
-        videoRenderer = nil
-        audioRenderer = nil
+        if preserveForReconnect {
+            // Keep WebRTCClient alive but disconnect the peer connection
+            // This preserves the signaling callbacks for reconnection
+            dlog("♻️ [DEBUG] Preserving WebRTCClient for reconnection")
+            // Don't nil out webrtcClient, videoRenderer, audioRenderer
+        } else {
+            // Full cleanup
+            dlog("🧹 [DEBUG] Full cleanup - destroying WebRTCClient")
+            webrtcClient?.disconnect()
+            webrtcClient = nil
+            videoRenderer = nil
+            audioRenderer = nil
+        }
     }
 }
 

@@ -2881,8 +2881,9 @@ private struct StateChangeModifiers: ViewModifier {
                 if status == "Peer disconnected" || status.contains("ICE disconnected") || status.contains("ICE failed") || status.contains("ICE closed") {
                     dlog("🔄 [CombinedStreamingView] Disconnection detected ('\(status)'), restarting VideoStreamManager...")
                     
-                    // Force restart of manager to return to "Waiting for Peer" state
-                    videoStreamManager.stop()
+                    // Stop with preserveForReconnect=true to keep WebRTCClient and its signaling callbacks
+                    // This is critical for cross-network mode where the same WebRTCClient handles reconnection
+                    videoStreamManager.stop(preserveForReconnect: true)
                     
                     // Reset UI state
                     resetStreamingState()
@@ -2943,7 +2944,7 @@ private struct StateChangeModifiers: ViewModifier {
         } else if newValue > 0 && oldValue != newValue {
             mujocoManager.poseStreamingViaWebRTC = false
             hasSimPoses = false
-            videoStreamManager.stop()
+            videoStreamManager.stop(preserveForReconnect: true)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 videoStreamManager.start(imageData: imageData)
             }
@@ -2961,7 +2962,7 @@ private struct StateChangeModifiers: ViewModifier {
         fixedWorldTransform = nil
         mujocoManager.poseStreamingViaWebRTC = false
         mujocoManager.simEnabled = false
-        videoStreamManager.stop()
+        videoStreamManager.stop(preserveForReconnect: true)
         
         mujocoEntity?.removeFromParent()
         mujocoEntity = nil
@@ -3000,7 +3001,7 @@ private struct StateChangeModifiers: ViewModifier {
     
     private func handleOnDisappear() {
         dlog("🛑 [CombinedStreamingView] View disappeared, stopping services")
-        videoStreamManager.stop()
+        videoStreamManager.stop(preserveForReconnect: false)  // Full cleanup on disappear
         uvcCameraManager.stopCapture()
         fixedWorldTransform = nil
         Task { await mujocoManager.stopServer() }

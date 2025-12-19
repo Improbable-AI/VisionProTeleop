@@ -29,6 +29,10 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
     private var pendingVideoRenderer: LKRTCVideoRenderer?  // Renderer waiting for track
     private var pendingAudioRenderer: LKRTCAudioRenderer?  // Renderer waiting for track
     
+    // Stored renderers for reconnection (don't clear these on disconnect)
+    private var storedVideoRenderer: LKRTCVideoRenderer?
+    private var storedAudioRenderer: LKRTCAudioRenderer?
+    
     // USDZ transfer state (cross-network mode)
     private var usdzDataChannel: LKRTCDataChannel?
     private var usdzTransferMetadata: UsdzTransferMetadata?
@@ -49,6 +53,10 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
     var onLocalICECandidateGenerated: ((LKRTCIceCandidate) -> Void)?
     
     private let stunServer = "stun:stun.l.google.com:19302"
+    
+    // Stored reference for reconnection support
+    private var storedSignalingClient: SignalingClient?
+    private var storedIceServers: [LKRTCIceServer] = []
     
     // ICE gathering completion tracking
     private var iceGatheringContinuation: CheckedContinuation<Void, Error>?
@@ -111,12 +119,30 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
     func connectWithSignaling(_ signalingClient: SignalingClient) async throws {
         dlog("DEBUG: Connecting with signaling client (Cross-Network Mode - Answerer)")
         await MainActor.run {
+            DataManager.shared.connectionStatus = "Requesting TURN servers..."
+        }
+        
+        // Request ICE servers (including TURN) from signaling server
+        let iceServers = await requestIceServersFromSignaling(signalingClient)
+        
+        // Store for reconnection
+        self.storedSignalingClient = signalingClient
+        self.storedIceServers = iceServers
+        
+        await MainActor.run {
             DataManager.shared.connectionStatus = "Waiting for Python to connect..."
         }
         
-        // Create peer connection with STUN/TURN servers
+        // Create peer connection with STUN/TURN servers from signaling
         let config = LKRTCConfiguration()
-        config.iceServers = [LKRTCIceServer(urlStrings: [stunServer])]
+        if iceServers.isEmpty {
+            // Fallback to STUN only if TURN request failed
+            dlog("⚠️ [WEBRTC] No TURN servers received, using STUN only (may fail across NAT)")
+            config.iceServers = [LKRTCIceServer(urlStrings: [stunServer])]
+        } else {
+            dlog("✅ [WEBRTC] Using \(iceServers.count) ICE servers (including TURN)")
+            config.iceServers = iceServers
+        }
         config.iceCandidatePoolSize = 10
         config.continualGatheringPolicy = .gatherContinually
         
@@ -139,10 +165,23 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
         await MainActor.run {
             // Handle incoming SDP offer from Python (NEW: we are now the answerer)
             signalingClient.onSDPOfferReceived = { [weak self] sdp in
-                dlog("📥 [SIGNALING] Received SDP offer from Python")
-                Task {
-                    await self?.handleOfferAndCreateAnswer(sdp: sdp, signalingClient: signalingClient)
+                dlog("📥 [SIGNALING] onSDPOfferReceived CALLBACK FIRED!")
+                dlog("📥 [SIGNALING] SDP length: \(sdp.count) characters")
+                dlog("📥 [SIGNALING] self is \(self == nil ? "NIL ❌" : "VALID ✅")")
+                dlog("📥 [SIGNALING] peerConnection is \(self?.peerConnection == nil ? "NIL (will recreate)" : "EXISTS")")
+                
+                guard let strongSelf = self else {
+                    dlog("❌ [SIGNALING] self is nil, cannot handle offer!")
+                    return
                 }
+                
+                dlog("📥 [SIGNALING] Creating Task to handle offer...")
+                Task {
+                    dlog("📥 [SIGNALING] Task started, calling handleOfferAndCreateAnswer")
+                    await strongSelf.handleOfferAndCreateAnswer(sdp: sdp, signalingClient: signalingClient)
+                    dlog("📥 [SIGNALING] handleOfferAndCreateAnswer completed")
+                }
+                dlog("📥 [SIGNALING] Task scheduled successfully")
             }
             
             signalingClient.onICECandidateReceived = { [weak self] candidateDict in
@@ -162,12 +201,15 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
             // Handle Peer Left
             signalingClient.onPeerLeft = { [weak self] in
                 dlog("⚠️ [SIGNALING] Peer left room - closing WebRTC")
+                dlog("⚠️ [SIGNALING] self is \(self == nil ? "NIL" : "VALID"), will close peerConnection")
                 Task { @MainActor in
                     DataManager.shared.connectionStatus = "Peer disconnected"
-                    // Close connection
+                    // Close connection but keep WebRTCClient alive for reconnection
                     self?.peerConnection?.close()
                     self?.peerConnection = nil
+                    dlog("⚠️ [SIGNALING] peerConnection closed and set to nil")
                     self?.stopStatsTimer()
+                    self?.stopHandTrackingStream()  // Stop hand tracking to prevent error spam
                     self?.onConnectionStateChanged?(false)
                 }
             }
@@ -193,8 +235,116 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
         dlog("DEBUG: Waiting for Python to send SDP offer...")
     }
     
+    /// Request ICE servers (including TURN) from the signaling server
+    /// Returns an array of RTCIceServer objects to use for peer connection
+    private func requestIceServersFromSignaling(_ signalingClient: SignalingClient) async -> [LKRTCIceServer] {
+        return await withCheckedContinuation { continuation in
+            var hasResumed = false
+            
+            // Set up callback for when ICE servers are received
+            Task { @MainActor in
+                signalingClient.onIceServersReceived = { iceServers in
+                    guard !hasResumed else { return }
+                    hasResumed = true
+                    dlog("📡 [WEBRTC] Received \(iceServers.count) ICE servers from signaling")
+                    for server in iceServers {
+                        dlog("  - URLs: \(server.urlStrings)")
+                    }
+                    continuation.resume(returning: iceServers)
+                }
+                
+                // Request ICE servers
+                signalingClient.requestIceServers()
+            }
+            
+            // Timeout after 5 seconds - fall back to STUN only
+            Task {
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                guard !hasResumed else { return }
+                hasResumed = true
+                dlog("⚠️ [WEBRTC] ICE server request timed out, using STUN fallback")
+                continuation.resume(returning: [])
+            }
+        }
+    }
+    
+    /// Recreate peer connection for handling reconnection after peer-left
+    private func recreatePeerConnection(signalingClient: SignalingClient) async throws {
+        dlog("🔄 [WEBRTC] recreatePeerConnection called")
+        dlog("🔄 [WEBRTC] storedIceServers count: \(storedIceServers.count)")
+        
+        await MainActor.run {
+            DataManager.shared.connectionStatus = "Reconnecting..."
+        }
+        
+        // Use stored ICE servers if available, otherwise request new ones
+        var iceServers = storedIceServers
+        if iceServers.isEmpty {
+            dlog("📡 [WEBRTC] No stored ICE servers, requesting new ones...")
+            iceServers = await requestIceServersFromSignaling(signalingClient)
+            storedIceServers = iceServers
+        }
+        
+        // Create peer connection with ICE servers
+        let config = LKRTCConfiguration()
+        if iceServers.isEmpty {
+            dlog("⚠️ [WEBRTC] No TURN servers available, using STUN only")
+            config.iceServers = [LKRTCIceServer(urlStrings: [stunServer])]
+        } else {
+            dlog("✅ [WEBRTC] Using \(iceServers.count) ICE servers for reconnection")
+            config.iceServers = iceServers
+        }
+        config.iceCandidatePoolSize = 10
+        config.continualGatheringPolicy = .gatherContinually
+        
+        let constraints = LKRTCMediaConstraints(
+            mandatoryConstraints: nil,
+            optionalConstraints: ["DtlsSrtpKeyAgreement": "true"]
+        )
+        
+        guard let pc = factory.peerConnection(
+            with: config,
+            constraints: constraints,
+            delegate: self
+        ) else {
+            throw WebRTCError.failedToCreatePeerConnection
+        }
+        
+        self.peerConnection = pc
+        
+        // Re-wire local ICE candidate generation
+        self.onLocalICECandidateGenerated = { candidate in
+            Task { @MainActor in
+                signalingClient.sendICECandidate(
+                    candidate: candidate.sdp,
+                    sdpMid: candidate.sdpMid,
+                    sdpMLineIndex: candidate.sdpMLineIndex
+                )
+            }
+        }
+        
+        await MainActor.run {
+            DataManager.shared.connectionStatus = "Waiting for Python's offer..."
+        }
+        dlog("✅ [WEBRTC] Peer connection recreated successfully")
+    }
+    
     /// Handle incoming SDP offer from Python and create answer
     private func handleOfferAndCreateAnswer(sdp: String, signalingClient: SignalingClient) async {
+        dlog("🎯 [WEBRTC] >>> handleOfferAndCreateAnswer ENTRY POINT <<<")
+        dlog("🎯 [WEBRTC] SDP length: \(sdp.count), peerConnection: \(self.peerConnection == nil ? "NIL" : "EXISTS")")
+        
+        // If peer connection is nil (e.g., after peer-left), recreate it
+        if self.peerConnection == nil {
+            dlog("🔄 [WEBRTC] Peer connection is nil, recreating for reconnection...")
+            do {
+                try await recreatePeerConnection(signalingClient: signalingClient)
+            } catch {
+                dlog("❌ [WEBRTC] Failed to recreate peer connection: \(error)")
+                return
+            }
+        }
+        
         guard let pc = self.peerConnection else {
             dlog("❌ [WEBRTC] PeerConnection not initialized, cannot handle offer")
             return
@@ -397,6 +547,9 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
     }
     
     func addVideoRenderer(_ renderer: LKRTCVideoRenderer) {
+        // Store renderer permanently for reconnection
+        self.storedVideoRenderer = renderer
+        
         if let track = videoTrack {
             track.add(renderer)
             dlog("DEBUG: Video renderer attached to track - track enabled: \(track.isEnabled)")
@@ -408,6 +561,9 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
     }
     
     func addAudioRenderer(_ renderer: LKRTCAudioRenderer) {
+        // Store renderer permanently for reconnection
+        self.storedAudioRenderer = renderer
+        
         if let track = audioTrack {
             track.add(renderer)
             dlog("DEBUG: Audio renderer attached to track - track enabled: \(track.isEnabled)")
@@ -539,11 +695,16 @@ extension WebRTCClient {
             self.videoTrack = videoTrack
             dlog("DEBUG: Video track received - id: \(videoTrack.trackId), enabled: \(videoTrack.isEnabled)")
             
-            // Attach pending renderer if one was waiting
+            // Attach pending renderer if one was waiting, or use stored renderer for reconnection
             if let pendingRenderer = self.pendingVideoRenderer {
                 videoTrack.add(pendingRenderer)
                 dlog("DEBUG: Attached pending video renderer to newly received track")
                 self.pendingVideoRenderer = nil
+            } else if let storedRenderer = self.storedVideoRenderer {
+                videoTrack.add(storedRenderer)
+                dlog("DEBUG: Attached stored video renderer to newly received track (reconnection)")
+            } else {
+                dlog("⚠️ WARNING: No video renderer available to attach to track!")
             }
             
             Task { @MainActor in
@@ -555,11 +716,16 @@ extension WebRTCClient {
             self.audioTrack = audioTrack
             dlog("DEBUG: Audio track received - id: \(audioTrack.trackId), enabled: \(audioTrack.isEnabled)")
             
-            // Attach pending renderer if one was waiting
+            // Attach pending renderer if one was waiting, or use stored renderer for reconnection
             if let pendingRenderer = self.pendingAudioRenderer {
                 audioTrack.add(pendingRenderer)
                 dlog("DEBUG: Attached pending audio renderer to newly received track")
                 self.pendingAudioRenderer = nil
+            } else if let storedRenderer = self.storedAudioRenderer {
+                audioTrack.add(storedRenderer)
+                dlog("DEBUG: Attached stored audio renderer to newly received track (reconnection)")
+            } else {
+                dlog("⚠️ WARNING: No audio renderer available to attach to track!")
             }
             
             Task { @MainActor in

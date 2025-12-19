@@ -847,7 +847,7 @@ def _is_room_code(value: str) -> bool:
 
 class VisionProStreamer:
 
-    def __init__(self, ip=None, record=True, ht_backend="grpc", benchmark_quiet=False, verbose=False, origin="avp", signaling_url=None):
+    def __init__(self, ip=None, record=True, ht_backend="grpc", benchmark_quiet=False, verbose=False, origin="avp", signaling_url=None, relay_only=False):
         """Initialize the VisionProStreamer.
 
         Parameters
@@ -989,6 +989,7 @@ class VisionProStreamer:
         self._stylus_lock = Lock()
         
         self._ice_servers = None  # Initialize ICE servers (populated in cross-network mode)
+        self._relay_only = relay_only  # Force TURN relay only (for testing)
         
         # Register for cleanup on exit
         _active_streamers.append(self)
@@ -1684,6 +1685,16 @@ class VisionProStreamer:
         else:
             self._log(f'[WEBRTC] Configured {len(ice_servers)} ICE servers (including TURN)', force=True)
         
+        # Apply relay-only mode if requested (forces TURN relay, no direct/STUN)
+        if self._relay_only:
+            self._log('[WEBRTC] ⚠️ RELAY-ONLY MODE: Forcing TURN relay (for testing)', force=True)
+            from aioice.ice import Connection as AioiceConnection, TransportPolicy
+            _original_init = AioiceConnection.__init__
+            def _patched_init(self_conn, *args, **kwargs):
+                kwargs['transport_policy'] = TransportPolicy.RELAY
+                return _original_init(self_conn, *args, **kwargs)
+            AioiceConnection.__init__ = _patched_init
+        
         config = RTCConfiguration(iceServers=ice_servers)
         pc = RTCPeerConnection(configuration=config)
         self._pc = pc
@@ -1696,6 +1707,20 @@ class VisionProStreamer:
                 with self._webrtc_connection_condition:
                     self._webrtc_connected = True
                     self._webrtc_connection_condition.notify_all()
+                # Log connection type (relay vs direct)
+                try:
+                    for transceiver in pc.getTransceivers():
+                        transport = getattr(transceiver, '_transport', None)
+                        if transport:
+                            ice_transport = getattr(transport, '_transport', None)
+                            if ice_transport and hasattr(ice_transport, '_connection'):
+                                conn = ice_transport._connection
+                                local = conn.local_candidate
+                                remote = conn.remote_candidate
+                                if local and remote:
+                                    self._log(f"[WEBRTC] Connection path: local={local.type}({local.host}) <-> remote={remote.type}({remote.host})", force=True)
+                except Exception as e:
+                    pass  # Stats not available
             if pc.iceConnectionState in ("failed", "closed", "disconnected"):
                 with self._webrtc_connection_condition:
                     self._webrtc_connected = False
@@ -1948,6 +1973,29 @@ class VisionProStreamer:
                         loop = asyncio.new_event_loop()
                         asyncio.set_event_loop(loop)
                         self._webrtc_loop = loop
+                        
+                        # Custom exception handler for TURN channel bind errors
+                        # These happen when TURN tries to bind to private IPs (which it can't relay to)
+                        def handle_exception(loop, context):
+                            exception = context.get('exception')
+                            msg = context.get('message', '')
+                            
+                            # Handle known TURN channel bind 401 errors
+                            if exception and 'TransactionFailed' in type(exception).__name__:
+                                if '401' in str(exception):
+                                    # Extract peer address from the task context if available
+                                    # This happens when TURN server rejects channel binding to private IPs
+                                    # (172.x.x.x, 192.168.x.x, 10.x.x.x) since it can't relay to them
+                                    self._log(
+                                        "[TURN] Channel bind rejected (401) - likely a private/host IP that TURN can't relay to. "
+                                        "This is expected; connection will use public IP instead.",
+                                        force=False  # Only show in verbose mode
+                                    )
+                                    return
+                            # Log other exceptions normally
+                            self._log(f"[ASYNCIO] Unhandled exception: {msg} - {exception}", force=True)
+                        
+                        loop.set_exception_handler(handle_exception)
                         loop.run_until_complete(self._create_webrtc_offer_signaling())
                         loop.run_forever()
                     except Exception as e:

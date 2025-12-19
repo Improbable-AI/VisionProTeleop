@@ -90,11 +90,13 @@ class SignalingClient: ObservableObject {
     /// Clear WebRTC-related callbacks (call when session ends so new session can re-register)
     /// This ensures that when a new WebRTCClient is created, it can register fresh callbacks
     /// and receive any buffered offers.
+    /// NOTE: We keep onSDPOfferReceived and onICECandidateReceived to support reconnection
+    /// when the same WebRTCClient handles multiple peer connections.
     func clearWebRTCCallbacks() {
-        print("[SIGNALING] Clearing WebRTC callbacks for session reset")
-        onSDPOfferReceived = nil
+        print("[SIGNALING] Clearing WebRTC callbacks for session reset (keeping offer/ice callbacks for reconnection)")
+        // Keep onSDPOfferReceived - needed for handling reconnection
+        // Keep onICECandidateReceived - needed for handling reconnection  
         onSDPAnswerReceived = nil
-        onICECandidateReceived = nil
         onPeerJoined = nil
         onOfferRequested = nil
         onIceServersReceived = nil
