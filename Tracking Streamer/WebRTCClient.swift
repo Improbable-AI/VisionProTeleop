@@ -40,6 +40,7 @@ class WebRTCClient: NSObject, LKRTCPeerConnectionDelegate, @unchecked Sendable {
     private var usdzTransferMetadata: UsdzTransferMetadata?
     private var usdzChunks: [Int: Data] = [:]
     private var usdzReceivedChunksCount: Int = 0
+    private var usdzLoadedFromCache: Bool = false  // Flag to ignore chunks after cache hit
     
     var onFrameReceived: ((CVPixelBuffer) -> Void)?
     
@@ -1084,10 +1085,16 @@ extension WebRTCClient: LKRTCDataChannelDelegate {
                     forceReload: forceReload
                 )
                 
+                // Reset cache loaded flag for new transfer
+                usdzLoadedFromCache = false
+                
                 // Check if we have this file cached (and force reload is not requested)
                 if let cacheKey = cacheKey, !forceReload {
                     if let cachedPath = UsdzCacheManager.shared.getCachedFilePath(cacheKey: cacheKey) {
                         dlog("✅ [USDZ] Using cached file: \(cachedPath.lastPathComponent)")
+                        
+                        // Mark as loaded from cache - ignore any incoming chunks
+                        usdzLoadedFromCache = true
                         
                         // Send "cached" response to Python (so it can skip sending chunks)
                         sendUsdzCached(cacheKey: cacheKey)
@@ -1125,6 +1132,14 @@ extension WebRTCClient: LKRTCDataChannelDelegate {
             }
         } else {
             // Binary chunk data: [4 bytes index][N bytes data]
+            
+            // If we already loaded from cache, ignore any incoming chunks
+            // (Python may have started sending before receiving our "cached" response)
+            if usdzLoadedFromCache {
+                dlog("⚠️ [USDZ] Ignoring chunk - already loaded from cache")
+                return
+            }
+            
             guard data.count >= 4 else {
                 dlog("⚠️ [USDZ] Chunk too small")
                 return

@@ -3830,12 +3830,21 @@ class VisionProStreamer:
         send_message(json.dumps(metadata))
         self._log(f"[USDZ-WEBRTC] Sent metadata for {filename} (cacheKey: {cache_key[:8]}...)", force=True)
         
-        # Wait for response (could be "cached" or we just start sending chunks)
-        # Short wait to check if visionOS says it has the file cached
+        # Wait for cache response from visionOS before sending chunks
+        # visionOS will respond with "cached" if it has the file, allowing us to skip transfer
         self._usdz_cached_hit = False
         self._usdz_transfer_complete = False
         import time
-        time.sleep(0.3)  # Brief wait for cached response
+        
+        # Wait up to 2 seconds for cache response (WebRTC round-trip can be slow)
+        cache_check_timeout = 2.0
+        cache_check_waited = 0
+        while not self._usdz_cached_hit and cache_check_waited < cache_check_timeout:
+            time.sleep(0.05)
+            cache_check_waited += 0.05
+            # Also check if transfer was marked complete (means cache hit was received)
+            if self._usdz_transfer_complete:
+                break
         
         if self._usdz_cached_hit:
             self._log("[USDZ-WEBRTC] visionOS has cached version, skipping transfer!", force=True)
