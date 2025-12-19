@@ -1083,6 +1083,13 @@ extension WebRTCClient: LKRTCDataChannelDelegate {
                 dlog("📦 [USDZ] Receiving: \(filename) (\(totalSize / 1024)KB, \(totalChunks) chunks)")
                 Task { @MainActor in
                     DataManager.shared.connectionStatus = "Receiving USDZ: \(filename)..."
+                    // Start USDZ transfer progress tracking
+                    DataManager.shared.usdzTransferInProgress = true
+                    DataManager.shared.usdzTransferFilename = filename
+                    DataManager.shared.usdzTransferProgress = 0.0
+                    DataManager.shared.usdzTransferReceivedChunks = 0
+                    DataManager.shared.usdzTransferTotalChunks = totalChunks
+                    DataManager.shared.usdzTransferTotalSizeKB = totalSize / 1024
                 }
             }
         } else {
@@ -1101,10 +1108,24 @@ extension WebRTCClient: LKRTCDataChannelDelegate {
             usdzChunks[Int(chunkIndex)] = chunkData
             usdzReceivedChunksCount += 1
             
-            // Log progress every 50 chunks
-            if usdzReceivedChunksCount % 50 == 0, let meta = usdzTransferMetadata {
-                let progress = Float(usdzReceivedChunksCount) / Float(meta.totalChunks) * 100
-                dlog("📥 [USDZ] Progress: \(usdzReceivedChunksCount)/\(meta.totalChunks) (\(String(format: "%.1f", progress))%)")
+            // Update progress on every chunk (UI will handle throttling via SwiftUI)
+            if let meta = usdzTransferMetadata {
+                let progressPercent = Float(usdzReceivedChunksCount) / Float(meta.totalChunks) * 100
+                let progressNormalized = Float(usdzReceivedChunksCount) / Float(meta.totalChunks)
+                
+                // Log progress every 50 chunks
+                if usdzReceivedChunksCount % 50 == 0 {
+                    dlog("📥 [USDZ] Progress: \(usdzReceivedChunksCount)/\(meta.totalChunks) (\(String(format: "%.1f", progressPercent))%)")
+                }
+                
+                // Update DataManager for UI (throttle to every 10 chunks to reduce main thread load)
+                if usdzReceivedChunksCount % 10 == 0 || usdzReceivedChunksCount == meta.totalChunks {
+                    let currentReceived = usdzReceivedChunksCount
+                    Task { @MainActor in
+                        DataManager.shared.usdzTransferProgress = progressNormalized
+                        DataManager.shared.usdzTransferReceivedChunks = currentReceived
+                    }
+                }
             }
             
             // Check if transfer is complete
@@ -1163,6 +1184,9 @@ extension WebRTCClient: LKRTCDataChannelDelegate {
                 DataManager.shared.loadedUsdzPath = usdzURL.path
                 DataManager.shared.loadedUsdzAttachPosition = meta.attachPosition
                 DataManager.shared.loadedUsdzAttachRotation = meta.attachRotation
+                // Clear USDZ transfer progress
+                DataManager.shared.usdzTransferInProgress = false
+                DataManager.shared.usdzTransferProgress = 1.0
             }
             
         } catch {
@@ -1194,6 +1218,11 @@ extension WebRTCClient: LKRTCDataChannelDelegate {
     /// Send error message to Python
     private func sendUsdzError(_ message: String) {
         guard let channel = usdzDataChannel, channel.readyState == .open else { return }
+        
+        // Clear transfer progress on error
+        Task { @MainActor in
+            DataManager.shared.usdzTransferInProgress = false
+        }
         
         let response: [String: Any] = [
             "type": "error",

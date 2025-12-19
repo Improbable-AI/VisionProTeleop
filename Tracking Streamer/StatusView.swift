@@ -378,6 +378,69 @@ struct StatusOverlay: View {
                 )
             }
             
+            // USDZ transfer progress indicator (show above buttons when transferring)
+            if dataManager.usdzTransferInProgress {
+                VStack(spacing: 6) {
+                    // Header
+                    HStack(spacing: 6) {
+                        Image(systemName: "cube.transparent.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.purple)
+                        
+                        Text("Loading 3D Scene")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white)
+                        
+                        // Spinning indicator
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .purple))
+                            .scaleEffect(0.7)
+                    }
+                    
+                    // Filename
+                    if !dataManager.usdzTransferFilename.isEmpty {
+                        Text(dataManager.usdzTransferFilename)
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.7))
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                    
+                    // Progress bar with percentage
+                    HStack(spacing: 8) {
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color.white.opacity(0.2))
+                                .frame(width: 140, height: 8)
+                            
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color.purple)
+                                .frame(width: 140 * CGFloat(dataManager.usdzTransferProgress), height: 8)
+                                .animation(.easeInOut(duration: 0.2), value: dataManager.usdzTransferProgress)
+                        }
+                        
+                        Text("\(Int(dataManager.usdzTransferProgress * 100))%")
+                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                            .foregroundColor(.white)
+                    }
+                    
+                    // Size info
+                    Text("\(dataManager.usdzTransferReceivedChunks)/\(dataManager.usdzTransferTotalChunks) chunks • \(dataManager.usdzTransferTotalSizeKB) KB")
+                        .font(.system(size: 10))
+                        .foregroundColor(.white.opacity(0.5))
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.purple.opacity(0.25))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.purple.opacity(0.5), lineWidth: 1)
+                        )
+                )
+            }
+            
             HStack(spacing: 16) {
                 if showLocalExitConfirmation {
                     // Confirmation mode with upload warning
@@ -1126,6 +1189,82 @@ struct StatusOverlay: View {
         .background(Color.white.opacity(0.05))
         .cornerRadius(10)
     }
+    
+    private var usdzTransferProgressSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // Header with icon and filename
+            HStack(spacing: 8) {
+                Image(systemName: "cube.transparent.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.purple)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Loading 3D Scene")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                    
+                    if !dataManager.usdzTransferFilename.isEmpty {
+                        Text(dataManager.usdzTransferFilename)
+                            .font(.caption2)
+                            .foregroundColor(.white.opacity(0.6))
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                }
+                
+                Spacer()
+                
+                // Percentage
+                Text("\(Int(dataManager.usdzTransferProgress * 100))%")
+                    .font(.system(size: 14, weight: .bold, design: .monospaced))
+                    .foregroundColor(.purple)
+            }
+            
+            // Progress bar
+            ZStack(alignment: .leading) {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.white.opacity(0.15))
+                    .frame(height: 8)
+                
+                GeometryReader { geo in
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.purple, Color.purple.opacity(0.7)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: geo.size.width * CGFloat(dataManager.usdzTransferProgress), height: 8)
+                        .animation(.easeInOut(duration: 0.2), value: dataManager.usdzTransferProgress)
+                }
+                .frame(height: 8)
+            }
+            
+            // Stats
+            HStack {
+                Text("\(dataManager.usdzTransferReceivedChunks)/\(dataManager.usdzTransferTotalChunks) chunks")
+                    .font(.caption2)
+                    .foregroundColor(.white.opacity(0.5))
+                
+                Spacer()
+                
+                Text("\(dataManager.usdzTransferTotalSizeKB) KB")
+                    .font(.caption2)
+                    .foregroundColor(.white.opacity(0.5))
+            }
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.purple.opacity(0.15))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.purple.opacity(0.3), lineWidth: 1)
+                )
+        )
+    }
 
     private var expandedView: some View {
         HStack(alignment: .center, spacing: 0) {
@@ -1252,6 +1391,14 @@ struct StatusOverlay: View {
                         .background(Color.white.opacity(0.2))
                     
                     streamDetailsSection
+                }
+                
+                // USDZ transfer progress (shown when loading 3D scene)
+                if dataManager.usdzTransferInProgress {
+                    Divider()
+                        .background(Color.white.opacity(0.2))
+                    
+                    usdzTransferProgressSection
                 }
             }
             

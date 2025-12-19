@@ -161,6 +161,14 @@ class DataManager: ObservableObject {
     @Published var loadedUsdzAttachPosition: [Float]? = nil  // Attach position [x, y, z]
     @Published var loadedUsdzAttachRotation: [Float]? = nil  // Attach rotation [x, y, z, w]
     
+    // USDZ transfer progress tracking
+    @Published var usdzTransferInProgress: Bool = false  // Whether a USDZ transfer is in progress
+    @Published var usdzTransferFilename: String = ""  // Name of the file being transferred
+    @Published var usdzTransferProgress: Float = 0.0  // Progress 0.0 to 1.0
+    @Published var usdzTransferReceivedChunks: Int = 0  // Number of chunks received
+    @Published var usdzTransferTotalChunks: Int = 0  // Total number of chunks
+    @Published var usdzTransferTotalSizeKB: Int = 0  // Total size in KB
+    
     // Persistent setting for Cross-Network Mode (vs Local Mode)
     @Published var isCrossNetworkMode: Bool {
         didSet {
