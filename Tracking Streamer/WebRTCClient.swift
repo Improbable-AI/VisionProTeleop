@@ -1203,7 +1203,7 @@ extension WebRTCClient: LKRTCDataChannelDelegate {
             
             // Cache the file if we have a cache key
             if let cacheKey = meta.cacheKey {
-                UsdzCacheManager.shared.cacheFile(sourceURL: usdzURL, cacheKey: cacheKey)
+                _ = UsdzCacheManager.shared.cacheFile(data: assembledData, cacheKey: cacheKey, filename: meta.filename)
             }
             
             // Clear transfer state
