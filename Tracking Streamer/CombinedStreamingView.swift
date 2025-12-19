@@ -2934,18 +2934,32 @@ private struct StateChangeModifiers: ViewModifier {
     private func handlePythonClientDisconnected() {
         dlog("🔌 [CombinedStreamingView] Python client disconnected")
         recordingManager.onVideoSourceDisconnected(reason: "Python client disconnected")
+        
+        // In local mode, when Python disconnects via gRPC, we need to fully close the WebRTC 
+        // connection to stop video frames immediately. Otherwise frames keep flowing until ICE timeout.
+        videoStreamManager.stop(preserveForReconnect: false)  // Full cleanup
+        
         resetStreamingState()
     }
     
     private func handleWebRTCGenerationChange(oldValue: Int, newValue: Int) {
         if newValue < 0 {
             recordingManager.onVideoSourceDisconnected(reason: "WebRTC disconnected")
+            // Full cleanup to stop video frames immediately
+            videoStreamManager.stop(preserveForReconnect: false)
             resetStreamingState()
         } else if newValue > 0 && oldValue != newValue {
             mujocoManager.poseStreamingViaWebRTC = false
             hasSimPoses = false
             videoStreamManager.stop(preserveForReconnect: true)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            // Capture the generation to check if it's still valid when the delayed block runs
+            let expectedGeneration = newValue
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak dataManager] in
+                // Only start if generation hasn't changed (prevents restart during disconnect)
+                guard let dm = dataManager, dm.webrtcGeneration == expectedGeneration else {
+                    dlog("⚠️ [CombinedStreamingView] Skipping delayed start - generation changed")
+                    return
+                }
                 videoStreamManager.start(imageData: imageData)
             }
         }

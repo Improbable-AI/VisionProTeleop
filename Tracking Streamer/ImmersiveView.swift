@@ -433,20 +433,26 @@ struct ImmersiveView: View {
         }
         .onChange(of: dataManager.webrtcGeneration) { oldValue, newValue in
             if newValue < 0 {
-                // Disconnection detected - preserve client for reconnection
-                dlog("🔌 [ImmersiveView] WebRTC disconnected (generation: \(newValue)) - clearing state")
+                // Disconnection detected - full cleanup to stop frames immediately
+                dlog("🔌 [ImmersiveView] WebRTC disconnected (generation: \(newValue)) - full cleanup")
                 imageData.left = nil
                 imageData.right = nil
                 hasFrames = false
                 videoMinimized = false
                 fixedWorldTransform = nil
-                videoStreamManager.stop(preserveForReconnect: true)
+                videoStreamManager.stop(preserveForReconnect: false)  // Full cleanup
             } else if newValue > 0 && oldValue != newValue {
                 // New connection or reconnection - preserve client for smooth transition
                 dlog("🔄 [ImmersiveView] WebRTC generation changed to \(newValue), restarting stream...")
                 videoStreamManager.stop(preserveForReconnect: true)
-                // Give it a moment to cleanup
+                // Give it a moment to cleanup, but verify generation is still valid
+                let expectedGeneration = newValue
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    // Only start if generation hasn't changed (prevents restart during disconnect)
+                    guard DataManager.shared.webrtcGeneration == expectedGeneration else {
+                        dlog("⚠️ [ImmersiveView] Skipping delayed start - generation changed")
+                        return
+                    }
                     videoStreamManager.start(imageData: imageData)
                 }
             }
@@ -536,6 +542,13 @@ class VideoStreamManager: ObservableObject {
     }
     
     func start(imageData: ImageData) {
+        // Refuse to start if we're in a disconnected state (webrtcGeneration < 0)
+        // This prevents accidental restarts during cleanup
+        guard DataManager.shared.webrtcGeneration >= 0 else {
+            dlog("⚠️ [DEBUG] VideoStreamManager.start() called but webrtcGeneration is \(DataManager.shared.webrtcGeneration) (disconnected). Ignoring.")
+            return
+        }
+        
         // If already running, we might want to restart if called explicitly, 
         // but for now let's respect the flag unless stop() was called.
         if isRunning {
