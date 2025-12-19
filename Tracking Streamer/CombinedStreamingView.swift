@@ -1549,60 +1549,37 @@ struct CombinedStreamingView: View {
     
     /// Check if all required streams are ready and auto-minimize if conditions are met
     private func tryAutoMinimize() {
-        dlog("🔍 [AutoMinimize] Checking... hasAutoMinimized=\(hasAutoMinimized), userInteracted=\(userInteracted)")
-        guard !hasAutoMinimized && !userInteracted else {
-            dlog("🔍 [AutoMinimize] Early exit: already minimized or user interacted")
-            return
-        }
+        guard !hasAutoMinimized && !userInteracted else { return }
         
         let dm = DataManager.shared
         
-        // Don't auto-minimize while USDZ transfer is in progress
-        if dm.usdzTransferInProgress {
-            dlog("⏳ [AutoMinimize] USDZ transfer in progress - waiting for completion")
-            return
-        }
+        // Simple logic:
+        // - If sim is enabled: need USDZ loaded in RealityKit AND sim poses coming in
+        // - If video is enabled: need frames coming in
+        // - If audio is enabled: need audio coming in (or frames if video+audio)
         
-        // Determine what's required based on what Python configured
-        let videoRequired = dm.videoEnabled
-        let audioRequired = dm.audioEnabled
-        let simRequired = dm.simEnabled
+        let simReady = !dm.simEnabled || (hasSimPoses && dm.usdzSceneLoaded)
+        let videoReady = !dm.videoEnabled || hasFrames
+        let audioReady = !dm.audioEnabled || hasAudio || (dm.videoEnabled && hasFrames)
         
-        dlog("🔍 [AutoMinimize] Config: video=\(videoRequired), audio=\(audioRequired), sim=\(simRequired)")
-        dlog("🔍 [AutoMinimize] State: hasFrames=\(hasFrames), hasAudio=\(hasAudio), hasSimPoses=\(hasSimPoses)")
+        let allReady = simReady && videoReady && audioReady
+        let somethingEnabled = dm.simEnabled || dm.videoEnabled || dm.audioEnabled
         
-        // Check if all required streams are ready
-        let videoReady = !videoRequired || hasFrames
-        let audioReady = !audioRequired || hasAudio
-        let simReady = !simRequired || hasSimPoses
-        
-        // Special case: if audio is required but video is also enabled, audio comes with video
-        let audioEffectivelyReady = !audioRequired || (audioRequired && videoRequired && hasFrames) || hasAudio
-        
-        let allReady = videoReady && audioEffectivelyReady && simReady
-        
-        // Also need at least one thing to be configured and ready
-        let somethingConfigured = videoRequired || audioRequired || simRequired
-        let somethingReady = hasFrames || hasAudio || hasSimPoses
-        
-        dlog("🔍 [AutoMinimize] Ready: video=\(videoReady), audio=\(audioEffectivelyReady), sim=\(simReady), all=\(allReady)")
-        dlog("🔍 [AutoMinimize] somethingConfigured=\(somethingConfigured), somethingReady=\(somethingReady)")
-        
-        if allReady && somethingConfigured && somethingReady {
-            dlog("✅ [AutoMinimize] All required streams ready (video=\(videoRequired)/\(hasFrames), audio=\(audioRequired)/\(hasAudio), sim=\(simRequired)/\(hasSimPoses))")
+        if allReady && somethingEnabled {
+            dlog("✅ [AutoMinimize] Ready - minimizing after delay")
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 1_000_000_000)  // 1 second delay
-                dlog("✅ [AutoMinimize] After delay: hasAutoMinimized=\(hasAutoMinimized), userInteracted=\(userInteracted)")
-                if !hasAutoMinimized && !userInteracted {
-                    dlog("✅ [AutoMinimize] Minimizing status view now!")
+                // Re-check conditions after delay
+                let stillReady = (!dm.simEnabled || (hasSimPoses && dm.usdzSceneLoaded)) &&
+                                 (!dm.videoEnabled || hasFrames) &&
+                                 (!dm.audioEnabled || hasAudio || (dm.videoEnabled && hasFrames))
+                if !hasAutoMinimized && !userInteracted && stillReady {
                     withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
                         isMinimized = true
                         hasAutoMinimized = true
                     }
                 }
             }
-        } else {
-            dlog("⏳ [AutoMinimize] Waiting for streams (video=\(videoRequired)/\(hasFrames), audio=\(audioRequired)/\(hasAudio), sim=\(simRequired)/\(hasSimPoses))")
         }
     }
     
@@ -1618,6 +1595,7 @@ struct CombinedStreamingView: View {
             initialLocalTransforms.removeAll()
             pythonToSwiftNameMap.removeAll()
             nameMappingInitialized = false
+            DataManager.shared.usdzSceneLoaded = false
             
             let loadedEntity = try await Entity(contentsOf: url)
             
@@ -1636,6 +1614,12 @@ struct CombinedStreamingView: View {
             
             indexMuJoCoBodyEntities(newEntity)
             dlog("✅ [MuJoCo] Model loaded with \(mujocoBodyEntities.count) bodies")
+            
+            // Mark USDZ as fully loaded in RealityKit
+            await MainActor.run {
+                DataManager.shared.usdzSceneLoaded = true
+                tryAutoMinimize()  // Now check if we can auto-minimize
+            }
             
         } catch {
             dlog("❌ [MuJoCo] Failed to load USDZ: \(error)")

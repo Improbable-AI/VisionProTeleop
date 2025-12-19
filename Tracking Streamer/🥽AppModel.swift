@@ -324,6 +324,7 @@ class DataManager: ObservableObject {
     @Published var loadedUsdzPath: String? = nil  // Path to the loaded USDZ file
     @Published var loadedUsdzAttachPosition: [Float]? = nil  // Attach position [x, y, z]
     @Published var loadedUsdzAttachRotation: [Float]? = nil  // Attach rotation [x, y, z, w]
+    @Published var usdzSceneLoaded: Bool = false  // True when USDZ is fully loaded in RealityKit
     
     // USDZ transfer progress tracking
     @Published var usdzTransferInProgress: Bool = false  // Whether a USDZ transfer is in progress
