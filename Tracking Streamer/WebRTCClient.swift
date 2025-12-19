@@ -10,6 +10,8 @@ struct UsdzTransferMetadata {
     let totalChunks: Int
     let attachPosition: [Float]?  // [x, y, z]
     let attachRotation: [Float]?  // [x, y, z, w]
+    let cacheKey: String?  // Hash for caching (if nil, no caching)
+    let forceReload: Bool  // If true, bypass cache even if available
 }
 
 /// WebRTC client that connects to the Python server and receives video frames
@@ -1069,14 +1071,43 @@ extension WebRTCClient: LKRTCDataChannelDelegate {
                 
                 let attachPosition = json["attachPosition"] as? [Double]
                 let attachRotation = json["attachRotation"] as? [Double]
+                let cacheKey = json["cacheKey"] as? String
+                let forceReload = json["forceReload"] as? Bool ?? false
                 
                 usdzTransferMetadata = UsdzTransferMetadata(
                     filename: filename,
                     totalSize: totalSize,
                     totalChunks: totalChunks,
                     attachPosition: attachPosition?.map { Float($0) },
-                    attachRotation: attachRotation?.map { Float($0) }
+                    attachRotation: attachRotation?.map { Float($0) },
+                    cacheKey: cacheKey,
+                    forceReload: forceReload
                 )
+                
+                // Check if we have this file cached (and force reload is not requested)
+                if let cacheKey = cacheKey, !forceReload {
+                    if let cachedPath = UsdzCacheManager.shared.getCachedFilePath(cacheKey: cacheKey) {
+                        dlog("✅ [USDZ] Using cached file: \(cachedPath.lastPathComponent)")
+                        
+                        // Send "cached" response to Python (so it can skip sending chunks)
+                        sendUsdzCached(cacheKey: cacheKey)
+                        
+                        // Load the cached file directly
+                        Task { @MainActor in
+                            DataManager.shared.connectionStatus = "Using cached USDZ: \(filename)"
+                            DataManager.shared.loadedUsdzPath = cachedPath.path
+                            DataManager.shared.loadedUsdzAttachPosition = attachPosition?.map { Float($0) }
+                            DataManager.shared.loadedUsdzAttachRotation = attachRotation?.map { Float($0) }
+                            // No transfer in progress (using cache)
+                            DataManager.shared.usdzTransferInProgress = false
+                        }
+                        return
+                    } else {
+                        dlog("📦 [USDZ] Cache miss for key: \(cacheKey)")
+                    }
+                }
+                
+                // Not cached or force reload - prepare to receive chunks
                 usdzChunks = [:]
                 usdzReceivedChunksCount = 0
                 
@@ -1170,6 +1201,11 @@ extension WebRTCClient: LKRTCDataChannelDelegate {
             try assembledData.write(to: usdzURL)
             dlog("✅ [USDZ] Saved to: \(usdzURL.path)")
             
+            // Cache the file if we have a cache key
+            if let cacheKey = meta.cacheKey {
+                UsdzCacheManager.shared.cacheFile(sourceURL: usdzURL, cacheKey: cacheKey)
+            }
+            
             // Clear transfer state
             usdzChunks = [:]
             usdzReceivedChunksCount = 0
@@ -1212,6 +1248,26 @@ extension WebRTCClient: LKRTCDataChannelDelegate {
             let buffer = LKRTCDataBuffer(data: jsonString.data(using: .utf8)!, isBinary: false)
             channel.sendData(buffer)
             dlog("📤 [USDZ] Sent completion ack")
+        }
+    }
+    
+    /// Send cached response to Python (skip chunk transfer)
+    private func sendUsdzCached(cacheKey: String) {
+        guard let channel = usdzDataChannel, channel.readyState == .open else {
+            dlog("⚠️ [USDZ] Cannot send cached response - channel not open")
+            return
+        }
+        
+        let response: [String: Any] = [
+            "type": "cached",
+            "cacheKey": cacheKey
+        ]
+        
+        if let jsonData = try? JSONSerialization.data(withJSONObject: response),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            let buffer = LKRTCDataBuffer(data: jsonString.data(using: .utf8)!, isBinary: false)
+            channel.sendData(buffer)
+            dlog("📤 [USDZ] Sent cached response for key: \(cacheKey)")
         }
     }
     

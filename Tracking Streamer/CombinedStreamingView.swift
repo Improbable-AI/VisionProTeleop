@@ -1557,6 +1557,12 @@ struct CombinedStreamingView: View {
         
         let dm = DataManager.shared
         
+        // Don't auto-minimize while USDZ transfer is in progress
+        if dm.usdzTransferInProgress {
+            dlog("⏳ [AutoMinimize] USDZ transfer in progress - waiting for completion")
+            return
+        }
+        
         // Determine what's required based on what Python configured
         let videoRequired = dm.videoEnabled
         let audioRequired = dm.audioEnabled

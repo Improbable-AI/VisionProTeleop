@@ -1348,6 +1348,21 @@ class VisionProStreamer:
             def start_streaming_delayed():
                 import time
                 time.sleep(0.3)  # Small delay for channel stabilization
+                
+                # Check if we should wait for USDZ transfer to complete first
+                wait_for_usdz = self._sim_config.get("wait_for_usdz_transfer", False) if self._sim_config else False
+                if wait_for_usdz and self._cross_network_mode:
+                    self._log("[WEBRTC] Waiting for USDZ transfer to complete before streaming poses...", force=True)
+                    timeout = 300  # 5 minute timeout for large files
+                    start_wait = time.time()
+                    while not getattr(self, '_usdz_transfer_complete', False):
+                        if time.time() - start_wait > timeout:
+                            self._log("[WEBRTC] Warning: Timeout waiting for USDZ, starting pose streaming anyway", force=True)
+                            break
+                        time.sleep(0.5)
+                    if getattr(self, '_usdz_transfer_complete', False):
+                        self._log("[WEBRTC] USDZ transfer complete, starting pose streaming", force=True)
+                
                 self._log("[WEBRTC] Starting pose streaming...", force=True)
                 if self._sim_config is not None and self._webrtc_sim_ready:
                     self._start_pose_streaming_webrtc()
@@ -2589,6 +2604,7 @@ class VisionProStreamer:
         grpc_port: int = 50051,
         force_reload: bool = False,
         streaming_hz: int = 120,
+        wait_for_usdz_transfer: bool = False,
     ):
         """
         Configure MuJoCo simulation streaming. Call this before serve().
@@ -2606,6 +2622,9 @@ class VisionProStreamer:
             grpc_port: gRPC port for MuJoCo AR communication (default: 50051)
             force_reload: If True, force re-conversion of XML to USDZ even if cached
             streaming_hz: Rate limit for pose streaming in Hz (default: 120)
+            wait_for_usdz_transfer: If True, delay pose streaming until USDZ transfer
+                        completes. Useful for large scenes where you want the 3D model
+                        to be fully loaded before poses start animating. (default: False)
         
         Example::
         
@@ -2664,6 +2683,7 @@ class VisionProStreamer:
             "grpc_port": grpc_port,
             "force_reload": force_reload,
             "streaming_hz": streaming_hz,
+            "wait_for_usdz_transfer": wait_for_usdz_transfer,
         }
         
         # Automatically switch to simulation-relative coordinates
@@ -2686,6 +2706,7 @@ class VisionProStreamer:
         stage = None,  # Optional, derived from scene if not provided
         streaming_hz: int = 120,
         force_reload: bool = False,
+        wait_for_usdz_transfer: bool = False,
     ):
         """
         Configure Isaac Lab simulation streaming. Call this before start_webrtc().
@@ -2705,6 +2726,10 @@ class VisionProStreamer:
             grpc_port: gRPC port for USDZ transfer (default: 50051)
             stage: (Deprecated) USD stage, automatically derived from scene.
             force_reload: If True, force re-export of USDZ even if cached (default: False)
+            streaming_hz: Rate limit for pose streaming in Hz (default: 120)
+            wait_for_usdz_transfer: If True, delay pose streaming until USDZ transfer
+                        completes. Useful for large scenes where you want the 3D model
+                        to be fully loaded before poses start animating. (default: False)
         
         Example::
         
@@ -2788,6 +2813,7 @@ class VisionProStreamer:
             "attach_to": attach_to,
             "grpc_port": grpc_port,
             "streaming_hz": streaming_hz,
+            "wait_for_usdz_transfer": wait_for_usdz_transfer,
         }
         
         # Automatically switch to simulation-relative coordinates
@@ -3779,6 +3805,9 @@ class VisionProStreamer:
             quat_wxyz = attach_to[3:]
             attach_rotation = [quat_wxyz[1], quat_wxyz[2], quat_wxyz[3], quat_wxyz[0]]  # wxyz -> xyzw
         
+        # Compute cache key from USDZ file content
+        cache_key = hashlib.sha256(usdz_data).hexdigest()[:32]
+        
         # Send metadata message (JSON)
         metadata = {
             "type": "metadata",
@@ -3787,6 +3816,8 @@ class VisionProStreamer:
             "totalChunks": total_chunks,
             "attachPosition": attach_position,
             "attachRotation": attach_rotation,
+            "cacheKey": cache_key,
+            "forceReload": force_reload,
         }
         
         # Use call_soon_threadsafe since we're in a background thread
@@ -3797,7 +3828,18 @@ class VisionProStreamer:
                 channel.send(msg)
         
         send_message(json.dumps(metadata))
-        self._log(f"[USDZ-WEBRTC] Sent metadata for {filename}", force=True)
+        self._log(f"[USDZ-WEBRTC] Sent metadata for {filename} (cacheKey: {cache_key[:8]}...)", force=True)
+        
+        # Wait for response (could be "cached" or we just start sending chunks)
+        # Short wait to check if visionOS says it has the file cached
+        self._usdz_cached_hit = False
+        self._usdz_transfer_complete = False
+        import time
+        time.sleep(0.3)  # Brief wait for cached response
+        
+        if self._usdz_cached_hit:
+            self._log("[USDZ-WEBRTC] visionOS has cached version, skipping transfer!", force=True)
+            return True
         
         # Send data chunks (binary: 4-byte index + chunk data)
         for i in range(total_chunks):
@@ -3864,6 +3906,10 @@ class VisionProStreamer:
                     data = json.loads(message)
                     if data.get("type") == "complete":
                         self._log(f"[USDZ-WEBRTC] VisionOS loaded scene: {data.get('path')}", force=True)
+                        self._usdz_transfer_complete = True
+                    elif data.get("type") == "cached":
+                        self._log(f"[USDZ-WEBRTC] VisionOS using cached scene (key: {data.get('cacheKey', 'unknown')[:8]}...)", force=True)
+                        self._usdz_cached_hit = True
                         self._usdz_transfer_complete = True
                     elif data.get("type") == "error":
                         self._log(f"[USDZ-WEBRTC] VisionOS error: {data.get('message')}", force=True)

@@ -60,6 +60,7 @@ enum ExpandedPanel: Equatable {
     case stereoBaseline  // Stereo IPD/baseline adjustment
     case markerDetection  // ArUco marker detection settings
     case accessoryTracking  // Spatial controller tracking (visionOS 26+)
+    case usdzCache  // USDZ scene cache management
 }
 
 /// App mode: Teleop (network-based teleoperation) vs Egorecord (local UVC recording)
@@ -1849,6 +1850,20 @@ struct StatusOverlay: View {
                     }
                 }
                 
+                // USDZ Cache (Teleop mode - for MuJoCo/Isaac sim scenes)
+                let cacheManager = UsdzCacheManager.shared
+                menuItem(
+                    icon: "archivebox.fill",
+                    title: "USDZ Cache",
+                    subtitle: cacheManager.formattedCacheSize,
+                    isExpanded: false,
+                    accentColor: .purple
+                ) {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        expandedPanel = .usdzCache
+                    }
+                }
+                
                 // Accessory Tracking (visionOS 26+ only)
                 if #available(visionOS 26.0, *) {
                     let accessoryManager = AccessoryTrackingManager.shared
@@ -1896,6 +1911,8 @@ struct StatusOverlay: View {
                 stereoBaselinePanelContent
             case .markerDetection:
                 markerDetectionPanelContent
+            case .usdzCache:
+                usdzCachePanelContent
             case .accessoryTracking:
                 if #available(visionOS 26.0, *) {
                     accessoryTrackingPanelContent
@@ -1922,6 +1939,7 @@ struct StatusOverlay: View {
         case .handTracking: return "Hand Tracking"
         case .stereoBaseline: return "Stereo Baseline"
         case .markerDetection: return "Marker Detection"
+        case .usdzCache: return "USDZ Cache"
         case .accessoryTracking: return "Accessory Tracking"
         case .none: return ""
         }
@@ -3491,6 +3509,129 @@ struct StatusOverlay: View {
             
             // Custom Images section
             customImagesSection
+        }
+    }
+    
+    // MARK: - USDZ Cache Panel Content
+    
+    private var usdzCachePanelContent: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            let cacheManager = UsdzCacheManager.shared
+            
+            // Description
+            Text("Cached USDZ scenes are reused when connecting to the same MuJoCo/Isaac sim scene, speeding up reconnection.")
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.6))
+                .fixedSize(horizontal: false, vertical: true)
+            
+            Divider()
+                .background(Color.white.opacity(0.2))
+            
+            // Cache stats
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Cached Files")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.6))
+                    Text("\(cacheManager.getCachedFiles().count)")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                }
+                
+                Spacer()
+                
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("Total Size")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.6))
+                    Text(cacheManager.formattedCacheSize)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.purple)
+                }
+            }
+            .padding(12)
+            .background(Color.white.opacity(0.1))
+            .cornerRadius(8)
+            
+            // Cached files list
+            let cachedFiles = cacheManager.getCachedFiles()
+            if !cachedFiles.isEmpty {
+                Divider()
+                    .background(Color.white.opacity(0.2))
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Cached Scenes")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white.opacity(0.7))
+                    
+                    ScrollView {
+                        VStack(spacing: 6) {
+                            ForEach(cachedFiles, id: \.path) { fileInfo in
+                                HStack(spacing: 12) {
+                                    Image(systemName: "cube.fill")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(.purple)
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(fileInfo.lastPathComponent)
+                                            .font(.caption)
+                                            .fontWeight(.medium)
+                                            .foregroundColor(.white)
+                                            .lineLimit(1)
+                                        
+                                        if let size = try? FileManager.default.attributesOfItem(atPath: fileInfo.path)[.size] as? Int64 {
+                                            let sizeStr = size > 1024 * 1024 
+                                                ? String(format: "%.1f MB", Double(size) / 1024 / 1024)
+                                                : String(format: "%.0f KB", Double(size) / 1024)
+                                            Text(sizeStr)
+                                                .font(.caption2)
+                                                .foregroundColor(.white.opacity(0.5))
+                                        }
+                                    }
+                                    
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Color.white.opacity(0.05))
+                                .cornerRadius(6)
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 150)
+                }
+            }
+            
+            Divider()
+                .background(Color.white.opacity(0.2))
+            
+            // Clear cache button
+            Button {
+                cacheManager.clearCache()
+            } label: {
+                HStack {
+                    Image(systemName: "trash.fill")
+                        .font(.system(size: 14))
+                    Text("Clear All Cache")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(cachedFiles.isEmpty ? Color.white.opacity(0.1) : Color.red.opacity(0.3))
+                .cornerRadius(8)
+            }
+            .buttonStyle(.plain)
+            .disabled(cachedFiles.isEmpty)
+            .opacity(cachedFiles.isEmpty ? 0.5 : 1.0)
+            
+            Text("Clearing the cache will force re-download of scenes on next connection.")
+                .font(.caption2)
+                .foregroundColor(.white.opacity(0.5))
         }
     }
     

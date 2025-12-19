@@ -111,6 +111,170 @@ enum VideoSource: String, CaseIterable {
     }
 }
 
+// MARK: - USDZ Cache Manager
+
+/// Manages caching of USDZ files transferred from Python to avoid re-downloading large scenes
+class UsdzCacheManager: ObservableObject {
+    static let shared = UsdzCacheManager()
+    
+    /// Published property for UI updates
+    @Published var cacheSize: Int64 = 0
+    @Published var cachedFileCount: Int = 0
+    
+    private let cacheDirectory: URL
+    private let fileManager = FileManager.default
+    
+    private init() {
+        // Create cache directory in Documents/UsdzCache
+        let documentsDir = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
+        cacheDirectory = documentsDir.appendingPathComponent("UsdzCache", isDirectory: true)
+        
+        // Create directory if needed
+        if !fileManager.fileExists(atPath: cacheDirectory.path) {
+            try? fileManager.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
+        }
+        
+        // Update cache stats
+        updateCacheStats()
+    }
+    
+    /// Check if a USDZ file with the given cache key exists
+    func hasCachedFile(cacheKey: String) -> Bool {
+        let filePath = cacheDirectory.appendingPathComponent("\(cacheKey).usdz")
+        return fileManager.fileExists(atPath: filePath.path)
+    }
+    
+    /// Get the path to a cached USDZ file (returns nil if not cached)
+    func getCachedFilePath(cacheKey: String) -> URL? {
+        let filePath = cacheDirectory.appendingPathComponent("\(cacheKey).usdz")
+        if fileManager.fileExists(atPath: filePath.path) {
+            return filePath
+        }
+        return nil
+    }
+    
+    /// Save USDZ data to cache with the given key
+    func cacheFile(data: Data, cacheKey: String, filename: String) -> URL? {
+        let filePath = cacheDirectory.appendingPathComponent("\(cacheKey).usdz")
+        do {
+            try data.write(to: filePath)
+            dlog("✅ [UsdzCache] Cached \(filename) with key \(cacheKey) (\(data.count / 1024)KB)")
+            
+            // Also save metadata (original filename, size, date)
+            let metadataPath = cacheDirectory.appendingPathComponent("\(cacheKey).meta.json")
+            let metadata: [String: Any] = [
+                "filename": filename,
+                "size": data.count,
+                "cachedDate": ISO8601DateFormatter().string(from: Date())
+            ]
+            if let metadataData = try? JSONSerialization.data(withJSONObject: metadata) {
+                try? metadataData.write(to: metadataPath)
+            }
+            
+            // Update cache stats on main thread
+            DispatchQueue.main.async {
+                self.updateCacheStats()
+            }
+            
+            return filePath
+        } catch {
+            dlog("❌ [UsdzCache] Failed to cache file: \(error)")
+            return nil
+        }
+    }
+    
+    /// Clear all cached USDZ files
+    func clearCache() {
+        do {
+            let contents = try fileManager.contentsOfDirectory(at: cacheDirectory, includingPropertiesForKeys: nil)
+            for file in contents {
+                try fileManager.removeItem(at: file)
+            }
+            dlog("🗑️ [UsdzCache] Cache cleared")
+            
+            DispatchQueue.main.async {
+                self.updateCacheStats()
+            }
+        } catch {
+            dlog("❌ [UsdzCache] Failed to clear cache: \(error)")
+        }
+    }
+    
+    /// Get list of cached files with metadata
+    func getCachedFiles() -> [(cacheKey: String, filename: String, size: Int, date: Date)] {
+        var files: [(cacheKey: String, filename: String, size: Int, date: Date)] = []
+        
+        do {
+            let contents = try fileManager.contentsOfDirectory(at: cacheDirectory, includingPropertiesForKeys: [.fileSizeKey, .creationDateKey])
+            
+            for file in contents where file.pathExtension == "usdz" {
+                let cacheKey = file.deletingPathExtension().lastPathComponent
+                
+                // Try to read metadata
+                let metadataPath = cacheDirectory.appendingPathComponent("\(cacheKey).meta.json")
+                var filename = cacheKey
+                var size = 0
+                var date = Date()
+                
+                if let metadataData = try? Data(contentsOf: metadataPath),
+                   let metadata = try? JSONSerialization.jsonObject(with: metadataData) as? [String: Any] {
+                    filename = metadata["filename"] as? String ?? cacheKey
+                    size = metadata["size"] as? Int ?? 0
+                    if let dateString = metadata["cachedDate"] as? String {
+                        date = ISO8601DateFormatter().date(from: dateString) ?? Date()
+                    }
+                } else {
+                    // Fall back to file attributes
+                    let attrs = try? fileManager.attributesOfItem(atPath: file.path)
+                    size = (attrs?[.size] as? Int) ?? 0
+                    date = (attrs?[.creationDate] as? Date) ?? Date()
+                }
+                
+                files.append((cacheKey: cacheKey, filename: filename, size: size, date: date))
+            }
+        } catch {
+            dlog("❌ [UsdzCache] Failed to list cached files: \(error)")
+        }
+        
+        return files.sorted { $0.date > $1.date }
+    }
+    
+    /// Update cache statistics
+    private func updateCacheStats() {
+        var totalSize: Int64 = 0
+        var count = 0
+        
+        do {
+            let contents = try fileManager.contentsOfDirectory(at: cacheDirectory, includingPropertiesForKeys: [.fileSizeKey])
+            for file in contents where file.pathExtension == "usdz" {
+                if let attrs = try? fileManager.attributesOfItem(atPath: file.path),
+                   let size = attrs[.size] as? Int64 {
+                    totalSize += size
+                    count += 1
+                }
+            }
+        } catch {
+            // Ignore errors
+        }
+        
+        self.cacheSize = totalSize
+        self.cachedFileCount = count
+    }
+    
+    /// Format cache size for display
+    var formattedCacheSize: String {
+        if cacheSize < 1024 {
+            return "\(cacheSize) B"
+        } else if cacheSize < 1024 * 1024 {
+            return String(format: "%.1f KB", Double(cacheSize) / 1024)
+        } else if cacheSize < 1024 * 1024 * 1024 {
+            return String(format: "%.1f MB", Double(cacheSize) / 1024 / 1024)
+        } else {
+            return String(format: "%.2f GB", Double(cacheSize) / 1024 / 1024 / 1024)
+        }
+    }
+}
+
 class DataManager: ObservableObject {
     static let shared = DataManager()
     
