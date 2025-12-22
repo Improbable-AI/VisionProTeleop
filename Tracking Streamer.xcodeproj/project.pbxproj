@@ -652,7 +652,7 @@
 				CODE_SIGN_ENTITLEMENTS = "Tracking Streamer/VisionProTeleop.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 15;
+				CURRENT_PROJECT_VERSION = 16;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = ATTMC2WVK2;
 				ENABLE_PREVIEWS = YES;
@@ -691,7 +691,7 @@
 				CODE_SIGN_ENTITLEMENTS = "Tracking Streamer/VisionProTeleop.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 15;
+				CURRENT_PROJECT_VERSION = 16;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = ATTMC2WVK2;
 				ENABLE_PREVIEWS = YES;

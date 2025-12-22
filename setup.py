@@ -10,7 +10,7 @@ setup(
     install_requires=[
         'numpy', 'grpcio', 'grpcio-tools', 'matplotlib', 'opencv-python', 
         'aiortc', 'av', 'requests', 'pyyaml', 'mujoco', 'tqdm', 'scipy', 'pydub',
-        'websocket-client',
+        'websocket-client', 'gdown', 'flask'
     ],
     extras_require={
     },
