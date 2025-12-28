@@ -199,27 +199,38 @@ struct HandTrackingServiceImpl: Handtracking_HandTrackingService.SimpleServicePr
         
         dlog("🔄 [DEBUG] Starting hand tracking data stream...")
         dlog("⏱️ [DEBUG] Starting hand tracking updates...")
-        
+
         var updateCount = 0
         
-        // Stream hand tracking data until cancelled
-        while !Task.isCancelled {
-            let handUpdate = fill_handUpdate()
-            updateCount += 1
+        // create a stream that buffers only newest item
+        let handPoseStream = AsyncStream(Handtracking_HandUpdate.self, bufferingPolicy: .bufferingNewest(1)) { continuation in
             
-//            if updateCount == 1 || updateCount % 100 == 0 {
-//                dlog("📤 [DEBUG] Sending hand update #\(updateCount)...")
-//            }
+            // generator
+            let task = Task {
+                while !Task.isCancelled {
+                    let update = fill_handUpdate()
+                    updateCount += 1
+                    continuation.yield(update)
+                    
+                    // Stream at approximately 200Hz (5ms delay)
+                    try? await Task.sleep(nanoseconds: 5_000_000)
+                }
+                continuation.finish()
+            }
             
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
+        }
+        
+        // sample the latest frame from the stream
+        for await handUpdate in handPoseStream {
             do {
                 try await response.write(handUpdate)
             } catch {
                 dlog("🔌 [DEBUG] Client disconnected or error writing: \(error)")
                 break
             }
-            
-            // Stream at approximately 200Hz (5ms delay)
-            try await Task.sleep(nanoseconds: 5_000_000)
         }
         
         dlog("🔌 [DEBUG] Stream ended. Sent \(updateCount) updates.")
